@@ -60,79 +60,90 @@ export default function QuizPage() {
   };
 
   const handleAnswer = (selectedAnswerId: string, timeTaken: number) => {
-    if (!quizSession || quizSession.currentQuestionIndex >= questionsForTag.length) return;
+    setQuizSession(prevSession => {
+      if (!prevSession || prevSession.currentQuestionIndex >= questionsForTag.length) {
+        // console.warn("QuizPage.handleAnswer: No active session or index out of bounds.");
+        return prevSession;
+      }
+      const currentQuestion = questionsForTag[prevSession.currentQuestionIndex];
+      if (!currentQuestion) {
+        // console.warn("QuizPage.handleAnswer: Current question not found.");
+        return prevSession;
+      }
 
-    const currentQuestion = questionsForTag[quizSession.currentQuestionIndex];
-    if (!currentQuestion) return;
+      if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
+        // console.warn(`QuizPage.handleAnswer: Attempted to log a second answer for question ${currentQuestion.id}. Ignoring.`);
+        return prevSession;
+      }
 
-    // Prevent duplicate answers for the same question
-    if (quizSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
-      // console.warn(`QuizPage: Attempted to log a second answer for question ${currentQuestion.id}. Ignoring.`);
-      return; 
-    }
-
-    const isCorrect = currentQuestion.correctAnswerId === selectedAnswerId;
-
-    const newAnswer: QuizAnswer = {
-      questionId: currentQuestion.id,
-      selectedAnswerId,
-      isCorrect,
-      timeTaken,
-      skipped: false,
-    };
-    
-    const updatedSession = {
-      ...quizSession,
-      answers: [...quizSession.answers, newAnswer],
-    };
-    setQuizSession(updatedSession); 
-    saveQuizSession(updatedSession); 
+      const isCorrect = currentQuestion.correctAnswerId === selectedAnswerId;
+      const newAnswer: QuizAnswer = {
+        questionId: currentQuestion.id,
+        selectedAnswerId,
+        isCorrect,
+        timeTaken,
+        skipped: false,
+      };
+      
+      const updatedAnswers = [...prevSession.answers, newAnswer];
+      const updatedSession = { ...prevSession, answers: updatedAnswers };
+      
+      saveQuizSession(updatedSession);
+      return updatedSession;
+    });
   };
 
   const handleTimeout = (timeTaken: number) => {
-    if (!quizSession || quizSession.currentQuestionIndex >= questionsForTag.length) return;
+    setQuizSession(prevSession => {
+      if (!prevSession || prevSession.currentQuestionIndex >= questionsForTag.length) {
+        // console.warn("QuizPage.handleTimeout: No active session or index out of bounds.");
+        return prevSession;
+      }
+      const currentQuestion = questionsForTag[prevSession.currentQuestionIndex];
+      if (!currentQuestion) {
+        // console.warn("QuizPage.handleTimeout: Current question not found.");
+        return prevSession;
+      }
+      
+      if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
+        // console.warn(`QuizPage.handleTimeout: Attempted to log timeout for already answered question ${currentQuestion.id}. Ignoring.`);
+        return prevSession;
+      }
 
-    const currentQuestion = questionsForTag[quizSession.currentQuestionIndex];
-    if (!currentQuestion) return;
-    
-    // Prevent logging timeout if question was already answered
-    if (quizSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
-      // console.warn(`QuizPage: Attempted to log timeout for already answered question ${currentQuestion.id}. Ignoring.`);
-      return;
-    }
+      const newAnswer: QuizAnswer = {
+        questionId: currentQuestion.id,
+        timeTaken,
+        skipped: true,
+      };
+      
+      const updatedAnswers = [...prevSession.answers, newAnswer];
+      const updatedSession = { ...prevSession, answers: updatedAnswers };
 
-    const newAnswer: QuizAnswer = {
-      questionId: currentQuestion.id,
-      timeTaken,
-      skipped: true,
-    };
-    
-    const updatedSession = {
-      ...quizSession,
-      answers: [...quizSession.answers, newAnswer],
-    };
-    setQuizSession(updatedSession);
-    saveQuizSession(updatedSession);
+      saveQuizSession(updatedSession);
+      return updatedSession;
+    });
   };
 
   const handleNextQuestion = () => {
-    if (!quizSession) return;
+    setQuizSession(prevSession => {
+      if (!prevSession) return prevSession;
 
-    const nextIndex = quizSession.currentQuestionIndex + 1;
-    if (nextIndex < questionsForTag.length) {
-      const updatedSession = { ...quizSession, currentQuestionIndex: nextIndex };
-      setQuizSession(updatedSession);
-      saveQuizSession(updatedSession);
-    } else {
-      const completedSession = { 
-        ...quizSession, 
-        status: 'completed' as 'completed',
-        endTime: Date.now() 
-      };
-      setQuizSession(completedSession);
-      saveQuizSession(completedSession);
-      router.push('/summary');
-    }
+      const nextIndex = prevSession.currentQuestionIndex + 1;
+      if (nextIndex < questionsForTag.length) {
+        const updatedSession = { ...prevSession, currentQuestionIndex: nextIndex };
+        saveQuizSession(updatedSession);
+        return updatedSession;
+      } else {
+        const completedSession = { 
+          ...prevSession, 
+          status: 'completed' as 'completed',
+          endTime: Date.now() 
+        };
+        saveQuizSession(completedSession);
+        router.push('/summary');
+        return completedSession;
+      }
+    });
   };
   
   const handleRestartQuiz = () => {
@@ -157,10 +168,7 @@ export default function QuizPage() {
     return <TagSelector onSelectTag={startQuiz} />;
   }
   
-  // Ensure currentQuestionIndex is within bounds
   if (quizSession.currentQuestionIndex >= questionsForTag.length) {
-     // This can happen if questionsForTag becomes empty or shrinks unexpectedly after session start.
-     // Or if somehow currentQuestionIndex became too large.
      return (
       <Card className="w-full max-w-md mx-auto text-center shadow-lg">
         <CardHeader>
