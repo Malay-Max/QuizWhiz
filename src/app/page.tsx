@@ -36,12 +36,11 @@ export default function QuizPage() {
     const exactMatchFromParams = searchParams.get('exact') === 'true';
 
     if (categoryFromParams) {
-      // Clear any potentially conflicting query params to avoid re-triggering on refresh
       const current = new URLSearchParams(Array.from(searchParams.entries()));
       current.delete('category');
       current.delete('exact');
       const query = current.toString() ? `?${current}` : '';
-      router.replace(`${window.location.pathname}${query}`, {scroll: false}); // use replace to not add to history
+      router.replace(`${window.location.pathname}${query}`, {scroll: false}); 
 
       startQuiz(categoryFromParams, exactMatchFromParams);
       return;
@@ -52,7 +51,7 @@ export default function QuizPage() {
       setQuizSession(activeSession);
     }
     setIsLoading(false);
-  }, [searchParams, router]); // Added router to dependencies
+  }, [searchParams, router, toast]); 
 
   useEffect(() => {
     loadActiveSessionOrFromParams();
@@ -73,12 +72,11 @@ export default function QuizPage() {
     if (selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY) {
       filteredQuestions = allQuestions;
       quizCategoryName = "All Categories (Random)";
-      exactMatch = false; // Ensure exactMatch is false for random all
+      exactMatch = false; 
     } else if (exactMatch) {
       filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category === selectedCategoryPath);
-      quizCategoryName = selectedCategoryPath; // Keep original name for exact match
+      quizCategoryName = selectedCategoryPath; 
     } else {
-      // Default: include sub-categories
       filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category.startsWith(selectedCategoryPath));
       quizCategoryName = selectedCategoryPath;
     }
@@ -93,19 +91,27 @@ export default function QuizPage() {
       return;
     }
 
-    // Shuffle questions first
-    const shuffledQuestions = [...filteredQuestions].sort(() => Math.random() - 0.5);
+    // Fisher-Yates shuffle function
+    const shuffleArray = (array: any[]) => {
+      const newArray = [...array];
+      for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+      }
+      return newArray;
+    };
 
-    // Then, for each question, shuffle its options
+    const shuffledQuestions = shuffleArray(filteredQuestions);
+
     const questionsWithShuffledOptions = shuffledQuestions.map(question => ({
       ...question,
-      options: [...question.options].sort(() => Math.random() - 0.5),
+      options: shuffleArray(question.options),
     }));
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
       category: quizCategoryName,
-      questions: questionsWithShuffledOptions, // Use questions with shuffled options
+      questions: questionsWithShuffledOptions,
       currentQuestionIndex: 0,
       answers: [],
       startTime: Date.now(),
@@ -118,10 +124,8 @@ export default function QuizPage() {
 
   const handleCategoryAction = (categoryPath: string, isLeafNode: boolean) => {
     if (isLeafNode) {
-      // Navigate to manage page for leaf nodes
       router.push(`/quiz/manage/${categoryPath.split('/').map(segment => encodeURIComponent(segment)).join('/')}`);
     } else {
-      // Start quiz for branch nodes (includes sub-categories)
       startQuiz(categoryPath, false);
     }
   };
@@ -134,11 +138,10 @@ export default function QuizPage() {
     setQuizSession(prevSession => {
       if (!prevSession) return prevSession;
       const currentQuestion = prevSession.questions[prevSession.currentQuestionIndex];
-      // Check if an answer for this question already exists
       if (!currentQuestion || prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
-        return prevSession; // Already answered, do nothing
+        return prevSession;
       }
-
+      
       const isCorrect = currentQuestion.correctAnswerId === selectedAnswerId;
       const newAnswer: QuizAnswer = {
         questionId: currentQuestion.id,
@@ -160,9 +163,8 @@ export default function QuizPage() {
     setQuizSession(prevSession => {
       if (!prevSession) return prevSession;
       const currentQuestion = prevSession.questions[prevSession.currentQuestionIndex];
-      // Check if an answer for this question (even a skip) already exists
-       if (!currentQuestion || prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
-        return prevSession; // Already processed (answered or skipped), do nothing
+      if (!currentQuestion || prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
+        return prevSession; 
       }
       
       const newAnswer: QuizAnswer = {
@@ -189,12 +191,11 @@ export default function QuizPage() {
         saveQuizSession(updatedSession);
         return updatedSession;
       } else {
-        const completedSession = {
-          ...prevSession,
+        const completedSession = { 
+          ...prevSession, 
           status: 'completed' as 'completed',
-          endTime: Date.now()
+          endTime: Date.now() 
         };
-        // Navigation is handled by useEffect watching quizSession.status
         saveQuizSession(completedSession);
         return completedSession;
       }
@@ -204,14 +205,14 @@ export default function QuizPage() {
   const handleRestartQuiz = () => {
     clearQuizSession();
     setQuizSession(null);
-    setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 50); // Brief delay to allow UI to reset
+    setIsLoading(true); 
+    setTimeout(() => setIsLoading(false), 50);
   };
 
   const handleDeleteCurrentQuestionDialog = () => {
     setShowDeleteQuestionConfirmDialog(true);
   };
-  
+
   const handleDeleteCategoryDialog = () => {
      if (quizSession?.category === "All Categories (Random)") {
         toast({
@@ -240,7 +241,7 @@ export default function QuizPage() {
         if (!prevSession) return null;
 
         const updatedQuestionsArray = prevSession.questions.filter(q => q.id !== currentQuestionToDelete.id);
-        
+
         if (updatedQuestionsArray.length === 0 || prevSession.currentQuestionIndex >= updatedQuestionsArray.length) {
             const completedSession: QuizSession = {
                 ...prevSession,
@@ -258,7 +259,6 @@ export default function QuizPage() {
             ...prevSession,
             questions: updatedQuestionsArray,
             answers: prevSession.answers.filter(ans => updatedQuestionsArray.some(q => q.id === ans.questionId)),
-            // currentQuestionIndex remains the same if not out of bounds
             status: 'active',
         };
         saveQuizSession(updatedSession);
@@ -277,9 +277,9 @@ export default function QuizPage() {
     if (!quizSession || !quizSession.category || quizSession.category === ALL_QUESTIONS_RANDOM_KEY) return;
 
     const categoryToDelete = quizSession.category;
-    deleteQuestionsByCategory(categoryToDelete); 
+    deleteQuestionsByCategory(categoryToDelete);
 
-    clearQuizSession(); 
+    clearQuizSession();
     setQuizSession(null);
     setShowDeleteCategoryConfirmDialog(false);
     setIsLoading(true); 
@@ -292,7 +292,6 @@ export default function QuizPage() {
     });
   };
 
-
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
@@ -303,27 +302,22 @@ export default function QuizPage() {
   }
 
   if (!quizSession || quizSession.status !== 'active') {
-    return <CategorySelector onCategoryAction={handleCategoryAction} onStartRandomQuiz={handleStartRandomQuiz} />;
+     return <CategorySelector onCategoryAction={handleCategoryAction} onStartRandomQuiz={handleStartRandomQuiz} />;
   }
   
   if (quizSession.questions.length === 0 || quizSession.currentQuestionIndex >= quizSession.questions.length) {
-     // This block might be reached if a quiz becomes empty after deletions
-     // Or if an active session somehow has no questions or an invalid index.
-     if (quizSession.status === 'active') { 
+     if (quizSession.status === 'active') {
         const completedSession = { 
             ...quizSession, 
             status: 'completed' as 'completed',
             endTime: quizSession.endTime || Date.now() 
         };
-        // Check if session in storage is the one we are completing
         const storedSession = getQuizSession();
         if (storedSession?.id === quizSession.id && storedSession?.status !== 'completed') {
             saveQuizSession(completedSession);
-            // Set state to trigger useEffect for navigation
-            setQuizSession(completedSession); 
+            setQuizSession(completedSession);
         }
      }
-     // Show loader while state updates and navigation happens
      return ( 
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -334,8 +328,7 @@ export default function QuizPage() {
 
   const currentQuestion = quizSession.questions[quizSession.currentQuestionIndex];
 
-  // This check is for robustness, though the above block should handle empty questions.
-  if (!currentQuestion) { 
+  if (!currentQuestion) {
      return (
       <Card className="w-full max-w-md mx-auto text-center shadow-lg">
         <CardHeader>
@@ -357,7 +350,7 @@ export default function QuizPage() {
     <>
       <div className="flex flex-col items-center">
         <QuestionCard
-          key={currentQuestion.id}
+          key={`${quizSession.id}-${currentQuestion.id}`}
           question={currentQuestion}
           onAnswer={handleAnswer}
           onTimeout={handleTimeout}

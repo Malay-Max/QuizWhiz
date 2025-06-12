@@ -54,7 +54,7 @@ export default function QuizPlayPage() {
       setQuizSession(activeSession);
     }
     setIsLoading(false);
-  }, [searchParams, router]);
+  }, [searchParams, router, toast]);
 
   useEffect(() => {
     loadActiveSessionOrFromParams();
@@ -94,19 +94,27 @@ export default function QuizPlayPage() {
       return;
     }
 
-    // Shuffle questions first
-    const shuffledQuestions = [...filteredQuestions].sort(() => Math.random() - 0.5);
+    // Fisher-Yates shuffle function
+    const shuffleArray = (array: any[]) => {
+      const newArray = [...array];
+      for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+      }
+      return newArray;
+    };
+
+    const shuffledQuestions = shuffleArray(filteredQuestions);
     
-    // Then, for each question, shuffle its options
     const questionsWithShuffledOptions = shuffledQuestions.map(question => ({
       ...question,
-      options: [...question.options].sort(() => Math.random() - 0.5),
+      options: shuffleArray(question.options),
     }));
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
       category: quizCategoryName,
-      questions: questionsWithShuffledOptions, // Use questions with shuffled options
+      questions: questionsWithShuffledOptions, 
       currentQuestionIndex: 0,
       answers: [],
       startTime: Date.now(),
@@ -345,7 +353,7 @@ export default function QuizPlayPage() {
     <>
       <div className="flex flex-col items-center">
         <QuestionCard
-          key={currentQuestion.id} 
+          key={`${quizSession.id}-${currentQuestion.id}`}
           question={currentQuestion}
           onAnswer={handleAnswer}
           onTimeout={handleTimeout}
