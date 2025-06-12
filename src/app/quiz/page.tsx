@@ -94,12 +94,19 @@ export default function QuizPlayPage() {
       return;
     }
 
+    // Shuffle questions first
     const shuffledQuestions = [...filteredQuestions].sort(() => Math.random() - 0.5);
+    
+    // Then, for each question, shuffle its options
+    const questionsWithShuffledOptions = shuffledQuestions.map(question => ({
+      ...question,
+      options: [...question.options].sort(() => Math.random() - 0.5),
+    }));
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
       category: quizCategoryName,
-      questions: shuffledQuestions,
+      questions: questionsWithShuffledOptions, // Use questions with shuffled options
       currentQuestionIndex: 0,
       answers: [],
       startTime: Date.now(),
@@ -300,7 +307,8 @@ export default function QuizPlayPage() {
             status: 'completed' as 'completed',
             endTime: quizSession.endTime || Date.now() 
         };
-        if (getQuizSession()?.id === quizSession.id && getQuizSession()?.status !== 'completed') {
+        const storedSession = getQuizSession();
+        if (storedSession?.id === quizSession.id && storedSession?.status !== 'completed') {
             saveQuizSession(completedSession);
             setQuizSession(completedSession);
         }

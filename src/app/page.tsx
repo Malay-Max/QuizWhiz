@@ -8,7 +8,7 @@ import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession, delete
 import { CategorySelector, ALL_QUESTIONS_RANDOM_KEY } from '@/components/quiz/CategorySelector';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { Button } from '@/components/ui/button';
-import { Loader2, RotateCcw, Trash2, Library } from 'lucide-react'; 
+import { Loader2, RotateCcw, Trash2, Library } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AlertDialog,
@@ -80,7 +80,7 @@ export default function QuizPage() {
     } else {
       // Default: include sub-categories
       filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category.startsWith(selectedCategoryPath));
-      quizCategoryName = selectedCategoryPath; 
+      quizCategoryName = selectedCategoryPath;
     }
     
     if (filteredQuestions.length === 0) {
@@ -93,12 +93,19 @@ export default function QuizPage() {
       return;
     }
 
+    // Shuffle questions first
     const shuffledQuestions = [...filteredQuestions].sort(() => Math.random() - 0.5);
+
+    // Then, for each question, shuffle its options
+    const questionsWithShuffledOptions = shuffledQuestions.map(question => ({
+      ...question,
+      options: [...question.options].sort(() => Math.random() - 0.5),
+    }));
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
       category: quizCategoryName,
-      questions: shuffledQuestions,
+      questions: questionsWithShuffledOptions, // Use questions with shuffled options
       currentQuestionIndex: 0,
       answers: [],
       startTime: Date.now(),
@@ -127,8 +134,9 @@ export default function QuizPage() {
     setQuizSession(prevSession => {
       if (!prevSession) return prevSession;
       const currentQuestion = prevSession.questions[prevSession.currentQuestionIndex];
+      // Check if an answer for this question already exists
       if (!currentQuestion || prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
-        return prevSession;
+        return prevSession; // Already answered, do nothing
       }
 
       const isCorrect = currentQuestion.correctAnswerId === selectedAnswerId;
@@ -152,8 +160,9 @@ export default function QuizPage() {
     setQuizSession(prevSession => {
       if (!prevSession) return prevSession;
       const currentQuestion = prevSession.questions[prevSession.currentQuestionIndex];
+      // Check if an answer for this question (even a skip) already exists
        if (!currentQuestion || prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
-        return prevSession; 
+        return prevSession; // Already processed (answered or skipped), do nothing
       }
       
       const newAnswer: QuizAnswer = {
@@ -180,8 +189,8 @@ export default function QuizPage() {
         saveQuizSession(updatedSession);
         return updatedSession;
       } else {
-        const completedSession = { 
-          ...prevSession, 
+        const completedSession = {
+          ...prevSession,
           status: 'completed' as 'completed',
           endTime: Date.now()
         };
@@ -195,7 +204,7 @@ export default function QuizPage() {
   const handleRestartQuiz = () => {
     clearQuizSession();
     setQuizSession(null);
-    setIsLoading(true); 
+    setIsLoading(true);
     setTimeout(() => setIsLoading(false), 50); // Brief delay to allow UI to reset
   };
 
@@ -237,7 +246,7 @@ export default function QuizPage() {
                 ...prevSession,
                 questions: updatedQuestionsArray,
                 answers: prevSession.answers.filter(ans => updatedQuestionsArray.some(q => q.id === ans.questionId)),
-                currentQuestionIndex: 0, 
+                currentQuestionIndex: 0,
                 status: 'completed',
                 endTime: Date.now(),
             };
@@ -249,6 +258,7 @@ export default function QuizPage() {
             ...prevSession,
             questions: updatedQuestionsArray,
             answers: prevSession.answers.filter(ans => updatedQuestionsArray.some(q => q.id === ans.questionId)),
+            // currentQuestionIndex remains the same if not out of bounds
             status: 'active',
         };
         saveQuizSession(updatedSession);
@@ -306,7 +316,8 @@ export default function QuizPage() {
             endTime: quizSession.endTime || Date.now() 
         };
         // Check if session in storage is the one we are completing
-        if (getQuizSession()?.id === quizSession.id && getQuizSession()?.status !== 'completed') {
+        const storedSession = getQuizSession();
+        if (storedSession?.id === quizSession.id && storedSession?.status !== 'completed') {
             saveQuizSession(completedSession);
             // Set state to trigger useEffect for navigation
             setQuizSession(completedSession); 
