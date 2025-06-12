@@ -60,9 +60,17 @@ export default function QuizPage() {
   };
 
   const handleAnswer = (selectedAnswerId: string, timeTaken: number) => {
-    if (!quizSession) return;
+    if (!quizSession || quizSession.currentQuestionIndex >= questionsForTag.length) return;
 
     const currentQuestion = questionsForTag[quizSession.currentQuestionIndex];
+    if (!currentQuestion) return;
+
+    // Prevent duplicate answers for the same question
+    if (quizSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
+      // console.warn(`QuizPage: Attempted to log a second answer for question ${currentQuestion.id}. Ignoring.`);
+      return; 
+    }
+
     const isCorrect = currentQuestion.correctAnswerId === selectedAnswerId;
 
     const newAnswer: QuizAnswer = {
@@ -82,9 +90,17 @@ export default function QuizPage() {
   };
 
   const handleTimeout = (timeTaken: number) => {
-    if (!quizSession) return;
+    if (!quizSession || quizSession.currentQuestionIndex >= questionsForTag.length) return;
 
     const currentQuestion = questionsForTag[quizSession.currentQuestionIndex];
+    if (!currentQuestion) return;
+    
+    // Prevent logging timeout if question was already answered
+    if (quizSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
+      // console.warn(`QuizPage: Attempted to log timeout for already answered question ${currentQuestion.id}. Ignoring.`);
+      return;
+    }
+
     const newAnswer: QuizAnswer = {
       questionId: currentQuestion.id,
       timeTaken,
@@ -139,6 +155,27 @@ export default function QuizPage() {
 
   if (!quizSession || quizSession.status !== 'active') {
     return <TagSelector onSelectTag={startQuiz} />;
+  }
+  
+  // Ensure currentQuestionIndex is within bounds
+  if (quizSession.currentQuestionIndex >= questionsForTag.length) {
+     // This can happen if questionsForTag becomes empty or shrinks unexpectedly after session start.
+     // Or if somehow currentQuestionIndex became too large.
+     return (
+      <Card className="w-full max-w-md mx-auto text-center shadow-lg">
+        <CardHeader>
+          <CardTitle className="font-headline text-2xl">Quiz Error</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-destructive-foreground bg-destructive p-4 rounded-md">
+            There was an issue loading the next question. The quiz may have ended or data is inconsistent.
+          </p>
+          <Button onClick={handleRestartQuiz} className="mt-6 w-full" variant="destructive">
+            <RotateCcw className="mr-2 h-4 w-4" /> Restart Quiz Selection
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   const currentQuestion = questionsForTag[quizSession.currentQuestionIndex];
