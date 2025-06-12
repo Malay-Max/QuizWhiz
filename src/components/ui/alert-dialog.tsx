@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -86,14 +87,16 @@ const AlertDialogTitle = React.forwardRef<
 AlertDialogTitle.displayName = AlertDialogPrimitive.Title.displayName
 
 const AlertDialogDescription = React.forwardRef<
-  React.ElementRef<typeof AlertDialogPrimitive.Description>,
+  HTMLDivElement, // Changed from React.ElementRef<typeof AlertDialogPrimitive.Description>
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Description>
 >(({ className, ...props }, ref) => (
-  <AlertDialogPrimitive.Description
-    ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
-    {...props}
-  />
+  <AlertDialogPrimitive.Description asChild>
+    <div // Use a div as the child
+      ref={ref}
+      className={cn("text-sm text-muted-foreground", className)}
+      {...props} // Props are passed to the div
+    />
+  </AlertDialogPrimitive.Description>
 ))
 AlertDialogDescription.displayName =
   AlertDialogPrimitive.Description.displayName
