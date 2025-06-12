@@ -2,28 +2,31 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getCategories } from '@/lib/storage';
+import { getCategories, buildCategoryTree } from '@/lib/storage';
+import type { CategoryTreeNode } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Folder } from 'lucide-react'; // Changed from Tag
+import { CategoryTreeItem } from './CategoryTreeItem';
 import { useRouter } from 'next/navigation';
 
 interface CategorySelectorProps {
-  onSelectCategory: (category: string) => void;
+  onSelectCategory: (categoryPath: string) => void;
 }
 
 export function CategorySelector({ onSelectCategory }: CategorySelectorProps) {
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     const loadCategories = () => {
       try {
-        setCategories(getCategories());
+        const flatCategories = getCategories();
+        const tree = buildCategoryTree(flatCategories);
+        setCategoryTree(tree);
       } catch (error) {
-        console.error("Failed to load categories:", error);
-        setCategories([]); // Fallback to empty array on error
+        console.error("Failed to load or build category tree:", error);
+        setCategoryTree([]); 
       } finally {
         setIsLoading(false);
       }
@@ -48,7 +51,7 @@ export function CategorySelector({ onSelectCategory }: CategorySelectorProps) {
     );
   }
 
-  if (categories.length === 0) {
+  if (categoryTree.length === 0) {
     return (
       <Card className="w-full max-w-md mx-auto shadow-lg">
         <CardHeader>
@@ -67,23 +70,19 @@ export function CategorySelector({ onSelectCategory }: CategorySelectorProps) {
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto shadow-xl">
+    <Card className="w-full max-w-lg mx-auto shadow-xl">
       <CardHeader>
         <CardTitle className="font-headline text-3xl">Select a Quiz Category</CardTitle>
-        <CardDescription>Choose a category to start your quiz.</CardDescription>
+        <CardDescription>Choose a category or sub-category to start your quiz.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {categories.map((category) => (
-          <Button
-            key={category}
-            onClick={() => onSelectCategory(category)}
-            variant="outline"
-            size="lg"
-            className="w-full justify-start text-lg shadow-sm hover:bg-primary/10 hover:text-primary transition-all"
-          >
-            <Folder className="mr-3 h-5 w-5 text-primary/80" />
-            {category}
-          </Button>
+      <CardContent className="space-y-1">
+        {categoryTree.map((node) => (
+          <CategoryTreeItem
+            key={node.path}
+            node={node}
+            onSelectCategory={onSelectCategory}
+            level={0}
+          />
         ))}
       </CardContent>
     </Card>

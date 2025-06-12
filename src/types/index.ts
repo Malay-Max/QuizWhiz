@@ -11,7 +11,7 @@ export interface Question {
   text: string;
   options: AnswerOption[];
   correctAnswerId: string;
-  category: string; // Changed from tags: string[]
+  category: string; // Represents a path, e.g., "Science/Physics"
 }
 
 export interface QuizAnswer {
@@ -24,7 +24,7 @@ export interface QuizAnswer {
 
 export interface QuizSession {
   id: string;
-  category: string; // Changed from tag: string
+  category: string; // The selected category path for the quiz
   questions: Question[];
   currentQuestionIndex: number;
   answers: QuizAnswer[];
@@ -61,3 +61,10 @@ export const GenerateDistractorsOutputSchema = z.object({
   ).describe('An array of distractors for the question.')
 });
 export type GenerateDistractorsOutput = z.infer<typeof GenerateDistractorsOutputSchema>;
+
+// For Nested Category Tree
+export interface CategoryTreeNode {
+  name: string; // The display name of this node (e.g., "Physics")
+  path: string; // The full path to this node (e.g., "Science/Physics")
+  children: CategoryTreeNode[];
+}

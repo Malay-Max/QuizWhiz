@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Question, QuizSession, QuizAnswer } from '@/types';
 import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession } from '@/lib/storage';
-import { CategorySelector } from '@/components/quiz/CategorySelector'; // Changed from TagSelector
+import { CategorySelector } from '@/components/quiz/CategorySelector';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { Button } from '@/components/ui/button';
 import { Loader2, RotateCcw } from 'lucide-react';
@@ -15,14 +15,16 @@ export default function QuizPage() {
   const router = useRouter();
   const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [questionsForCategory, setQuestionsForCategory] = useState<Question[]>([]); // Renamed
+  const [questionsForCategory, setQuestionsForCategory] = useState<Question[]>([]);
 
   const loadActiveSession = useCallback(() => {
     const activeSession = getQuizSession();
     if (activeSession && activeSession.status === 'active') {
       setQuizSession(activeSession);
       const allQuestions = getQuestions();
-      setQuestionsForCategory(allQuestions.filter(q => q.category === activeSession.category && activeSession.questions.find(sq => sq.id === q.id)));
+      // For nested categories, if a session was for "Science", it includes "Science/Physics"
+      // The questions in the session are already filtered, so we just find them by ID.
+      setQuestionsForCategory(activeSession.questions);
     }
     setIsLoading(false);
   }, []);
@@ -38,13 +40,15 @@ export default function QuizPage() {
     }
   }, [quizSession?.status, router]);
 
-  const startQuiz = (category: string) => { // Changed parameter name
+  const startQuiz = (selectedCategoryPath: string) => {
     setIsLoading(true);
     const allQuestions = getQuestions();
-    const filteredQuestions = allQuestions.filter(q => q.category === category); // Changed filter logic
+    // Filter questions: include if question's category starts with the selected path
+    // e.g., if selectedCategoryPath is "Science", include "Science", "Science/Physics", "Science/Chemistry"
+    const filteredQuestions = allQuestions.filter(q => q.category.startsWith(selectedCategoryPath));
     
     if (filteredQuestions.length === 0) {
-      alert(`No questions found for the category "${category}". Please select another category or add questions.`);
+      alert(`No questions found for the category "${selectedCategoryPath}" or its sub-categories. Please select another category or add questions.`);
       setIsLoading(false);
       return;
     }
@@ -53,7 +57,7 @@ export default function QuizPage() {
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
-      category, // Changed from tag
+      category: selectedCategoryPath,
       questions: shuffledQuestions,
       currentQuestionIndex: 0,
       answers: [],
@@ -76,6 +80,7 @@ export default function QuizPage() {
         return prevSession;
       }
 
+      // Prevent duplicate answers for the same question
       if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
         return prevSession; 
       }
@@ -107,6 +112,7 @@ export default function QuizPage() {
         return prevSession;
       }
       
+      // Prevent duplicate answers (e.g. if timeout happens after manual answer)
       if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
         return prevSession; 
       }
@@ -135,12 +141,14 @@ export default function QuizPage() {
         saveQuizSession(updatedSession);
         return updatedSession;
       } else {
+        // This is the last question, mark as completed
         const completedSession = { 
           ...prevSession, 
           status: 'completed' as 'completed',
-          endTime: Date.now() 
+          endTime: Date.now() // Set end time
         };
         saveQuizSession(completedSession);
+        // Navigation to /summary will be handled by useEffect
         return completedSession;
       }
     });
@@ -151,6 +159,7 @@ export default function QuizPage() {
     setQuizSession(null);
     setQuestionsForCategory([]);
     setIsLoading(true); 
+    // Short delay to ensure state reset before CategorySelector re-evaluates
     setTimeout(() => setIsLoading(false), 50);
   };
 
@@ -165,17 +174,21 @@ export default function QuizPage() {
   }
 
   if (!quizSession || quizSession.status !== 'active') {
-    return <CategorySelector onSelectCategory={startQuiz} />; // Changed component and prop
+    return <CategorySelector onSelectCategory={startQuiz} />;
   }
   
+  // This case should ideally be caught by the useEffect navigating to /summary
+  // or by the next condition if currentQuestionIndex is out of bounds.
   if (quizSession.currentQuestionIndex >= questionsForCategory.length && quizSession.status === 'active') {
+     // Attempt to finalize, but useEffect should catch 'completed' status for navigation
      const completedSession = { 
         ...quizSession, 
         status: 'completed' as 'completed',
         endTime: quizSession.endTime || Date.now() 
       };
       saveQuizSession(completedSession);
-      setQuizSession(completedSession); 
+      setQuizSession(completedSession); // This should trigger the useEffect for navigation
+     // Show a loader while the useEffect picks up the change and navigates
      return ( 
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -187,7 +200,9 @@ export default function QuizPage() {
 
   const currentQuestion = questionsForCategory[quizSession.currentQuestionIndex];
 
+  // If currentQuestion is undefined, but session is active, it's an error state
   if (!currentQuestion && quizSession.status === 'active') {
+     // This might indicate an issue with questionsForCategory or currentQuestionIndex
      return (
       <Card className="w-full max-w-md mx-auto text-center shadow-lg">
         <CardHeader>
@@ -205,7 +220,10 @@ export default function QuizPage() {
     );
   }
   
+  // General loading/error state if quiz session status is not 'active' or question is missing
+  // This should ideally not be hit if other conditions are correctly handled.
   if (quizSession.status !== 'active' || !currentQuestion) {
+     // Fallback loader, implies an unexpected state
      return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -218,7 +236,7 @@ export default function QuizPage() {
   return (
     <div className="flex flex-col items-center">
       <QuestionCard
-        key={currentQuestion.id} 
+        key={currentQuestion.id} // Ensure QuestionCard re-mounts/re-initializes for new questions
         question={currentQuestion}
         onAnswer={handleAnswer}
         onTimeout={handleTimeout}

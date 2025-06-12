@@ -26,7 +26,7 @@ const questionFormSchema = z.object({
   text: z.string().min(5, 'Question text must be at least 5 characters'),
   options: z.array(answerOptionSchema).min(2, 'At least 2 answer options are required').max(6, 'Maximum 6 answer options allowed'),
   correctAnswerId: z.string().min(1,'Please select a correct answer'),
-  category: z.string().min(1, 'Category is required'),
+  category: z.string().min(1, 'Category is required. Use / to create subcategories (e.g., Science/Physics).'),
 });
 
 type QuestionFormData = z.infer<typeof questionFormSchema>;
@@ -179,7 +179,7 @@ export function QuestionForm() {
       text: data.text,
       options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
       correctAnswerId: data.correctAnswerId,
-      category: data.category.trim(),
+      category: data.category.trim().replace(/\s*\/\s*/g, '/'), // Normalize slashes
     };
     addQuestion(newQuestion);
     setAvailableCategories(getCategories()); // Refresh available categories
@@ -292,14 +292,14 @@ export function QuestionForm() {
             <Input
               id="category"
               {...form.register('category')}
-              placeholder="e.g., Science, History, General Knowledge"
+              placeholder="e.g., Science or TopFolder/SubFolder"
               className="mt-1 text-base"
               aria-invalid={form.formState.errors.category ? "true" : "false"}
             />
             {form.formState.errors.category && <p className="text-sm text-destructive mt-1">{form.formState.errors.category.message}</p>}
              {availableCategories.length > 0 && (
               <div className="mt-2">
-                <p className="text-sm text-muted-foreground">Existing categories:</p>
+                <p className="text-sm text-muted-foreground">Existing categories (click to use):</p>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {availableCategories.map(cat => (
                     <Button
@@ -309,6 +309,7 @@ export function QuestionForm() {
                       size="sm"
                       onClick={() => handleCategoryClick(cat)}
                       className="text-xs px-2 py-1 h-auto"
+                      title={`Use category: ${cat}`}
                     >
                       <Folder className="mr-1.5 h-3 w-3" />
                       {cat}

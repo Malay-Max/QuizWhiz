@@ -5,24 +5,28 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Question, QuizSession, QuizAnswer } from '@/types';
 import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession } from '@/lib/storage';
-import { CategorySelector } from '@/components/quiz/CategorySelector'; // Changed from TagSelector
+import { CategorySelector } from '@/components/quiz/CategorySelector';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { Button } from '@/components/ui/button';
 import { Loader2, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+// This page is currently a duplicate of src/app/page.tsx
+// Consider redirecting or removing if src/app/page.tsx is the primary quiz page.
+// For now, I'll apply the same category logic.
+
 export default function QuizPage() {
   const router = useRouter();
   const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [questionsForCategory, setQuestionsForCategory] = useState<Question[]>([]); // Renamed
+  const [questionsForCategory, setQuestionsForCategory] = useState<Question[]>([]);
 
   const loadActiveSession = useCallback(() => {
     const activeSession = getQuizSession();
     if (activeSession && activeSession.status === 'active') {
       setQuizSession(activeSession);
-      const allQuestions = getQuestions();
-      setQuestionsForCategory(allQuestions.filter(q => q.category === activeSession.category && activeSession.questions.find(sq => sq.id === q.id)));
+      // The questions in the session are already filtered according to its category path.
+      setQuestionsForCategory(activeSession.questions);
     }
     setIsLoading(false);
   }, []);
@@ -31,13 +35,21 @@ export default function QuizPage() {
     loadActiveSession();
   }, [loadActiveSession]);
 
-  const startQuiz = (category: string) => { // Changed parameter name
+  // Effect to handle navigation when quiz is completed
+  useEffect(() => {
+    if (quizSession?.status === 'completed') {
+      router.push('/summary');
+    }
+  }, [quizSession?.status, router]);
+
+
+  const startQuiz = (selectedCategoryPath: string) => {
     setIsLoading(true);
     const allQuestions = getQuestions();
-    const filteredQuestions = allQuestions.filter(q => q.category === category); // Changed filter logic
+    const filteredQuestions = allQuestions.filter(q => q.category.startsWith(selectedCategoryPath));
     
     if (filteredQuestions.length === 0) {
-      alert(`No questions found for the category "${category}". Please select another category or add questions.`);
+      alert(`No questions found for the category "${selectedCategoryPath}" or its sub-categories. Please select another category or add questions.`);
       setIsLoading(false);
       return;
     }
@@ -46,7 +58,7 @@ export default function QuizPage() {
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
-      category, // Changed from tag
+      category: selectedCategoryPath,
       questions: shuffledQuestions,
       currentQuestionIndex: 0,
       answers: [],
@@ -134,7 +146,7 @@ export default function QuizPage() {
           endTime: Date.now() 
         };
         saveQuizSession(completedSession);
-        router.push('/summary'); // Navigate after state is set
+        // Navigation will be handled by useEffect
         return completedSession;
       }
     });
@@ -159,12 +171,28 @@ export default function QuizPage() {
   }
 
   if (!quizSession || quizSession.status !== 'active') {
-    return <CategorySelector onSelectCategory={startQuiz} />; // Changed component and prop
+    return <CategorySelector onSelectCategory={startQuiz} />;
+  }
+  
+  if (quizSession.currentQuestionIndex >= questionsForCategory.length && quizSession.status === 'active') {
+     const completedSession = { 
+        ...quizSession, 
+        status: 'completed' as 'completed',
+        endTime: quizSession.endTime || Date.now() 
+      };
+      saveQuizSession(completedSession);
+      setQuizSession(completedSession); 
+     return ( 
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Finalizing Quiz...</p>
+      </div>
+    );
   }
 
   const currentQuestion = questionsForCategory[quizSession.currentQuestionIndex];
 
-  if (!currentQuestion) {
+  if (!currentQuestion && quizSession.status === 'active') {
      return (
       <Card className="w-full max-w-md mx-auto text-center shadow-lg">
         <CardHeader>
@@ -181,6 +209,16 @@ export default function QuizPage() {
       </Card>
     );
   }
+  
+  if (quizSession.status !== 'active' || !currentQuestion) {
+     return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="flex flex-col items-center">
