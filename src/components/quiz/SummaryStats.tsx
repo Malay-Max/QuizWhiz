@@ -1,9 +1,10 @@
+
 "use client";
 
 import type { QuizSession } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, CheckCircle, XCircle, SkipForward, Clock, HelpCircle } from 'lucide-react';
+import { BarChart, CheckCircle, XCircle, SkipForward, Clock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTooltip } from 'recharts';
 
@@ -12,9 +13,9 @@ interface SummaryStatsProps {
 }
 
 const COLORS = {
-  correct: 'hsl(var(--accent))', // Green
-  incorrect: 'hsl(var(--destructive))', // Red
-  skipped: 'hsl(var(--muted))', // Gray
+  correct: 'hsl(var(--accent))', 
+  incorrect: 'hsl(var(--destructive))', 
+  skipped: 'hsl(var(--muted))', 
 };
 
 export function SummaryStats({ session }: SummaryStatsProps) {
@@ -30,7 +31,7 @@ export function SummaryStats({ session }: SummaryStatsProps) {
           <p className="text-muted-foreground mb-4">
             No completed quiz session found. Please complete a quiz to see your summary.
           </p>
-          <Button onClick={() => router.push('/quiz')} size="lg" className="shadow-md">
+          <Button onClick={() => router.push('/')} size="lg" className="shadow-md">
             Take a Quiz
           </Button>
         </CardContent>
@@ -124,10 +125,10 @@ export function SummaryStats({ session }: SummaryStatsProps) {
 
       </CardContent>
       <CardFooter className="flex flex-col sm:flex-row justify-center gap-4 pt-6">
-        <Button onClick={() => router.push('/quiz')} size="lg" variant="outline" className="w-full sm:w-auto shadow-sm hover:bg-primary/10 transition-all">
+        <Button onClick={() => router.push('/')} size="lg" variant="outline" className="w-full sm:w-auto shadow-sm hover:bg-primary/10 transition-all">
           Take Another Quiz
         </Button>
-        <Button onClick={() => router.push('/')} size="lg" className="w-full sm:w-auto shadow-md hover:scale-105 transition-transform">
+        <Button onClick={() => router.push('/add-question')} size="lg" className="w-full sm:w-auto shadow-md hover:scale-105 transition-transform">
           Add More Questions
         </Button>
       </CardFooter>

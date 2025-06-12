@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -11,8 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle, Trash2, Wand2, Loader2 } from 'lucide-react';
-import { addQuestion } from '@/lib/storage';
-import type { Question, AnswerOption } from '@/types';
+import { addQuestion, getTags } from '@/lib/storage';
+import type { Question } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { generateDistractorsAction } from '@/app/actions';
 
@@ -35,6 +36,7 @@ const defaultAnswerOptions = Array(2).fill(null).map(() => ({ id: crypto.randomU
 export function QuestionForm() {
   const { toast } = useToast();
   const [isGeneratingDistractors, setIsGeneratingDistractors] = useState(false);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   const form = useForm<QuestionFormData>({
     resolver: zodResolver(questionFormSchema),
@@ -46,10 +48,14 @@ export function QuestionForm() {
     },
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'options',
   });
+
+  useEffect(() => {
+    setAvailableTags(getTags());
+  }, []);
 
   const watchQuestionText = form.watch('text');
   const watchCorrectAnswerId = form.watch('correctAnswerId');
@@ -58,7 +64,6 @@ export function QuestionForm() {
   const canGenerateDistractors = watchQuestionText.length >= 5 && 
                                  watchCorrectAnswerId &&
                                  watchOptions.find(opt => opt.id === watchCorrectAnswerId)?.text.length > 0;
-
 
   const handleAddOption = () => {
     if (fields.length < 6) {
@@ -80,6 +85,15 @@ export function QuestionForm() {
     remove(index);
   };
   
+  const handleTagClick = (tag: string) => {
+    const currentTagsValue = form.getValues('tags');
+    const currentTagsArray = currentTagsValue.split(',').map(t => t.trim()).filter(t => t);
+    if (!currentTagsArray.includes(tag)) {
+      currentTagsArray.push(tag);
+      form.setValue('tags', currentTagsArray.join(', '), { shouldValidate: true, shouldDirty: true });
+    }
+  };
+
   const handleGenerateDistractors = async () => {
     if (!canGenerateDistractors) return;
 
@@ -99,7 +113,7 @@ export function QuestionForm() {
     
     setIsGeneratingDistractors(true);
     try {
-      const numDistractorsToGenerate = Math.max(0, 3 - (options.length -1)); // Aim for total 4 options (1 correct + 3 distractors)
+      const numDistractorsToGenerate = Math.max(0, 3 - (options.length -1)); 
       
       if (numDistractorsToGenerate <= 0 && options.length >= 4) {
          toast({
@@ -113,29 +127,25 @@ export function QuestionForm() {
       const result = await generateDistractorsAction({
         question: questionText,
         correctAnswer: correctAnswerOption.text,
-        numDistractors: numDistractorsToGenerate > 0 ? numDistractorsToGenerate : 3, // if options < 4, generate to fill up to 4, else generate 3 new ones to choose from
+        numDistractors: numDistractorsToGenerate > 0 ? numDistractorsToGenerate : 3, 
       });
 
       if (result.success && result.data) {
         const distractors = result.data.distractors;
         
-        // Remove empty options first, keeping the correct answer
         let currentOptions = form.getValues('options');
         const correctAnswer = currentOptions.find(opt => opt.id === correctAnswerId);
         let newOptions = correctAnswer ? [correctAnswer] : [];
         
-        // Add generated distractors
         distractors.forEach(distractorText => {
-          if (newOptions.length < 6) { // Max 6 options
+          if (newOptions.length < 6) { 
             newOptions.push({ id: crypto.randomUUID(), text: distractorText });
           }
         });
-
-        // Fill up to minimum 2 or desired 4 if not enough, with empty strings.
-        // For now, let's ensure it at least matches the fields length if distractors are fewer than existing empty slots
+        
         const currentFieldLength = fields.length;
         while (newOptions.length < Math.min(6, Math.max(2, currentFieldLength, newOptions.length + numDistractorsToGenerate)) && newOptions.length < 6) {
-           if (newOptions.length < options.length) { // if we removed some non-empty ones
+           if (newOptions.length < options.length) { 
              const existingNonDistractorOption = options.find(opt => opt.id !== correctAnswerId && !newOptions.find(no => no.id === opt.id) && opt.text.trim() !== "");
              if (existingNonDistractorOption) newOptions.push(existingNonDistractorOption);
              else newOptions.push({ id: crypto.randomUUID(), text: '' });
@@ -168,7 +178,6 @@ export function QuestionForm() {
     }
   };
 
-
   const onSubmit = (data: QuestionFormData) => {
     const newQuestion: Question = {
       id: crypto.randomUUID(),
@@ -178,6 +187,7 @@ export function QuestionForm() {
       tags: data.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0),
     };
     addQuestion(newQuestion);
+    setAvailableTags(getTags()); // Refresh available tags
     toast({
       title: 'Question Added!',
       description: 'Your new question has been saved.',
@@ -193,7 +203,6 @@ export function QuestionForm() {
   };
   
   useEffect(() => {
-    // Reset correctAnswerId if it's no longer in options (e.g., due to AI generation)
     const currentCorrectId = form.getValues('correctAnswerId');
     if (currentCorrectId && !form.getValues('options').find(opt => opt.id === currentCorrectId)) {
       form.setValue('correctAnswerId', '');
@@ -240,7 +249,6 @@ export function QuestionForm() {
             {form.formState.errors.options?.root && <p className="text-sm text-destructive mt-1">{form.formState.errors.options.root.message}</p>}
             {form.formState.errors.options?.map((error, index) => error?.text && <p key={index} className="text-sm text-destructive mt-1">{error.text.message}</p>)}
 
-
             <div className="flex gap-2 mt-2">
                 <Button type="button" variant="outline" onClick={handleAddOption} disabled={fields.length >= 6}>
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Option
@@ -271,7 +279,7 @@ export function QuestionForm() {
                   aria-invalid={form.formState.errors.correctAnswerId ? "true" : "false"}
                 >
                   {form.getValues('options').map((option, index) => (
-                    option.text.trim() && ( // Only show radio if option text is not empty
+                    option.text.trim() && ( 
                     <div key={option.id} className="flex items-center space-x-2 p-2 border rounded-md hover:bg-secondary/50 transition-colors">
                       <RadioGroupItem value={option.id} id={`option-${option.id}`} />
                       <Label htmlFor={`option-${option.id}`} className="flex-grow cursor-pointer">{option.text || `Option ${index + 1}`}</Label>
@@ -294,6 +302,25 @@ export function QuestionForm() {
               aria-invalid={form.formState.errors.tags ? "true" : "false"}
             />
             {form.formState.errors.tags && <p className="text-sm text-destructive mt-1">{form.formState.errors.tags.message}</p>}
+             {availableTags.length > 0 && (
+              <div className="mt-2">
+                <p className="text-sm text-muted-foreground">Frequently used tags:</p>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {availableTags.map(tag => (
+                    <Button
+                      key={tag}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTagClick(tag)}
+                      className="text-xs px-2 py-1 h-auto"
+                    >
+                      {tag}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <CardFooter className="px-0 pt-6">

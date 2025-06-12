@@ -1,3 +1,4 @@
+
 // src/ai/flows/generate-distractors.ts
 'use server';
 
@@ -11,22 +12,15 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { 
+  GenerateDistractorsInputSchema as ImportedGenerateDistractorsInputSchema, 
+  GenerateDistractorsOutputSchema as ImportedGenerateDistractorsOutputSchema 
+} from '@/types';
 
-const GenerateDistractorsInputSchema = z.object({
-  question: z.string().describe('The question for which to generate distractors.'),
-  correctAnswer: z.string().describe('The correct answer to the question.'),
-  numDistractors: z.number().default(3).describe('The number of distractors to generate. Defaults to 3.'),
-});
+// Re-export types for external use, derived from imported schemas
+export type GenerateDistractorsInput = z.infer<typeof ImportedGenerateDistractorsInputSchema>;
+export type GenerateDistractorsOutput = z.infer<typeof ImportedGenerateDistractorsOutputSchema>;
 
-export type GenerateDistractorsInput = z.infer<typeof GenerateDistractorsInputSchema>;
-
-const GenerateDistractorsOutputSchema = z.object({
-  distractors: z.array(
-    z.string().describe('A plausible distractor (incorrect answer option) for the question.')
-  ).describe('An array of distractors for the question.')
-});
-
-export type GenerateDistractorsOutput = z.infer<typeof GenerateDistractorsOutputSchema>;
 
 export async function generateDistractors(input: GenerateDistractorsInput): Promise<GenerateDistractorsOutput> {
   return generateDistractorsFlow(input);
@@ -34,8 +28,8 @@ export async function generateDistractors(input: GenerateDistractorsInput): Prom
 
 const generateDistractorsPrompt = ai.definePrompt({
   name: 'generateDistractorsPrompt',
-  input: {schema: GenerateDistractorsInputSchema},
-  output: {schema: GenerateDistractorsOutputSchema},
+  input: {schema: ImportedGenerateDistractorsInputSchema},
+  output: {schema: ImportedGenerateDistractorsOutputSchema},
   prompt: `You are an AI assistant helping quiz creators generate plausible distractors (incorrect answer options) for multiple-choice questions.
 
   Given the following question and correct answer, generate {{{numDistractors}}} plausible distractors that are likely to be chosen by someone who doesn't know the correct answer.
@@ -50,8 +44,8 @@ const generateDistractorsPrompt = ai.definePrompt({
 const generateDistractorsFlow = ai.defineFlow(
   {
     name: 'generateDistractorsFlow',
-    inputSchema: GenerateDistractorsInputSchema,
-    outputSchema: GenerateDistractorsOutputSchema,
+    inputSchema: ImportedGenerateDistractorsInputSchema,
+    outputSchema: ImportedGenerateDistractorsOutputSchema,
   },
   async input => {
     const {output} = await generateDistractorsPrompt(input);

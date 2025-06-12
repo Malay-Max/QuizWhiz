@@ -1,7 +1,8 @@
+
 "use client";
 
 import Link from 'next/link';
-import { Home, PlusSquare, Puzzle } from 'lucide-react';
+import { PlusSquare, Puzzle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -10,8 +11,8 @@ export function Navbar() {
   const pathname = usePathname();
 
   const navItems = [
-    { href: '/', label: 'Add Question', icon: PlusSquare },
-    { href: '/quiz', label: 'Take Quiz', icon: Puzzle },
+    { href: '/add-question', label: 'Add Question', icon: PlusSquare },
+    { href: '/', label: 'Take Quiz', icon: Puzzle },
   ];
 
   return (
