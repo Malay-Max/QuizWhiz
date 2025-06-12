@@ -14,7 +14,7 @@ interface CategoryTreeItemProps {
 }
 
 export function CategoryTreeItem({ node, onSelectCategory, level }: CategoryTreeItemProps) {
-  const [isOpen, setIsOpen] = useState(true); // Default to open, or manage state if complex
+  const [isOpen, setIsOpen] = useState(false); // Default to closed
 
   const hasChildren = node.children && node.children.length > 0;
 
@@ -26,6 +26,11 @@ export function CategoryTreeItem({ node, onSelectCategory, level }: CategoryTree
   };
   
   const handleSelect = () => {
+    // If it has children and is currently closed, opening it by clicking the name is a nice UX.
+    // Otherwise, just select the category.
+    if (hasChildren && !isOpen) {
+        setIsOpen(true); // Optionally open when the name is clicked if it's a folder
+    }
     onSelectCategory(node.path);
   };
 
@@ -39,6 +44,7 @@ export function CategoryTreeItem({ node, onSelectCategory, level }: CategoryTree
             onClick={handleToggleOpen}
             className="mr-1 p-1 h-auto"
             aria-label={isOpen ? `Collapse ${node.name}` : `Expand ${node.name}`}
+            aria-expanded={isOpen}
           >
             {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
