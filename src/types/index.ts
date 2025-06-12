@@ -11,7 +11,7 @@ export interface Question {
   text: string;
   options: AnswerOption[];
   correctAnswerId: string;
-  tags: string[];
+  category: string; // Changed from tags: string[]
 }
 
 export interface QuizAnswer {
@@ -24,7 +24,7 @@ export interface QuizAnswer {
 
 export interface QuizSession {
   id: string;
-  tag: string;
+  category: string; // Changed from tag: string
   questions: Question[];
   currentQuestionIndex: number;
   answers: QuizAnswer[];

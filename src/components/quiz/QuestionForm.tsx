@@ -11,8 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Trash2, Wand2, Loader2 } from 'lucide-react';
-import { addQuestion, getTags } from '@/lib/storage';
+import { PlusCircle, Trash2, Wand2, Loader2, Folder } from 'lucide-react';
+import { addQuestion, getCategories } from '@/lib/storage';
 import type { Question } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { generateDistractorsAction } from '@/app/actions';
@@ -26,7 +26,7 @@ const questionFormSchema = z.object({
   text: z.string().min(5, 'Question text must be at least 5 characters'),
   options: z.array(answerOptionSchema).min(2, 'At least 2 answer options are required').max(6, 'Maximum 6 answer options allowed'),
   correctAnswerId: z.string().min(1,'Please select a correct answer'),
-  tags: z.string().min(1, 'At least one tag is required'),
+  category: z.string().min(1, 'Category is required'),
 });
 
 type QuestionFormData = z.infer<typeof questionFormSchema>;
@@ -36,7 +36,7 @@ const defaultAnswerOptions = Array(2).fill(null).map(() => ({ id: crypto.randomU
 export function QuestionForm() {
   const { toast } = useToast();
   const [isGeneratingDistractors, setIsGeneratingDistractors] = useState(false);
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
 
   const form = useForm<QuestionFormData>({
     resolver: zodResolver(questionFormSchema),
@@ -44,7 +44,7 @@ export function QuestionForm() {
       text: '',
       options: defaultAnswerOptions,
       correctAnswerId: '',
-      tags: '',
+      category: '',
     },
   });
 
@@ -54,7 +54,7 @@ export function QuestionForm() {
   });
 
   useEffect(() => {
-    setAvailableTags(getTags());
+    setAvailableCategories(getCategories());
   }, []);
 
   const watchQuestionText = form.watch('text');
@@ -85,13 +85,8 @@ export function QuestionForm() {
     remove(index);
   };
   
-  const handleTagClick = (tag: string) => {
-    const currentTagsValue = form.getValues('tags');
-    const currentTagsArray = currentTagsValue.split(',').map(t => t.trim()).filter(t => t);
-    if (!currentTagsArray.includes(tag)) {
-      currentTagsArray.push(tag);
-      form.setValue('tags', currentTagsArray.join(', '), { shouldValidate: true, shouldDirty: true });
-    }
+  const handleCategoryClick = (category: string) => {
+    form.setValue('category', category, { shouldValidate: true, shouldDirty: true });
   };
 
   const handleGenerateDistractors = async () => {
@@ -184,10 +179,10 @@ export function QuestionForm() {
       text: data.text,
       options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
       correctAnswerId: data.correctAnswerId,
-      tags: data.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0),
+      category: data.category.trim(),
     };
     addQuestion(newQuestion);
-    setAvailableTags(getTags()); // Refresh available tags
+    setAvailableCategories(getCategories()); // Refresh available categories
     toast({
       title: 'Question Added!',
       description: 'Your new question has been saved.',
@@ -198,7 +193,7 @@ export function QuestionForm() {
       text: '',
       options: Array(2).fill(null).map(() => ({ id: crypto.randomUUID(), text: '' })),
       correctAnswerId: '',
-      tags: ''
+      category: ''
     });
   };
   
@@ -293,29 +288,30 @@ export function QuestionForm() {
           </div>
 
           <div>
-            <Label htmlFor="tags" className="text-lg">Tags (comma-separated)</Label>
+            <Label htmlFor="category" className="text-lg">Category</Label>
             <Input
-              id="tags"
-              {...form.register('tags')}
-              placeholder="e.g., science, history, fun-facts"
+              id="category"
+              {...form.register('category')}
+              placeholder="e.g., Science, History, General Knowledge"
               className="mt-1 text-base"
-              aria-invalid={form.formState.errors.tags ? "true" : "false"}
+              aria-invalid={form.formState.errors.category ? "true" : "false"}
             />
-            {form.formState.errors.tags && <p className="text-sm text-destructive mt-1">{form.formState.errors.tags.message}</p>}
-             {availableTags.length > 0 && (
+            {form.formState.errors.category && <p className="text-sm text-destructive mt-1">{form.formState.errors.category.message}</p>}
+             {availableCategories.length > 0 && (
               <div className="mt-2">
-                <p className="text-sm text-muted-foreground">Frequently used tags:</p>
+                <p className="text-sm text-muted-foreground">Existing categories:</p>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {availableTags.map(tag => (
+                  {availableCategories.map(cat => (
                     <Button
-                      key={tag}
+                      key={cat}
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => handleTagClick(tag)}
+                      onClick={() => handleCategoryClick(cat)}
                       className="text-xs px-2 py-1 h-auto"
                     >
-                      {tag}
+                      <Folder className="mr-1.5 h-3 w-3" />
+                      {cat}
                     </Button>
                   ))}
                 </div>

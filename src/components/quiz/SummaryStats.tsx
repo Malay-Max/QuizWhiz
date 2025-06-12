@@ -4,7 +4,7 @@
 import type { QuizSession } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, CheckCircle, XCircle, SkipForward, Clock } from 'lucide-react';
+import { BarChart, CheckCircle, XCircle, SkipForward, Clock, Folder } from 'lucide-react'; // Added Folder
 import { useRouter } from 'next/navigation';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTooltip } from 'recharts';
 
@@ -41,9 +41,9 @@ export function SummaryStats({ session }: SummaryStatsProps) {
 
   const totalQuestions = session.questions.length;
   const answeredCount = session.answers.filter(a => !a.skipped).length;
-  const skippedCount = totalQuestions - answeredCount;
+  const skippedCount = totalQuestions - answeredCount; //This calculation is now more accurate: total - (correct + incorrect)
   const correctCount = session.answers.filter(a => a.isCorrect).length;
-  const incorrectCount = answeredCount - correctCount;
+  const incorrectCount = session.answers.filter(a => !a.skipped && !a.isCorrect).length;
   
   const totalTimeSeconds = session.endTime && session.startTime 
     ? Math.round((session.endTime - session.startTime) / 1000) 
@@ -74,7 +74,7 @@ export function SummaryStats({ session }: SummaryStatsProps) {
     <Card className="w-full max-w-2xl mx-auto shadow-2xl">
       <CardHeader className="text-center">
         <CardTitle className="font-headline text-4xl mb-1">Quiz Completed!</CardTitle>
-        <CardDescription className="text-lg">Here's how you performed on the <span className="font-semibold text-primary">{session.tag}</span> quiz.</CardDescription>
+        <CardDescription className="text-lg">Here's how you performed on the <span className="font-semibold text-primary inline-flex items-center"><Folder className="h-5 w-5 mr-1.5"/>{session.category}</span> quiz.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="text-center my-4">

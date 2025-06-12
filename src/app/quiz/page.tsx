@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Question, QuizSession, QuizAnswer } from '@/types';
 import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession } from '@/lib/storage';
-import { TagSelector } from '@/components/quiz/TagSelector';
+import { CategorySelector } from '@/components/quiz/CategorySelector'; // Changed from TagSelector
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { Button } from '@/components/ui/button';
 import { Loader2, RotateCcw } from 'lucide-react';
@@ -14,18 +15,14 @@ export default function QuizPage() {
   const router = useRouter();
   const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [questionsForTag, setQuestionsForTag] = useState<Question[]>([]);
+  const [questionsForCategory, setQuestionsForCategory] = useState<Question[]>([]); // Renamed
 
   const loadActiveSession = useCallback(() => {
     const activeSession = getQuizSession();
     if (activeSession && activeSession.status === 'active') {
-      // Ensure questions are loaded for the active session.
-      // This is important if questions were modified after session start.
-      // For simplicity, we'll assume questions in session are fine.
-      // A more robust solution might re-fetch/validate questions here.
       setQuizSession(activeSession);
       const allQuestions = getQuestions();
-      setQuestionsForTag(allQuestions.filter(q => q.tags.includes(activeSession.tag) && activeSession.questions.find(sq => sq.id === q.id)));
+      setQuestionsForCategory(allQuestions.filter(q => q.category === activeSession.category && activeSession.questions.find(sq => sq.id === q.id)));
     }
     setIsLoading(false);
   }, []);
@@ -34,23 +31,22 @@ export default function QuizPage() {
     loadActiveSession();
   }, [loadActiveSession]);
 
-  const startQuiz = (tag: string) => {
+  const startQuiz = (category: string) => { // Changed parameter name
     setIsLoading(true);
     const allQuestions = getQuestions();
-    const filteredQuestions = allQuestions.filter(q => q.tags.includes(tag));
+    const filteredQuestions = allQuestions.filter(q => q.category === category); // Changed filter logic
     
     if (filteredQuestions.length === 0) {
-      alert(`No questions found for the tag "${tag}". Please select another tag or add questions.`);
+      alert(`No questions found for the category "${category}". Please select another category or add questions.`);
       setIsLoading(false);
       return;
     }
 
-    // Shuffle questions for variety
     const shuffledQuestions = [...filteredQuestions].sort(() => Math.random() - 0.5);
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
-      tag,
+      category, // Changed from tag
       questions: shuffledQuestions,
       currentQuestionIndex: 0,
       answers: [],
@@ -59,77 +55,96 @@ export default function QuizPage() {
     };
     saveQuizSession(newSession);
     setQuizSession(newSession);
-    setQuestionsForTag(shuffledQuestions);
+    setQuestionsForCategory(shuffledQuestions);
     setIsLoading(false);
   };
 
   const handleAnswer = (selectedAnswerId: string, timeTaken: number) => {
-    if (!quizSession) return;
+     setQuizSession(prevSession => {
+      if (!prevSession || prevSession.currentQuestionIndex >= questionsForCategory.length) {
+        return prevSession;
+      }
+      const currentQuestion = questionsForCategory[prevSession.currentQuestionIndex];
+      if (!currentQuestion) {
+        return prevSession;
+      }
 
-    const currentQuestion = questionsForTag[quizSession.currentQuestionIndex];
-    const isCorrect = currentQuestion.correctAnswerId === selectedAnswerId;
+      if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
+        return prevSession; 
+      }
 
-    const newAnswer: QuizAnswer = {
-      questionId: currentQuestion.id,
-      selectedAnswerId,
-      isCorrect,
-      timeTaken,
-      skipped: false,
-    };
-    
-    const updatedSession = {
-      ...quizSession,
-      answers: [...quizSession.answers, newAnswer],
-    };
-    setQuizSession(updatedSession); // Update local state first for responsiveness
-    saveQuizSession(updatedSession); // Persist to localStorage
+      const isCorrect = currentQuestion.correctAnswerId === selectedAnswerId;
+      const newAnswer: QuizAnswer = {
+        questionId: currentQuestion.id,
+        selectedAnswerId,
+        isCorrect,
+        timeTaken,
+        skipped: false,
+      };
+      
+      const updatedAnswers = [...prevSession.answers, newAnswer];
+      const updatedSession = { ...prevSession, answers: updatedAnswers };
+      
+      saveQuizSession(updatedSession);
+      return updatedSession;
+    });
   };
 
   const handleTimeout = (timeTaken: number) => {
-    if (!quizSession) return;
+    setQuizSession(prevSession => {
+      if (!prevSession || prevSession.currentQuestionIndex >= questionsForCategory.length) {
+        return prevSession;
+      }
+      const currentQuestion = questionsForCategory[prevSession.currentQuestionIndex];
+      if (!currentQuestion) {
+        return prevSession;
+      }
+      
+      if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
+        return prevSession; 
+      }
 
-    const currentQuestion = questionsForTag[quizSession.currentQuestionIndex];
-    const newAnswer: QuizAnswer = {
-      questionId: currentQuestion.id,
-      timeTaken,
-      skipped: true,
-    };
-    
-    const updatedSession = {
-      ...quizSession,
-      answers: [...quizSession.answers, newAnswer],
-    };
-    setQuizSession(updatedSession);
-    saveQuizSession(updatedSession);
+      const newAnswer: QuizAnswer = {
+        questionId: currentQuestion.id,
+        timeTaken,
+        skipped: true,
+      };
+      
+      const updatedAnswers = [...prevSession.answers, newAnswer];
+      const updatedSession = { ...prevSession, answers: updatedAnswers };
+
+      saveQuizSession(updatedSession);
+      return updatedSession;
+    });
   };
 
   const handleNextQuestion = () => {
-    if (!quizSession) return;
+    setQuizSession(prevSession => {
+      if (!prevSession) return prevSession;
 
-    const nextIndex = quizSession.currentQuestionIndex + 1;
-    if (nextIndex < questionsForTag.length) {
-      const updatedSession = { ...quizSession, currentQuestionIndex: nextIndex };
-      setQuizSession(updatedSession);
-      saveQuizSession(updatedSession);
-    } else {
-      // Quiz finished
-      const completedSession = { 
-        ...quizSession, 
-        status: 'completed' as 'completed', // Type assertion
-        endTime: Date.now() 
-      };
-      setQuizSession(completedSession);
-      saveQuizSession(completedSession);
-      router.push('/summary');
-    }
+      const nextIndex = prevSession.currentQuestionIndex + 1;
+      if (nextIndex < questionsForCategory.length) {
+        const updatedSession = { ...prevSession, currentQuestionIndex: nextIndex };
+        saveQuizSession(updatedSession);
+        return updatedSession;
+      } else {
+        const completedSession = { 
+          ...prevSession, 
+          status: 'completed' as 'completed',
+          endTime: Date.now() 
+        };
+        saveQuizSession(completedSession);
+        router.push('/summary'); // Navigate after state is set
+        return completedSession;
+      }
+    });
   };
   
   const handleRestartQuiz = () => {
     clearQuizSession();
     setQuizSession(null);
-    setQuestionsForTag([]);
-    setIsLoading(true); // Trigger reload of TagSelector
-    // Short delay to ensure state is cleared before re-evaluation
+    setQuestionsForCategory([]);
+    setIsLoading(true); 
     setTimeout(() => setIsLoading(false), 50);
   };
 
@@ -144,10 +159,10 @@ export default function QuizPage() {
   }
 
   if (!quizSession || quizSession.status !== 'active') {
-    return <TagSelector onSelectTag={startQuiz} />;
+    return <CategorySelector onSelectCategory={startQuiz} />; // Changed component and prop
   }
 
-  const currentQuestion = questionsForTag[quizSession.currentQuestionIndex];
+  const currentQuestion = questionsForCategory[quizSession.currentQuestionIndex];
 
   if (!currentQuestion) {
      return (
@@ -170,13 +185,13 @@ export default function QuizPage() {
   return (
     <div className="flex flex-col items-center">
       <QuestionCard
-        key={currentQuestion.id} // Ensures QuestionCard re-renders with new state for new question
+        key={currentQuestion.id} 
         question={currentQuestion}
         onAnswer={handleAnswer}
         onTimeout={handleTimeout}
         onNext={handleNextQuestion}
         questionNumber={quizSession.currentQuestionIndex + 1}
-        totalQuestions={questionsForTag.length}
+        totalQuestions={questionsForCategory.length}
       />
        <Button onClick={handleRestartQuiz} variant="outline" className="mt-8">
         <RotateCcw className="mr-2 h-4 w-4" /> Select Different Quiz

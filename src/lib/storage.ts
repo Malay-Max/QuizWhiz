@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Question, QuizSession } from '@/types';
@@ -24,11 +25,11 @@ export function addQuestion(question: Question): void {
   saveQuestions(questions);
 }
 
-export function getTags(): string[] {
+export function getCategories(): string[] {
   if (typeof window === 'undefined') return [];
   const questions = getQuestions();
-  const allTags = questions.reduce((acc, q) => [...acc, ...q.tags], [] as string[]);
-  return [...new Set(allTags)].sort();
+  const allCategories = questions.map(q => q.category);
+  return [...new Set(allCategories)].filter(c => c && c.trim() !== "").sort();
 }
 
 // Quiz Session Functions
