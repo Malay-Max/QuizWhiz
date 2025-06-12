@@ -11,9 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Trash2, Wand2, Loader2, Folder } from 'lucide-react';
+import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText } from 'lucide-react';
 import { addQuestion, getCategories } from '@/lib/storage';
-import type { Question } from '@/types';
+import type { Question, AnswerOption as QuestionAnswerOption } from '@/types'; // Renamed to avoid conflict
 import { useToast } from '@/hooks/use-toast';
 import { generateDistractorsAction } from '@/app/actions';
 
@@ -37,6 +37,10 @@ export function QuestionForm() {
   const { toast } = useToast();
   const [isGeneratingDistractors, setIsGeneratingDistractors] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  
+  const [batchInput, setBatchInput] = useState('');
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+
 
   const form = useForm<QuestionFormData>({
     resolver: zodResolver(questionFormSchema),
@@ -179,10 +183,10 @@ export function QuestionForm() {
       text: data.text,
       options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
       correctAnswerId: data.correctAnswerId,
-      category: data.category.trim().replace(/\s*\/\s*/g, '/'), // Normalize slashes
+      category: data.category.trim().replace(/\s*\/\s*/g, '/'), 
     };
     addQuestion(newQuestion);
-    setAvailableCategories(getCategories()); // Refresh available categories
+    setAvailableCategories(getCategories()); 
     toast({
       title: 'Question Added!',
       description: 'Your new question has been saved.',
@@ -204,14 +208,112 @@ export function QuestionForm() {
     }
   }, [watchOptions, form]);
 
+  const handleBatchInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setBatchInput(e.target.value);
+  };
+
+  const handleProcessBatch = () => {
+    const categoryValue = form.getValues('category');
+    if (!categoryValue.trim()) {
+      toast({
+        title: 'Category Required',
+        description: 'Please enter a category in the form above before processing batch questions.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsProcessingBatch(true);
+    const lines = batchInput.split('\n').filter(line => line.trim() !== '');
+    let questionsAddedCount = 0;
+    let questionsFailedCount = 0;
+
+    lines.forEach((line, index) => {
+      try {
+        const questionMatch = line.match(/;;(.*?);;/);
+        const optionsMatch = line.match(/\{(.*?)\}/);
+        const correctMatch = line.match(/\[(.*?)\]/);
+
+        if (!questionMatch || !optionsMatch || !correctMatch) {
+          console.warn(`Skipping malformed line ${index + 1}: ${line}`);
+          questionsFailedCount++;
+          return;
+        }
+
+        const questionText = questionMatch[1].trim();
+        const optionTexts = optionsMatch[1].split('-').map(opt => opt.trim()).filter(opt => opt);
+        const correctAnswerText = correctMatch[1].trim();
+
+        if (!questionText || optionTexts.length < 2 || !correctAnswerText) {
+          console.warn(`Skipping invalid data in line ${index + 1}: ${line}`);
+          questionsFailedCount++;
+          return;
+        }
+
+        const answerOptions: QuestionAnswerOption[] = optionTexts.map(text => ({
+          id: crypto.randomUUID(),
+          text: text,
+        }));
+
+        const correctOption = answerOptions.find(opt => opt.text === correctAnswerText);
+        if (!correctOption) {
+          console.warn(`Correct answer text "${correctAnswerText}" not found in options for line ${index + 1}: ${line}`);
+          questionsFailedCount++;
+          return;
+        }
+
+        const newQuestion: Question = {
+          id: crypto.randomUUID(),
+          text: questionText,
+          options: answerOptions,
+          correctAnswerId: correctOption.id,
+          category: categoryValue.trim().replace(/\s*\/\s*/g, '/'),
+        };
+
+        addQuestion(newQuestion);
+        questionsAddedCount++;
+      } catch (e) {
+        console.error(`Error processing line ${index + 1}: ${line}`, e);
+        questionsFailedCount++;
+      }
+    });
+
+    setIsProcessingBatch(false);
+
+    if (questionsAddedCount > 0) {
+      toast({
+        title: 'Batch Processing Complete',
+        description: `${questionsAddedCount} questions added successfully. ${questionsFailedCount > 0 ? `${questionsFailedCount} failed.` : ''}`,
+        variant: 'default',
+        className: 'bg-accent text-accent-foreground'
+      });
+      setBatchInput(''); // Clear input only if some were successful
+      setAvailableCategories(getCategories()); // Refresh category list
+    } else if (questionsFailedCount > 0) {
+       toast({
+        title: 'Batch Processing Failed',
+        description: `No questions were added. ${questionsFailedCount} entries had errors. Check console for details.`,
+        variant: 'destructive',
+      });
+    } else {
+       toast({
+        title: 'No Questions Processed',
+        description: 'The batch input was empty or no valid questions were found.',
+        variant: 'default',
+      });
+    }
+  };
+
+
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
         <CardTitle className="font-headline text-3xl">Add New Question</CardTitle>
-        <CardDescription>Fill in the details for your multiple-choice question.</CardDescription>
+        <CardDescription>Fill in the details for your multiple-choice question, or use the batch add feature below.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {/* Single Question Form Fields */}
           <div>
             <Label htmlFor="text" className="text-lg">Question Text</Label>
             <Textarea
@@ -288,7 +390,7 @@ export function QuestionForm() {
           </div>
 
           <div>
-            <Label htmlFor="category" className="text-lg">Category</Label>
+            <Label htmlFor="category" className="text-lg">Category (for single & batch)</Label>
             <Input
               id="category"
               {...form.register('category')}
@@ -323,10 +425,43 @@ export function QuestionForm() {
           <CardFooter className="px-0 pt-6">
             <Button type="submit" size="lg" className="w-full text-lg shadow-md" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-              Add Question
+              Add Single Question
             </Button>
           </CardFooter>
         </form>
+
+        {/* Batch Add Section */}
+        <div className="mt-10 pt-6 border-t">
+          <div className="flex items-center mb-3">
+            <FileText className="h-6 w-6 mr-2 text-primary" />
+            <h3 className="text-xl font-semibold">Batch Add Questions</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Format: <code className="font-code bg-muted px-1 py-0.5 rounded text-xs">;;Question Text;; {'{OptionA - OptionB - OptionC}'} [Correct Option Text]</code>
+          </p>
+          <p className="text-sm text-muted-foreground mb-1">
+            Enter one question per line. Uses the category specified above.
+          </p>
+           <p className="text-xs text-muted-foreground mb-4">
+            Example: <code className="font-code bg-muted px-1 py-0.5 rounded">;;What is 2+2?;; {'{Three - Four - Five}'} [Four]</code>
+          </p>
+          <Textarea
+            value={batchInput}
+            onChange={handleBatchInputChange}
+            placeholder=";;What is the capital of France?;; {Paris - London - Rome} [Paris]\n;;Which planet is known as the Red Planet?;; {Earth - Mars - Jupiter} [Mars]"
+            className="min-h-[150px] text-sm font-code"
+            disabled={isProcessingBatch}
+            aria-label="Batch question input"
+          />
+          <Button 
+            onClick={handleProcessBatch} 
+            className="mt-4 w-full sm:w-auto" 
+            disabled={isProcessingBatch || !batchInput.trim()}
+          >
+            {isProcessingBatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+            Process Batch Questions
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
