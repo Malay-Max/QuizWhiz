@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -21,26 +22,23 @@ export function Timer({ duration, onTimeout, onTick, isPaused, resetKey }: Timer
   }, [duration, resetKey]);
 
   useEffect(() => {
-    if (isPaused || timeLeft <= 0) {
+    if (isPaused) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
       return;
     }
 
+    if (timeLeft <= 0) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      onTimeout();
+      return;
+    }
+
     intervalRef.current = setInterval(() => {
-      setTimeLeft((prevTime) => {
-        const newTime = prevTime - 1;
-        if (onTick) {
-          onTick(newTime);
-        }
-        if (newTime <= 0) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          onTimeout();
-          return 0;
-        }
-        return newTime;
-      });
+      setTimeLeft((prevTime) => prevTime - 1);
     }, 1000);
 
     return () => {
@@ -48,7 +46,13 @@ export function Timer({ duration, onTimeout, onTick, isPaused, resetKey }: Timer
         clearInterval(intervalRef.current);
       }
     };
-  }, [duration, onTimeout, onTick, isPaused, timeLeft, resetKey]);
+  }, [isPaused, timeLeft, duration, onTimeout]);
+
+  useEffect(() => {
+    if (onTick) {
+      onTick(timeLeft);
+    }
+  }, [timeLeft, onTick]);
 
   const progressPercentage = (timeLeft / duration) * 100;
 
