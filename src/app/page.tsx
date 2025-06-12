@@ -31,6 +31,13 @@ export default function QuizPage() {
     loadActiveSession();
   }, [loadActiveSession]);
 
+  // Effect to handle navigation when quiz is completed
+  useEffect(() => {
+    if (quizSession?.status === 'completed') {
+      router.push('/summary');
+    }
+  }, [quizSession?.status, router]);
+
   const startQuiz = (tag: string) => {
     setIsLoading(true);
     const allQuestions = getQuestions();
@@ -62,18 +69,16 @@ export default function QuizPage() {
   const handleAnswer = (selectedAnswerId: string, timeTaken: number) => {
     setQuizSession(prevSession => {
       if (!prevSession || prevSession.currentQuestionIndex >= questionsForTag.length) {
-        // console.warn("QuizPage.handleAnswer: No active session or index out of bounds.");
         return prevSession;
       }
       const currentQuestion = questionsForTag[prevSession.currentQuestionIndex];
       if (!currentQuestion) {
-        // console.warn("QuizPage.handleAnswer: Current question not found.");
         return prevSession;
       }
 
+      // Check if an answer for this question already exists
       if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
-        // console.warn(`QuizPage.handleAnswer: Attempted to log a second answer for question ${currentQuestion.id}. Ignoring.`);
-        return prevSession;
+        return prevSession; // Already answered, ignore subsequent calls
       }
 
       const isCorrect = currentQuestion.correctAnswerId === selectedAnswerId;
@@ -96,18 +101,16 @@ export default function QuizPage() {
   const handleTimeout = (timeTaken: number) => {
     setQuizSession(prevSession => {
       if (!prevSession || prevSession.currentQuestionIndex >= questionsForTag.length) {
-        // console.warn("QuizPage.handleTimeout: No active session or index out of bounds.");
         return prevSession;
       }
       const currentQuestion = questionsForTag[prevSession.currentQuestionIndex];
       if (!currentQuestion) {
-        // console.warn("QuizPage.handleTimeout: Current question not found.");
         return prevSession;
       }
       
+      // Check if an answer for this question already exists
       if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
-        // console.warn(`QuizPage.handleTimeout: Attempted to log timeout for already answered question ${currentQuestion.id}. Ignoring.`);
-        return prevSession;
+        return prevSession; // Already answered or skipped, ignore subsequent calls
       }
 
       const newAnswer: QuizAnswer = {
@@ -134,13 +137,14 @@ export default function QuizPage() {
         saveQuizSession(updatedSession);
         return updatedSession;
       } else {
+        // Quiz finished, mark as completed
         const completedSession = { 
           ...prevSession, 
           status: 'completed' as 'completed',
           endTime: Date.now() 
         };
         saveQuizSession(completedSession);
-        router.push('/summary');
+        // Navigation will be handled by the useEffect hook watching quizSession.status
         return completedSession;
       }
     });
@@ -168,27 +172,32 @@ export default function QuizPage() {
     return <TagSelector onSelectTag={startQuiz} />;
   }
   
-  if (quizSession.currentQuestionIndex >= questionsForTag.length) {
-     return (
-      <Card className="w-full max-w-md mx-auto text-center shadow-lg">
-        <CardHeader>
-          <CardTitle className="font-headline text-2xl">Quiz Error</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-destructive-foreground bg-destructive p-4 rounded-md">
-            There was an issue loading the next question. The quiz may have ended or data is inconsistent.
-          </p>
-          <Button onClick={handleRestartQuiz} className="mt-6 w-full" variant="destructive">
-            <RotateCcw className="mr-2 h-4 w-4" /> Restart Quiz Selection
-          </Button>
-        </CardContent>
-      </Card>
+  if (quizSession.currentQuestionIndex >= questionsForTag.length && quizSession.status === 'active') {
+     // This case can happen if somehow currentQuestionIndex is out of bounds but status is not yet completed
+     // Or if questionsForTag is empty after session started (unlikely with current checks but good to be safe)
+     // We should transition to completed status if not already.
+     const completedSession = { 
+        ...quizSession, 
+        status: 'completed' as 'completed',
+        endTime: quizSession.endTime || Date.now() 
+      };
+      saveQuizSession(completedSession);
+      setQuizSession(completedSession); // Update local state to trigger useEffect for navigation
+      // The useEffect will handle navigation to /summary
+     return ( // Show a loading or transitional state until navigation happens
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Finalizing Quiz...</p>
+      </div>
     );
   }
 
+
   const currentQuestion = questionsForTag[quizSession.currentQuestionIndex];
 
-  if (!currentQuestion) {
+  if (!currentQuestion && quizSession.status === 'active') {
+     // This is an error state: active quiz but no current question.
+     // Could be due to data corruption or unexpected state.
      return (
       <Card className="w-full max-w-md mx-auto text-center shadow-lg">
         <CardHeader>
@@ -205,6 +214,17 @@ export default function QuizPage() {
       </Card>
     );
   }
+  
+  // If session is not active (e.g., completed but navigation hasn't happened yet), don't render QuestionCard
+  if (quizSession.status !== 'active' || !currentQuestion) {
+     return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="flex flex-col items-center">
@@ -223,3 +243,4 @@ export default function QuizPage() {
     </div>
   );
 }
+
