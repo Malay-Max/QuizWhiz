@@ -2,7 +2,7 @@
 'use server';
 /**
  * @fileOverview A flow to generate an explanation for a quiz question and its answer,
- * now with the ability to fetch additional context about entities using tools.
+ * now with the ability to fetch additional context about entities using tools that query an LLM.
  *
  * - explainAnswer - A function that generates an explanation.
  * - ExplainAnswerInput - The input type for the explainAnswer function.
@@ -15,7 +15,7 @@ import {
   ExplainAnswerInputSchema as ImportedExplainAnswerInputSchema, 
   ExplainAnswerOutputSchema as ImportedExplainAnswerOutputSchema 
 } from '@/types';
-import type { AnswerOption } from '@/types';
+// Note: AnswerOption type is implicitly handled by the schemas if needed, but not directly used in this file's top-level logic.
 
 
 // Re-export types for external use, derived from imported schemas
@@ -23,7 +23,7 @@ export type ExplainAnswerInput = z.infer<typeof ImportedExplainAnswerInputSchema
 export type ExplainAnswerOutput = z.infer<typeof ImportedExplainAnswerOutputSchema>;
 
 
-// Internal schema for the prompt's direct input (not exported)
+// Internal schema for the main prompt's direct input (not exported)
 const PromptInputSchema = z.object({
   questionText: z.string().describe("The text of the quiz question."),
   allOptionsText: z.array(z.string()).describe("An array of all answer option texts."),
@@ -35,104 +35,136 @@ const PromptInputSchema = z.object({
 // --- Tool Definitions ---
 
 // Tool for Book Information
+const BookInfoInputSchema = z.object({ title: z.string().describe("The title of the book.") });
 const BookInfoSchema = z.object({
-  author: z.string().describe("The author of the book."),
-  publicationYear: z.string().describe("The year the book was published."),
-  summary: z.string().describe("A brief summary of the book.")
+  author: z.string().describe("The author of the book. Use 'Unknown' if not found."),
+  publicationYear: z.string().describe("The year the book was published (e.g., '1851'). Use 'Unknown' if not found."),
+  summary: z.string().describe("A brief (1-2 sentence) summary of the book. Use 'No summary available.' if not found.")
 });
+
+const bookInfoFetcherPrompt = ai.definePrompt({
+    name: 'bookInfoFetcherPrompt',
+    input: { schema: BookInfoInputSchema },
+    output: { schema: BookInfoSchema },
+    prompt: `You are a knowledgeable librarian. For the book titled "{{title}}", provide the following information:
+- author: The author's full name.
+- publicationYear: The year the book was first published (e.g., "1851").
+- summary: A concise 1-2 sentence summary of the book's main plot or theme.
+
+If any piece of information cannot be found, use "Unknown" for author/publicationYear and "No summary available." for the summary.
+Book Title: {{title}}`,
+    // Example of how you might set safety settings if needed, though often default is fine
+    // config: {
+    //   safetySettings: [{ category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' }],
+    // },
+});
+
 const getBookInfoTool = ai.defineTool(
   {
     name: 'getBookInfo',
-    description: 'Provides information about a book, including its author, publication year, and a brief summary. Use this if a book title is mentioned.',
-    inputSchema: z.object({ title: z.string().describe("The title of the book.") }),
+    description: 'Provides information about a book, including its author, publication year, and a brief summary. Use this if a book title is mentioned in the quiz question or options.',
+    inputSchema: BookInfoInputSchema,
     outputSchema: BookInfoSchema,
   },
   async ({ title }) => {
-    // Mock data for demonstration. In a real app, call an API here.
-    if (title.toLowerCase().includes("moby dick")) {
-      return { author: "Herman Melville", publicationYear: "1851", summary: "A novel about Captain Ahab's obsessive quest to hunt Moby Dick, a giant white sperm whale." };
+    try {
+      const { output } = await bookInfoFetcherPrompt({ title });
+      if (output) {
+        return output;
+      }
+      // Fallback if Gemini couldn't provide structured output or found nothing matching schema
+      return { author: "Information not found", publicationYear: "N/A", summary: "Could not retrieve details for this book via AI." };
+    } catch (error) {
+      console.error(`Error in getBookInfoTool for "${title}":`, error);
+      return { author: "Error fetching data", publicationYear: "Error", summary: "An error occurred while fetching book details." };
     }
-    if (title.toLowerCase().includes("pride and prejudice")) {
-      return { author: "Jane Austen", publicationYear: "1813", summary: "A romantic novel that charts the emotional development of the protagonist Elizabeth Bennet." };
-    }
-    if (title.toLowerCase().includes("1984") || title.toLowerCase().includes("nineteen eighty-four")) {
-      return { author: "George Orwell", publicationYear: "1949", summary: "A dystopian social science fiction novel and cautionary tale." };
-    }
-    return { author: "Unknown", publicationYear: "Unknown", summary: `No specific information found for "${title}".` };
   }
 );
 
 // Tool for Author Information
+const AuthorInfoInputSchema = z.object({ name: z.string().describe("The name of the author.") });
 const AuthorInfoSchema = z.object({
-  majorWorks: z.array(z.object({ title: z.string(), year: z.string() })).describe("A list of the author's major works with publication years."),
-  bioSummary: z.string().describe("A brief biographical summary of the author.")
+  majorWorks: z.array(z.object({ 
+    title: z.string().describe("Title of a major work."), 
+    year: z.string().describe("Publication year of the work (e.g., '1813'). Use 'Unknown' if year not found.") 
+  })).describe("A list of up to 3 of the author's major works with publication years. Empty list if none found."),
+  bioSummary: z.string().describe("A brief (1-2 sentence) biographical summary of the author. Use 'No biographical summary available.' if not found.")
 });
+
+const authorInfoFetcherPrompt = ai.definePrompt({
+    name: 'authorInfoFetcherPrompt',
+    input: { schema: AuthorInfoInputSchema },
+    output: { schema: AuthorInfoSchema },
+    prompt: `You are a literary expert. For the author named "{{name}}", provide the following:
+- majorWorks: A list of up to 3 of their most significant literary works, each including its title and publication year (e.g., "1949").
+- bioSummary: A concise 1-2 sentence biographical summary highlighting their significance or style.
+
+If information is unavailable, provide an empty list for majorWorks and "No biographical summary available." for bioSummary.
+Author: {{name}}`,
+});
+
 const getAuthorInfoTool = ai.defineTool(
   {
     name: 'getAuthorInfo',
     description: "Provides information about an author, including their major works and a brief biography. Use this if an author's name is mentioned.",
-    inputSchema: z.object({ name: z.string().describe("The name of the author.") }),
+    inputSchema: AuthorInfoInputSchema,
     outputSchema: AuthorInfoSchema,
   },
   async ({ name }) => {
-    // Mock data
-    if (name.toLowerCase().includes("jane austen")) {
-      return { 
-        majorWorks: [
-          { title: "Sense and Sensibility", year: "1811" },
-          { title: "Pride and Prejudice", year: "1813" },
-          { title: "Mansfield Park", year: "1814" },
-          { title: "Emma", year: "1815" },
-        ], 
-        bioSummary: "Jane Austen was an English novelist known primarily for her six major novels, which interpret, critique and comment upon the British landed gentry at the end of milking the 18th century." 
-      };
+    try {
+      const { output } = await authorInfoFetcherPrompt({ name });
+      if (output) {
+        return output;
+      }
+      return { majorWorks: [], bioSummary: "Could not retrieve details for this author via AI." };
+    } catch (error) {
+      console.error(`Error in getAuthorInfoTool for "${name}":`, error);
+      return { majorWorks: [], bioSummary: "An error occurred while fetching author details." };
     }
-     if (name.toLowerCase().includes("george orwell")) {
-      return { 
-        majorWorks: [
-          { title: "Animal Farm", year: "1945" },
-          { title: "Nineteen Eighty-Four", year: "1949" },
-        ], 
-        bioSummary: "Eric Arthur Blair (George Orwell) was an English novelist, essayist, journalist and critic, whose work is marked by lucid prose, awareness of social injustice, and opposition to totalitarianism." 
-      };
-    }
-    return { majorWorks: [], bioSummary: `No specific information found for author "${name}".` };
   }
 );
 
 // Tool for Event Information
+const EventInfoInputSchema = z.object({ eventName: z.string().describe("The name of the event.") });
 const EventInfoSchema = z.object({
-  date: z.string().describe("The date or date range of the event."),
-  keyFacts: z.array(z.string()).describe("A list of key facts about the event."),
-  significance: z.string().describe("The significance of the event.")
+  date: z.string().describe("The date or date range of the event (e.g., '1789–1799' or 'July 20, 1969'). Use 'Unknown' if not found."),
+  keyFacts: z.array(z.string()).describe("A list of up to 3 key facts about the event. Empty list if none found."),
+  significance: z.string().describe("A brief (1-2 sentence) statement on the significance of the event. Use 'No significance summary available.' if not found.")
 });
+
+const eventInfoFetcherPrompt = ai.definePrompt({
+    name: 'eventInfoFetcherPrompt',
+    input: { schema: EventInfoInputSchema },
+    output: { schema: EventInfoSchema },
+    prompt: `You are a historian. For the historical event named "{{eventName}}", provide:
+- date: The date or date range when the event occurred.
+- keyFacts: A list of up to 3 crucial facts or outcomes of the event.
+- significance: A concise 1-2 sentence summary of its historical significance.
+
+If information is unavailable, use "Unknown" for date, an empty list for keyFacts, and "No significance summary available." for significance.
+Event: {{eventName}}`,
+});
+
 const getEventInfoTool = ai.defineTool(
   {
     name: 'getEventInfo',
     description: 'Provides information about a historical or significant event, including its date, key facts, and significance. Use this if an event is mentioned.',
-    inputSchema: z.object({ eventName: z.string().describe("The name of the event.") }),
+    inputSchema: EventInfoInputSchema,
     outputSchema: EventInfoSchema,
   },
   async ({ eventName }) => {
-    // Mock data
-    if (eventName.toLowerCase().includes("french revolution")) {
-      return { 
-        date: "1789–1799", 
-        keyFacts: ["Storming of the Bastille", "Reign of Terror", "Rise of Napoleon Bonaparte"], 
-        significance: "A period of far-reaching social and political upheaval in France and its colonies beginning in 1789." 
-      };
+    try {
+      const { output } = await eventInfoFetcherPrompt({ eventName });
+      if (output) {
+        return output;
+      }
+      return { date: "N/A", keyFacts: [], significance: "Could not retrieve details for this event via AI." };
+    } catch (error) {
+      console.error(`Error in getEventInfoTool for "${eventName}":`, error);
+      return { date: "Error", keyFacts: [], significance: "An error occurred while fetching event details." };
     }
-    if (eventName.toLowerCase().includes("apollo 11 moon landing")) {
-      return { 
-        date: "July 20, 1969", 
-        keyFacts: ["Neil Armstrong and Buzz Aldrin were the first humans to walk on the Moon.", "Command module pilot was Michael Collins.", "Fulfilled President Kennedy's goal."], 
-        significance: "A major achievement in human history and the Space Race." 
-      };
-    }
-    return { date: "Unknown", keyFacts: [], significance: `No specific information found for event "${eventName}".` };
   }
 );
-
 
 // --- End Tool Definitions ---
 
@@ -144,7 +176,7 @@ const explainAnswerPrompt = ai.definePrompt({
   name: 'explainAnswerPrompt',
   input: {schema: PromptInputSchema},
   output: {schema: ImportedExplainAnswerOutputSchema},
-  tools: [getBookInfoTool, getAuthorInfoTool, getEventInfoTool], // Register tools with the prompt
+  tools: [getBookInfoTool, getAuthorInfoTool, getEventInfoTool], // Register tools
   prompt: `You are an AI Quiz Explainer. Your goal is to provide a comprehensive and informative explanation for a quiz question.
 
 First, directly address the question and the user's answer:
@@ -157,7 +189,7 @@ First, directly address the question and the user's answer:
 After addressing the immediate question, enhance the explanation:
 Identify any specific entities mentioned in the question or options, such as book titles, author names, or historical events.
 If you identify such entities, use the available tools (getBookInfo, getAuthorInfo, getEventInfo) to gather relevant details (e.g., publication years, author's major works and their years, event dates, key facts, significance).
-Seamlessly integrate this additional information into your explanation to provide richer context and educational value. Make the explanation engaging and easy to understand.
+Seamlessly integrate this additional information into your explanation to provide richer context and educational value. Make the explanation engaging, easy to understand, and ensure the information from tools is presented clearly.
 
 Question:
 {{{questionText}}}
@@ -202,7 +234,8 @@ const explainAnswerFlow = ai.defineFlow(
         selectedAnswerOptionText = selectedOpt.text;
         wasUserCorrect = input.selectedAnswerId === input.correctAnswerId;
       } else {
-        selectedAnswerOptionText = "An option that was not listed.";
+        // This case should ideally not happen if IDs are consistent
+        selectedAnswerOptionText = "An unlisted or invalid option was recorded.";
         wasUserCorrect = false;
       }
     }
@@ -215,11 +248,19 @@ const explainAnswerFlow = ai.defineFlow(
       wasCorrect: wasUserCorrect,
     };
     
-    const {output} = await explainAnswerPrompt(promptInternalInput);
-    if (!output) {
-        return { explanation: "Sorry, I couldn't generate an explanation at this time." };
+    try {
+        const {output} = await explainAnswerPrompt(promptInternalInput);
+        if (!output) {
+            // This can happen if the model fails to generate output matching the schema or an unknown error.
+            return { explanation: "Sorry, I couldn't generate a structured explanation at this time. The model might have had an issue." };
+        }
+        return output;
+    } catch (error) {
+        console.error("Error during explainAnswerPrompt execution:", error);
+        // Check for specific Genkit/Gemini error types if available, or provide a generic message.
+        // e.g. if (error instanceof GenkitError && error.isSafetyError) { ... }
+        return { explanation: "An error occurred while generating the explanation. Please try again." };
     }
-    return output;
   }
 );
 
