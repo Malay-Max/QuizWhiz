@@ -201,7 +201,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
             <AlertDialogTitle>Explanation</AlertDialogTitle>
           </AlertDialogHeader>
           <AlertDialogDescription className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap py-2">
-            {isExplanationLoading && <div className="flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /><p className="ml-2">Generating explanation...</p></div>}
+            {isExplanationLoading && <div className="flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /><span className="ml-2">Generating explanation...</span></div>}
             {!isExplanationLoading && explanation}
             {!isExplanationLoading && !explanation && "No explanation available or an error occurred."}
           </AlertDialogDescription>
