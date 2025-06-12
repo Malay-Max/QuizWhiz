@@ -2,7 +2,7 @@
 "use client";
 
 import type { Question } from '@/types';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Timer } from '@/components/quiz/Timer';
@@ -41,6 +41,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const [isExplanationLoading, setIsExplanationLoading] = useState(false);
   const [showExplanationDialog, setShowExplanationDialog] = useState(false);
   const { toast } = useToast();
+  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
 
   useEffect(() => {
@@ -51,29 +52,55 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     setExplanation(null);
     setIsExplanationLoading(false);
     setShowExplanationDialog(false);
+
+    // Clear any pending auto-advance timer from the previous question
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
   }, [question.id]);
 
   const handleAnswerClick = (answerId: string) => {
     if (isAnswered) return;
+
+    if (autoAdvanceTimerRef.current) {
+        clearTimeout(autoAdvanceTimerRef.current);
+        autoAdvanceTimerRef.current = null;
+    }
 
     const timeTaken = QUESTION_DURATION - timeLeft;
     setSelectedAnswerId(answerId);
     setIsAnswered(true);
     setShowFeedback(true);
     onAnswer(answerId, timeTaken);
+
+    const isCorrect = question.correctAnswerId === answerId;
+
+    if (isCorrect) {
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        onNext();
+      }, 5000); // 5 seconds delay
+    }
+    // If incorrect, manual "Next" button click is required.
   };
 
   const handleTimeout = () => {
     if (isAnswered) return; 
 
+    // Clear any pending auto-advance timer if timeout occurs
+    if (autoAdvanceTimerRef.current) {
+        clearTimeout(autoAdvanceTimerRef.current);
+        autoAdvanceTimerRef.current = null;
+    }
+
     setIsAnswered(true);
     setShowFeedback(true); 
-    onTimeout(QUESTION_DURATION);
+    onTimeout(QUESTION_DURATION); // Manual "Next" click required after timeout
   };
 
   const handleShowExplanation = async () => {
     setIsExplanationLoading(true);
-    setExplanation(null); // Clear previous explanation
+    setExplanation(null); 
     setShowExplanationDialog(true);
 
     const correctAnswerOption = question.options.find(opt => opt.id === question.correctAnswerId);
@@ -116,7 +143,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const getButtonClassNames = (optionId: string) => {
     if (!showFeedback) return '';
     if (optionId === question.correctAnswerId) return 'bg-accent hover:bg-accent/90 text-accent-foreground animate-pulse';
-    if (isAnswered && !selectedAnswerId && optionId === question.correctAnswerId) return 'bg-destructive hover:bg-destructive/90 text-destructive-foreground animate-pulse';
+    if (isAnswered && !selectedAnswerId && optionId === question.correctAnswerId) return 'bg-destructive hover:bg-destructive/90 text-destructive-foreground animate-pulse'; // For timeout, highlight correct
     if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return ''; 
     return '';
   };
@@ -132,7 +159,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
           <div className="flex justify-between items-center mb-2">
               <CardTitle className="font-headline text-2xl md:text-3xl">Question {questionNumber}/{totalQuestions}</CardTitle>
               <Timer
-                  key={question.id} 
+                  key={question.id + (isAnswered ? '-paused' : '-running')} // Key change to help reset timer state if needed
                   duration={QUESTION_DURATION}
                   onTimeout={handleTimeout}
                   onTick={setTimeLeft}
@@ -188,7 +215,16 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
             </Button>
           )}
           {isAnswered && (
-            <Button onClick={onNext} size="lg" className="w-full md:w-auto shadow-md transition-transform hover:scale-105">
+            <Button onClick={() => {
+              if (autoAdvanceTimerRef.current) { // If user clicks next manually, clear auto-advance
+                clearTimeout(autoAdvanceTimerRef.current);
+                autoAdvanceTimerRef.current = null;
+              }
+              onNext();
+            }} 
+            size="lg" 
+            className="w-full md:w-auto shadow-md transition-transform hover:scale-105"
+            >
               {questionNumber === totalQuestions ? 'Finish Quiz' : 'Next Question'} <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           )}
