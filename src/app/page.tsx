@@ -4,11 +4,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Question, QuizSession, QuizAnswer } from '@/types';
-import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession, deleteQuestionById } from '@/lib/storage';
-import { CategorySelector } from '@/components/quiz/CategorySelector';
+import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession, deleteQuestionById, deleteQuestionsByCategory } from '@/lib/storage';
+import { CategorySelector, ALL_QUESTIONS_RANDOM_KEY } from '@/components/quiz/CategorySelector';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { Button } from '@/components/ui/button';
-import { Loader2, RotateCcw, Trash2 } from 'lucide-react';
+import { Loader2, RotateCcw, Trash2, Library } from 'lucide-react'; // Added Library for delete category
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AlertDialog,
@@ -28,13 +28,13 @@ export default function QuizPage() {
   const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [questionsForCategory, setQuestionsForCategory] = useState<Question[]>([]);
-  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
+  const [showDeleteQuestionConfirmDialog, setShowDeleteQuestionConfirmDialog] = useState(false);
+  const [showDeleteCategoryConfirmDialog, setShowDeleteCategoryConfirmDialog] = useState(false);
 
   const loadActiveSession = useCallback(() => {
     const activeSession = getQuizSession();
     if (activeSession && activeSession.status === 'active') {
       setQuizSession(activeSession);
-      // Ensure questionsForCategory is also initialized from the loaded session
       setQuestionsForCategory(activeSession.questions || []);
     }
     setIsLoading(false);
@@ -48,17 +48,27 @@ export default function QuizPage() {
     if (quizSession?.status === 'completed') {
       router.push('/summary');
     }
-  }, [quizSession]);
+  }, [quizSession, router]);
 
   const startQuiz = (selectedCategoryPath: string) => {
     setIsLoading(true);
     const allQuestions = getQuestions();
-    // Filter questions: include if question's category starts with the selected path
-    // e.g., if selectedCategoryPath is "Science", include "Science", "Science/Physics", "Science/Chemistry"
-    const filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category.startsWith(selectedCategoryPath));
+    let filteredQuestions: Question[] = [];
+    let quizCategoryName = selectedCategoryPath;
+
+    if (selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY) {
+      filteredQuestions = allQuestions;
+      quizCategoryName = "All Categories (Random)";
+    } else {
+      filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category.startsWith(selectedCategoryPath));
+    }
     
     if (filteredQuestions.length === 0) {
-      alert(`No questions found for the category "${selectedCategoryPath}" or its sub-categories. Please select another category or add questions.`);
+      toast({
+        title: "No Questions Found",
+        description: `No questions found for "${selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY ? "any category" : selectedCategoryPath}". Please add questions or select a different category.`,
+        variant: "destructive",
+      });
       setIsLoading(false);
       return;
     }
@@ -67,7 +77,7 @@ export default function QuizPage() {
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
-      category: selectedCategoryPath,
+      category: quizCategoryName,
       questions: shuffledQuestions,
       currentQuestionIndex: 0,
       answers: [],
@@ -83,7 +93,9 @@ export default function QuizPage() {
   const handleAnswer = (selectedAnswerId: string, timeTaken: number) => {
     setQuizSession(prevSession => {
       if (!prevSession) return prevSession;
-      // Ensure questionsForCategory is derived from the session being updated
+      if (prevSession.answers.find(ans => ans.questionId === (prevSession.questions[prevSession.currentQuestionIndex] || {}).id)) {
+        return prevSession;
+      }
       const currentQuestions = prevSession.questions || [];
       if (prevSession.currentQuestionIndex >= currentQuestions.length) {
         return prevSession;
@@ -91,11 +103,6 @@ export default function QuizPage() {
       const currentQuestion = currentQuestions[prevSession.currentQuestionIndex];
       if (!currentQuestion) {
         return prevSession;
-      }
-
-      // Check if an answer for this question already exists
-      if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
-        return prevSession; 
       }
 
       const isCorrect = currentQuestion.correctAnswerId === selectedAnswerId;
@@ -118,7 +125,9 @@ export default function QuizPage() {
   const handleTimeout = (timeTaken: number) => {
     setQuizSession(prevSession => {
       if (!prevSession) return prevSession;
-      // Ensure questionsForCategory is derived from the session being updated
+      if (prevSession.answers.find(ans => ans.questionId === (prevSession.questions[prevSession.currentQuestionIndex] || {}).id)) {
+        return prevSession; 
+      }
       const currentQuestions = prevSession.questions || [];
       if (prevSession.currentQuestionIndex >= currentQuestions.length) {
         return prevSession;
@@ -128,11 +137,6 @@ export default function QuizPage() {
         return prevSession;
       }
       
-      // Check if an answer for this question already exists
-      if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
-        return prevSession; 
-      }
-
       const newAnswer: QuizAnswer = {
         questionId: currentQuestion.id,
         timeTaken,
@@ -150,7 +154,6 @@ export default function QuizPage() {
   const handleNextQuestion = () => {
     setQuizSession(prevSession => {
       if (!prevSession) return prevSession;
-      // Ensure questionsForCategory is derived from the session being updated
       const currentQuestions = prevSession.questions || [];
       const nextIndex = prevSession.currentQuestionIndex + 1;
 
@@ -165,7 +168,6 @@ export default function QuizPage() {
           endTime: Date.now()
         };
         saveQuizSession(completedSession);
-        // Navigation will be handled by useEffect watching quizSession.status
         return completedSession;
       }
     });
@@ -176,11 +178,23 @@ export default function QuizPage() {
     setQuizSession(null);
     setQuestionsForCategory([]);
     setIsLoading(true); 
-    setTimeout(() => setIsLoading(false), 50); // Brief delay to re-trigger loader and category selector
+    setTimeout(() => setIsLoading(false), 50);
   };
 
   const handleDeleteCurrentQuestionDialog = () => {
-    setShowDeleteConfirmDialog(true);
+    setShowDeleteQuestionConfirmDialog(true);
+  };
+  
+  const handleDeleteCategoryDialog = () => {
+     if (quizSession?.category === "All Categories (Random)") {
+        toast({
+            title: "Action Not Allowed",
+            description: "Cannot delete 'All Categories (Random)' quiz. This is a dynamic collection.",
+            variant: "destructive"
+        });
+        return;
+    }
+    setShowDeleteCategoryConfirmDialog(true);
   };
 
   const handleConfirmDeleteCurrentQuestion = () => {
@@ -189,7 +203,7 @@ export default function QuizPage() {
     const currentQuestionToDelete = questionsForCategory[quizSession.currentQuestionIndex];
     if (!currentQuestionToDelete) {
         toast({ title: "Error", description: "Could not identify question to delete.", variant: "destructive" });
-        setShowDeleteConfirmDialog(false);
+        setShowDeleteQuestionConfirmDialog(false);
         return;
     }
 
@@ -199,15 +213,16 @@ export default function QuizPage() {
         if (!prevSession) return null;
 
         const updatedQuestionsArray = prevSession.questions.filter(q => q.id !== currentQuestionToDelete.id);
-        setQuestionsForCategory(updatedQuestionsArray); // Keep this page state in sync
+        
+        // Ensure questionsForCategory is kept in sync
+        setQuestionsForCategory(updatedQuestionsArray);
 
         if (updatedQuestionsArray.length === 0 || prevSession.currentQuestionIndex >= updatedQuestionsArray.length) {
-            // No questions left, or the deleted question was the last one being displayed
             const completedSession: QuizSession = {
                 ...prevSession,
                 questions: updatedQuestionsArray,
                 answers: prevSession.answers.filter(ans => updatedQuestionsArray.some(q => q.id === ans.questionId)),
-                currentQuestionIndex: 0,
+                currentQuestionIndex: 0, // Reset index
                 status: 'completed',
                 endTime: Date.now(),
             };
@@ -215,25 +230,45 @@ export default function QuizPage() {
             return completedSession;
         }
 
-        // Current index is still valid for the new array, effectively shows the next question
+        // Current index might still be valid or effectively points to the "new" current after deletion
+        // If currentQuestionIndex was the last valid index, it's now out of bounds, handled above.
+        // Otherwise, the same index will show the next item from the filtered array.
         const updatedSession: QuizSession = {
             ...prevSession,
             questions: updatedQuestionsArray,
             answers: prevSession.answers.filter(ans => updatedQuestionsArray.some(q => q.id === ans.questionId)),
-            // currentQuestionIndex remains the same as the array shifts.
-            // If it was item 0 and deleted, new item 0 is the next.
-            currentQuestionIndex: prevSession.currentQuestionIndex, 
+            // currentQuestionIndex: prevSession.currentQuestionIndex, // No change needed here, or it could be Math.min(prevSession.currentQuestionIndex, updatedQuestionsArray.length -1) if that makes more sense. For now, no change as the condition above handles empty/out of bounds.
             status: 'active',
         };
         saveQuizSession(updatedSession);
         return updatedSession;
     });
 
-    setShowDeleteConfirmDialog(false);
+    setShowDeleteQuestionConfirmDialog(false);
     toast({
         title: "Question Deleted",
         description: `The question "${currentQuestionToDelete.text.substring(0,30)}..." has been removed.`,
         variant: "default",
+    });
+  };
+
+  const handleConfirmDeleteCategory = () => {
+    if (!quizSession || !quizSession.category || quizSession.category === ALL_QUESTIONS_RANDOM_KEY) return;
+
+    const categoryToDelete = quizSession.category;
+    deleteQuestionsByCategory(categoryToDelete); // This deletes from global storage
+
+    clearQuizSession(); // Clear the current session as it's based on the deleted category
+    setQuizSession(null);
+    setQuestionsForCategory([]);
+    setShowDeleteCategoryConfirmDialog(false);
+    setIsLoading(true); // To re-trigger category selector
+    setTimeout(() => setIsLoading(false), 50);
+
+    toast({
+      title: "Quiz Category Deleted",
+      description: `All questions in category "${categoryToDelete}" have been removed.`,
+      variant: "default",
     });
   };
 
@@ -251,21 +286,18 @@ export default function QuizPage() {
     return <CategorySelector onSelectCategory={startQuiz} />;
   }
   
-  // This condition needs to check based on questionsForCategory derived from quizSession
   if (quizSession.questions.length === 0 || quizSession.currentQuestionIndex >= quizSession.questions.length) {
-     if (quizSession.status === 'active') { // Only try to complete if it was active
+     if (quizSession.status === 'active') { 
         const completedSession = { 
             ...quizSession, 
             status: 'completed' as 'completed',
             endTime: quizSession.endTime || Date.now() 
         };
-        // Check if already completing to prevent loop if router.push is delayed
         if (quizSession.id && getQuizSession()?.id === quizSession.id && getQuizSession()?.status !== 'completed') {
             saveQuizSession(completedSession);
-            setQuizSession(completedSession); // This will trigger useEffect for navigation
+            setQuizSession(completedSession); 
         }
      }
-     // Show loader while transitioning to summary
      return ( 
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -276,7 +308,7 @@ export default function QuizPage() {
 
   const currentQuestion = quizSession.questions[quizSession.currentQuestionIndex];
 
-  if (!currentQuestion) { // Should be caught by above block, but as a safeguard
+  if (!currentQuestion) { 
      return (
       <Card className="w-full max-w-md mx-auto text-center shadow-lg">
         <CardHeader>
@@ -313,10 +345,15 @@ export default function QuizPage() {
           <Button onClick={handleDeleteCurrentQuestionDialog} variant="destructive" className="flex-1">
             <Trash2 className="mr-2 h-4 w-4" /> Delete This Question
           </Button>
+           {quizSession.category !== "All Categories (Random)" && (
+            <Button onClick={handleDeleteCategoryDialog} variant="destructive" className="flex-1 bg-red-700 hover:bg-red-800">
+              <Library className="mr-2 h-4 w-4" /> Delete Entire Quiz Category
+            </Button>
+          )}
         </div>
       </div>
 
-      <AlertDialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
+      <AlertDialog open={showDeleteQuestionConfirmDialog} onOpenChange={setShowDeleteQuestionConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -333,6 +370,25 @@ export default function QuizPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDeleteCurrentQuestion} className="bg-destructive hover:bg-destructive/90">
               Delete Question
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDeleteCategoryConfirmDialog} onOpenChange={setShowDeleteCategoryConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Entire Quiz Category?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete all questions in the category: <br />
+              <strong className="text-primary font-semibold">{quizSession?.category}</strong>
+              <br /> and all its sub-categories from your library.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteCategory} className="bg-destructive hover:bg-destructive/90">
+              Delete Category
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

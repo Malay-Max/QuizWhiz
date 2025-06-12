@@ -4,11 +4,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Question, QuizSession, QuizAnswer } from '@/types';
-import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession, deleteQuestionById } from '@/lib/storage';
-import { CategorySelector } from '@/components/quiz/CategorySelector';
+import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession, deleteQuestionById, deleteQuestionsByCategory } from '@/lib/storage';
+import { CategorySelector, ALL_QUESTIONS_RANDOM_KEY } from '@/components/quiz/CategorySelector';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { Button } from '@/components/ui/button';
-import { Loader2, RotateCcw, Trash2 } from 'lucide-react';
+import { Loader2, RotateCcw, Trash2, Library } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AlertDialog,
@@ -27,8 +27,9 @@ export default function QuizPage() {
   const { toast } = useToast();
   const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [questionsForCategory, setQuestionsForCategory] = useState<Question[]>([]); // Still used for QuestionCard prop
-  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
+  const [questionsForCategory, setQuestionsForCategory] = useState<Question[]>([]);
+  const [showDeleteQuestionConfirmDialog, setShowDeleteQuestionConfirmDialog] = useState(false);
+  const [showDeleteCategoryConfirmDialog, setShowDeleteCategoryConfirmDialog] = useState(false);
 
   const loadActiveSession = useCallback(() => {
     const activeSession = getQuizSession();
@@ -47,15 +48,27 @@ export default function QuizPage() {
     if (quizSession?.status === 'completed') {
       router.push('/summary');
     }
-  }, [quizSession, router]); // quizSession dependency is important here
+  }, [quizSession, router]);
 
   const startQuiz = (selectedCategoryPath: string) => {
     setIsLoading(true);
     const allQuestions = getQuestions();
-    const filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category.startsWith(selectedCategoryPath));
+    let filteredQuestions: Question[] = [];
+    let quizCategoryName = selectedCategoryPath;
+
+    if (selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY) {
+      filteredQuestions = allQuestions;
+      quizCategoryName = "All Categories (Random)";
+    } else {
+      filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category.startsWith(selectedCategoryPath));
+    }
     
     if (filteredQuestions.length === 0) {
-      alert(`No questions found for the category "${selectedCategoryPath}" or its sub-categories. Please select another category or add questions.`);
+      toast({
+        title: "No Questions Found",
+        description: `No questions found for "${selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY ? "any category" : selectedCategoryPath}". Please add questions or select a different category.`,
+        variant: "destructive",
+      });
       setIsLoading(false);
       return;
     }
@@ -64,7 +77,7 @@ export default function QuizPage() {
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
-      category: selectedCategoryPath,
+      category: quizCategoryName,
       questions: shuffledQuestions,
       currentQuestionIndex: 0,
       answers: [],
@@ -73,22 +86,21 @@ export default function QuizPage() {
     };
     saveQuizSession(newSession);
     setQuizSession(newSession);
-    setQuestionsForCategory(shuffledQuestions);
+    setQuestionsForCategory(shuffledQuestions); // Still used for QuestionCard prop
     setIsLoading(false);
   };
 
   const handleAnswer = (selectedAnswerId: string, timeTaken: number) => {
      setQuizSession(prevSession => {
       if (!prevSession) return prevSession;
+      if (prevSession.answers.find(ans => ans.questionId === (prevSession.questions[prevSession.currentQuestionIndex] || {}).id)) {
+        return prevSession;
+      }
       const currentQuestions = prevSession.questions || [];
       if (prevSession.currentQuestionIndex >= currentQuestions.length) return prevSession;
       
       const currentQuestion = currentQuestions[prevSession.currentQuestionIndex];
       if (!currentQuestion) return prevSession;
-
-      if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
-        return prevSession; 
-      }
 
       const isCorrect = currentQuestion.correctAnswerId === selectedAnswerId;
       const newAnswer: QuizAnswer = {
@@ -110,16 +122,15 @@ export default function QuizPage() {
   const handleTimeout = (timeTaken: number) => {
     setQuizSession(prevSession => {
       if (!prevSession) return prevSession;
+      if (prevSession.answers.find(ans => ans.questionId === (prevSession.questions[prevSession.currentQuestionIndex] || {}).id)) {
+        return prevSession; 
+      }
       const currentQuestions = prevSession.questions || [];
       if (prevSession.currentQuestionIndex >= currentQuestions.length) return prevSession;
 
       const currentQuestion = currentQuestions[prevSession.currentQuestionIndex];
       if (!currentQuestion) return prevSession;
       
-      if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
-        return prevSession; 
-      }
-
       const newAnswer: QuizAnswer = {
         questionId: currentQuestion.id,
         timeTaken,
@@ -165,7 +176,19 @@ export default function QuizPage() {
   };
 
   const handleDeleteCurrentQuestionDialog = () => {
-    setShowDeleteConfirmDialog(true);
+    setShowDeleteQuestionConfirmDialog(true);
+  };
+
+  const handleDeleteCategoryDialog = () => {
+     if (quizSession?.category === "All Categories (Random)") {
+        toast({
+            title: "Action Not Allowed",
+            description: "Cannot delete 'All Categories (Random)' quiz. This is a dynamic collection.",
+            variant: "destructive"
+        });
+        return;
+    }
+    setShowDeleteCategoryConfirmDialog(true);
   };
 
   const handleConfirmDeleteCurrentQuestion = () => {
@@ -174,7 +197,7 @@ export default function QuizPage() {
     const currentQuestionToDelete = quizSession.questions[quizSession.currentQuestionIndex];
     if (!currentQuestionToDelete) {
         toast({ title: "Error", description: "Could not identify question to delete.", variant: "destructive" });
-        setShowDeleteConfirmDialog(false);
+        setShowDeleteQuestionConfirmDialog(false);
         return;
     }
 
@@ -184,7 +207,7 @@ export default function QuizPage() {
         if (!prevSession) return null;
 
         const updatedQuestionsArray = prevSession.questions.filter(q => q.id !== currentQuestionToDelete.id);
-        setQuestionsForCategory(updatedQuestionsArray); // Update for UI consistency
+        setQuestionsForCategory(updatedQuestionsArray); 
 
         if (updatedQuestionsArray.length === 0 || prevSession.currentQuestionIndex >= updatedQuestionsArray.length) {
             const completedSession: QuizSession = {
@@ -203,14 +226,14 @@ export default function QuizPage() {
             ...prevSession,
             questions: updatedQuestionsArray,
             answers: prevSession.answers.filter(ans => updatedQuestionsArray.some(q => q.id === ans.questionId)),
-            currentQuestionIndex: prevSession.currentQuestionIndex,
+            // currentQuestionIndex: prevSession.currentQuestionIndex, // No change needed
             status: 'active',
         };
         saveQuizSession(updatedSession);
         return updatedSession;
     });
 
-    setShowDeleteConfirmDialog(false);
+    setShowDeleteQuestionConfirmDialog(false);
     toast({
         title: "Question Deleted",
         description: `The question "${currentQuestionToDelete.text.substring(0,30)}..." has been removed.`,
@@ -218,6 +241,25 @@ export default function QuizPage() {
     });
   };
 
+  const handleConfirmDeleteCategory = () => {
+    if (!quizSession || !quizSession.category || quizSession.category === ALL_QUESTIONS_RANDOM_KEY) return;
+
+    const categoryToDelete = quizSession.category;
+    deleteQuestionsByCategory(categoryToDelete);
+
+    clearQuizSession();
+    setQuizSession(null);
+    setQuestionsForCategory([]);
+    setShowDeleteCategoryConfirmDialog(false);
+    setIsLoading(true); 
+    setTimeout(() => setIsLoading(false), 50);
+
+    toast({
+      title: "Quiz Category Deleted",
+      description: `All questions in category "${categoryToDelete}" have been removed.`,
+      variant: "default",
+    });
+  };
 
   if (isLoading) {
     return (
@@ -291,10 +333,15 @@ export default function QuizPage() {
           <Button onClick={handleDeleteCurrentQuestionDialog} variant="destructive" className="flex-1">
             <Trash2 className="mr-2 h-4 w-4" /> Delete This Question
           </Button>
+          {quizSession.category !== "All Categories (Random)" && (
+            <Button onClick={handleDeleteCategoryDialog} variant="destructive" className="flex-1 bg-red-700 hover:bg-red-800">
+              <Library className="mr-2 h-4 w-4" /> Delete Entire Quiz Category
+            </Button>
+          )}
         </div>
       </div>
 
-      <AlertDialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
+      <AlertDialog open={showDeleteQuestionConfirmDialog} onOpenChange={setShowDeleteQuestionConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -311,6 +358,25 @@ export default function QuizPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDeleteCurrentQuestion} className="bg-destructive hover:bg-destructive/90">
               Delete Question
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDeleteCategoryConfirmDialog} onOpenChange={setShowDeleteCategoryConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Entire Quiz Category?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete all questions in the category: <br />
+              <strong className="text-primary font-semibold">{quizSession?.category}</strong>
+              <br /> and all its sub-categories from your library.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteCategory} className="bg-destructive hover:bg-destructive/90">
+              Delete Category
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
