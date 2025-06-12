@@ -35,8 +35,8 @@ const AUTO_ADVANCE_DELAY = 5000; // milliseconds
 
 export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNumber, totalQuestions }: QuestionCardProps) {
   const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null);
-  const [isAnswered, setIsAnswered] = useState(false); // Used to pause the main Timer and disable answer buttons
-  const isAnsweredRef = useRef(false); // Used for immediate checks to prevent race conditions
+  const [isAnswered, setIsAnswered] = useState(false);
+  const isAnsweredRef = useRef(false); 
   const [timeLeft, setTimeLeft] = useState(QUESTION_DURATION);
   const [showFeedback, setShowFeedback] = useState(false);
   const [explanation, setExplanation] = useState<string | null>(null);
@@ -46,14 +46,13 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   
   const { toast } = useToast();
   
-  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null); // For the 5s delay before onNext()
-  const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null); // For the "Next question in Xs..." message interval
+  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null); 
 
   useEffect(() => {
-    // Reset state for the new question
     setSelectedAnswerId(null);
     setIsAnswered(false); 
-    isAnsweredRef.current = false; // CRITICAL: Reset ref for the new question
+    isAnsweredRef.current = false; 
     setTimeLeft(QUESTION_DURATION);
     setShowFeedback(false);
     setExplanation(null);
@@ -61,7 +60,6 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     setShowExplanationDialog(false);
     setAutoAdvanceMessage(null);
 
-    // Clear any pending timers from the previous question
     if (autoAdvanceTimerRef.current) {
       clearTimeout(autoAdvanceTimerRef.current);
       autoAdvanceTimerRef.current = null;
@@ -73,19 +71,18 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   }, [question.id]);
 
   const handleAnswerClick = (answerId: string) => {
-    if (isAnsweredRef.current) return; // Already answered this question (via click or timeout)
-    isAnsweredRef.current = true;    // Mark as answered IMMEDIATELY
+    if (isAnsweredRef.current) return; 
+    isAnsweredRef.current = true;    
 
     const timeTaken = QUESTION_DURATION - timeLeft;
     setSelectedAnswerId(answerId);
-    setIsAnswered(true); // This will pause the Timer component & disable answer buttons
+    setIsAnswered(true); 
     setShowFeedback(true);
-    onAnswer(answerId, timeTaken); // Notifies parent, sets skipped: false
+    onAnswer(answerId, timeTaken); 
 
     const isCorrect = question.correctAnswerId === answerId;
 
     if (isCorrect) {
-      // Clear any existing auto-advance timers first
       if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
       if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
 
@@ -97,36 +94,32 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
         if (countdown > 0) {
           setAutoAdvanceMessage(`Next question in ${countdown}s...`);
         } else {
-          // Message will be cleared by the autoAdvanceTimerRef's timeout or manual next click
-          // or when question changes.
           if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
         }
       }, 1000);
 
       autoAdvanceTimerRef.current = setTimeout(() => {
-        setAutoAdvanceMessage(null); // Clear message
-        if (visualCountdownTimerRef.current) { // Ensure visual timer is also cleared
+        setAutoAdvanceMessage(null); 
+        if (visualCountdownTimerRef.current) { 
             clearInterval(visualCountdownTimerRef.current);
             visualCountdownTimerRef.current = null;
         }
         onNext();
       }, AUTO_ADVANCE_DELAY);
     }
-    // If incorrect, user manually clicks next. No auto-advance.
   };
 
   const handleTimeout = () => {
-    if (isAnsweredRef.current) return; // If already answered (e.g. clicked an option just before timeout), do nothing
-    isAnsweredRef.current = true;   // Mark as answered via timeout
+    if (isAnsweredRef.current) return; 
+    isAnsweredRef.current = true;   
 
-    // Clear auto-advance timers if they were somehow running (shouldn't be, but defensive)
     if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
     if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
     setAutoAdvanceMessage(null);
 
-    setIsAnswered(true); // Pauses the Timer & disable answer buttons
+    setIsAnswered(true); 
     setShowFeedback(true);
-    onTimeout(QUESTION_DURATION); // Notifies parent, sets skipped: true
+    onTimeout(QUESTION_DURATION); 
   };
 
   const handleShowExplanation = async () => {
@@ -166,15 +159,14 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const getButtonClassNames = (optionId: string) => {
     if (!showFeedback) return '';
     if (optionId === question.correctAnswerId) return 'bg-accent hover:bg-accent/90 text-accent-foreground animate-pulse';
-    // For timeout (isAnswered is true, selectedAnswerId is null), highlight correct answer in a neutral or slightly different way
     if (isAnswered && !selectedAnswerId && optionId === question.correctAnswerId) return 'border-2 border-primary ring-2 ring-primary';
-    if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return ''; // Destructive variant handles styling
+    if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return ''; 
     return '';
   };
 
   const CorrectIcon = <CheckCircle2 className="mr-2 h-5 w-5" />;
   const IncorrectIcon = <XCircle className="mr-2 h-5 w-5" />;
-  const TimeoutIcon = <AlertTriangle className="mr-2 h-5 w-5" />; // Used for visual indication on correct answer if timed out
+  const TimeoutIcon = <AlertTriangle className="mr-2 h-5 w-5" />; 
 
   return (
     <>
@@ -183,11 +175,12 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
           <div className="flex justify-between items-center mb-2">
             <CardTitle className="font-headline text-2xl md:text-3xl">Question {questionNumber}/{totalQuestions}</CardTitle>
             <Timer
-              key={question.id} // Key change to help reset timer state
+              key={question.id} 
               duration={QUESTION_DURATION}
               onTimeout={handleTimeout}
               onTick={setTimeLeft}
-              isPaused={isAnswered} // isAnswered state (not ref) controls the Timer's pause
+              isPaused={isAnswered}
+              isExternallyAnsweredRef={isAnsweredRef} // Pass the ref here
             />
           </div>
           <CardDescription className="text-lg md:text-xl pt-2 min-h-[60px]">{question.text}</CardDescription>
@@ -203,15 +196,13 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
                 selectedAnswerId === option.id && "ring-2 ring-offset-2",
                 selectedAnswerId === option.id && option.id === question.correctAnswerId && "ring-accent",
                 selectedAnswerId === option.id && option.id !== question.correctAnswerId && "ring-destructive",
-                // No special ring for timeout on the button itself, feedback text handles it
               )}
               onClick={() => handleAnswerClick(option.id)}
-              disabled={isAnswered} // isAnswered state (not ref) controls button disable
+              disabled={isAnswered} 
               aria-pressed={selectedAnswerId === option.id}
             >
               {showFeedback && option.id === selectedAnswerId && option.id === question.correctAnswerId && CorrectIcon}
               {showFeedback && option.id === selectedAnswerId && option.id !== question.correctAnswerId && IncorrectIcon}
-              {/* Icon for correct answer if timed out (shown on the correct option button) */}
               {showFeedback && isAnswered && !selectedAnswerId && option.id === question.correctAnswerId && TimeoutIcon}
               {option.text}
             </Button>
@@ -229,7 +220,6 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
             </p>
           )}
 
-          {/* Auto-advance countdown message */}
           {isAnswered && selectedAnswerId === question.correctAnswerId && autoAdvanceMessage && (
             <p className="text-sm text-muted-foreground">{autoAdvanceMessage}</p>
           )}
@@ -246,9 +236,8 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
             </Button>
           )}
 
-          {isAnswered && ( // Show "Next" button if any answer was made or if it timed out
+          {isAnswered && ( 
             <Button onClick={() => {
-              // If user clicks next manually, clear auto-advance and visual timers
               if (autoAdvanceTimerRef.current) {
                 clearTimeout(autoAdvanceTimerRef.current);
                 autoAdvanceTimerRef.current = null;
@@ -257,7 +246,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
                 clearInterval(visualCountdownTimerRef.current);
                 visualCountdownTimerRef.current = null;
               }
-              setAutoAdvanceMessage(null); // Reset message
+              setAutoAdvanceMessage(null); 
               onNext();
             }}
             size="lg"

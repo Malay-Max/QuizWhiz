@@ -10,15 +10,16 @@ interface TimerProps {
   onTimeout: () => void;
   onTick?: (timeLeft: number) => void;
   isPaused: boolean;
-  resetKey?: string | number; // Add a key to force reset
+  resetKey?: string | number; 
+  isExternallyAnsweredRef?: React.RefObject<boolean>; // New prop
 }
 
-export function Timer({ duration, onTimeout, onTick, isPaused, resetKey }: TimerProps) {
+export function Timer({ duration, onTimeout, onTick, isPaused, resetKey, isExternallyAnsweredRef }: TimerProps) {
   const [timeLeft, setTimeLeft] = useState(duration);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    setTimeLeft(duration); // Reset timer when resetKey changes or on initial mount
+    setTimeLeft(duration); 
   }, [duration, resetKey]);
 
   useEffect(() => {
@@ -33,12 +34,30 @@ export function Timer({ duration, onTimeout, onTick, isPaused, resetKey }: Timer
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      // Check the external ref before calling onTimeout
+      if (isExternallyAnsweredRef?.current) {
+        return;
+      }
       onTimeout();
       return;
     }
 
     intervalRef.current = setInterval(() => {
-      setTimeLeft((prevTime) => prevTime - 1);
+      setTimeLeft((prevTime) => {
+        // Check the external ref inside setInterval as well, as timeLeft could reach 0 here
+        if (isExternallyAnsweredRef?.current) {
+           if(intervalRef.current) clearInterval(intervalRef.current);
+           return prevTime; // Keep current time, effectively pausing
+        }
+        if (prevTime -1 <= 0) {
+            if(intervalRef.current) clearInterval(intervalRef.current);
+             // Check ref again before final onTimeout call from interval
+            if (!isExternallyAnsweredRef?.current) {
+                onTimeout();
+            }
+        }
+        return prevTime - 1;
+      });
     }, 1000);
 
     return () => {
@@ -46,7 +65,7 @@ export function Timer({ duration, onTimeout, onTick, isPaused, resetKey }: Timer
         clearInterval(intervalRef.current);
       }
     };
-  }, [isPaused, timeLeft, duration, onTimeout]);
+  }, [isPaused, timeLeft, duration, onTimeout, isExternallyAnsweredRef]);
 
   useEffect(() => {
     if (onTick) {
