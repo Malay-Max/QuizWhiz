@@ -25,6 +25,13 @@ export function addQuestion(question: Question): void {
   saveQuestions(questions);
 }
 
+export function deleteQuestionById(questionId: string): void {
+  if (typeof window === 'undefined') return;
+  let questions = getQuestions();
+  questions = questions.filter(q => q.id !== questionId);
+  saveQuestions(questions);
+}
+
 export function deleteQuestionsByCategory(categoryPath: string): void {
   if (typeof window === 'undefined') return;
   let questions = getQuestions();
