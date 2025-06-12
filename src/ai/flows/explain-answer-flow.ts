@@ -53,10 +53,6 @@ const bookInfoFetcherPrompt = ai.definePrompt({
 
 If any piece of information cannot be found, use "Unknown" for author/publicationYear and "No summary available." for the summary.
 Book Title: {{title}}`,
-    // Example of how you might set safety settings if needed, though often default is fine
-    // config: {
-    //   safetySettings: [{ category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' }],
-    // },
 });
 
 const getBookInfoTool = ai.defineTool(
@@ -72,7 +68,6 @@ const getBookInfoTool = ai.defineTool(
       if (output) {
         return output;
       }
-      // Fallback if Gemini couldn't provide structured output or found nothing matching schema
       return { author: "Information not found", publicationYear: "N/A", summary: "Could not retrieve details for this book via AI." };
     } catch (error) {
       console.error(`Error in getBookInfoTool for "${title}":`, error);
@@ -176,8 +171,8 @@ const explainAnswerPrompt = ai.definePrompt({
   name: 'explainAnswerPrompt',
   input: {schema: PromptInputSchema},
   output: {schema: ImportedExplainAnswerOutputSchema},
-  tools: [getBookInfoTool, getAuthorInfoTool, getEventInfoTool], // Register tools
-  prompt: `You are an AI Quiz Explainer. Your goal is to provide a comprehensive and informative explanation for a quiz question.
+  tools: [getBookInfoTool, getAuthorInfoTool, getEventInfoTool],
+  prompt: `You are an AI Quiz Explainer. Your goal is to provide a comprehensive, informative, and natural-sounding explanation for a quiz question.
 
 First, directly address the question and the user's answer:
 1.  Explain why the correct answer ("{{{correctAnswerText}}}") is indeed correct in the context of the question ("{{{questionText}}}").
@@ -188,8 +183,9 @@ First, directly address the question and the user's answer:
 
 After addressing the immediate question, enhance the explanation:
 Identify any specific entities mentioned in the question or options, such as book titles, author names, or historical events.
-If you identify such entities, use the available tools (getBookInfo, getAuthorInfo, getEventInfo) to gather relevant details (e.g., publication years, author's major works and their years, event dates, key facts, significance).
-Seamlessly integrate this additional information into your explanation to provide richer context and educational value. Make the explanation engaging, easy to understand, and ensure the information from tools is presented clearly.
+For any such entities, incorporate relevant details (e.g., a book's author and publication year; an author's major works with their publication years; an event's date, key facts, and significance) to provide richer context and educational value.
+Present this additional information as part of a natural, engaging, and easy-to-understand narrative.
+**Important**: Do NOT mention the process of how you obtained this information, do not refer to any specific tool names (like getBookInfo, getAuthorInfo, getEventInfo), and do not output the tool call itself (e.g., "According to the tool, getAuthorInfo(name='Some Author')"). Simply state the facts as if you already know them, weaving them seamlessly into the explanation.
 
 Question:
 {{{questionText}}}
@@ -234,7 +230,6 @@ const explainAnswerFlow = ai.defineFlow(
         selectedAnswerOptionText = selectedOpt.text;
         wasUserCorrect = input.selectedAnswerId === input.correctAnswerId;
       } else {
-        // This case should ideally not happen if IDs are consistent
         selectedAnswerOptionText = "An unlisted or invalid option was recorded.";
         wasUserCorrect = false;
       }
@@ -251,14 +246,11 @@ const explainAnswerFlow = ai.defineFlow(
     try {
         const {output} = await explainAnswerPrompt(promptInternalInput);
         if (!output) {
-            // This can happen if the model fails to generate output matching the schema or an unknown error.
             return { explanation: "Sorry, I couldn't generate a structured explanation at this time. The model might have had an issue." };
         }
         return output;
     } catch (error) {
         console.error("Error during explainAnswerPrompt execution:", error);
-        // Check for specific Genkit/Gemini error types if available, or provide a generic message.
-        // e.g. if (error instanceof GenkitError && error.isSafetyError) { ... }
         return { explanation: "An error occurred while generating the explanation. Please try again." };
     }
   }
