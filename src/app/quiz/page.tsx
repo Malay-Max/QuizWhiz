@@ -46,7 +46,7 @@ export default function QuizPage() {
   const startQuiz = (selectedCategoryPath: string) => {
     setIsLoading(true);
     const allQuestions = getQuestions();
-    const filteredQuestions = allQuestions.filter(q => q.category.startsWith(selectedCategoryPath));
+    const filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category.startsWith(selectedCategoryPath));
     
     if (filteredQuestions.length === 0) {
       alert(`No questions found for the category "${selectedCategoryPath}" or its sub-categories. Please select another category or add questions.`);

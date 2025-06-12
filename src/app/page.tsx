@@ -21,8 +21,6 @@ export default function QuizPage() {
     const activeSession = getQuizSession();
     if (activeSession && activeSession.status === 'active') {
       setQuizSession(activeSession);
-      const allQuestions = getQuestions();
-      // For nested categories, if a session was for "Science", it includes "Science/Physics"
       // The questions in the session are already filtered, so we just find them by ID.
       setQuestionsForCategory(activeSession.questions);
     }
@@ -45,7 +43,7 @@ export default function QuizPage() {
     const allQuestions = getQuestions();
     // Filter questions: include if question's category starts with the selected path
     // e.g., if selectedCategoryPath is "Science", include "Science", "Science/Physics", "Science/Chemistry"
-    const filteredQuestions = allQuestions.filter(q => q.category.startsWith(selectedCategoryPath));
+    const filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category.startsWith(selectedCategoryPath));
     
     if (filteredQuestions.length === 0) {
       alert(`No questions found for the category "${selectedCategoryPath}" or its sub-categories. Please select another category or add questions.`);
