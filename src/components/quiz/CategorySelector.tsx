@@ -8,15 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { CategoryTreeItem } from './CategoryTreeItem';
 import { useRouter } from 'next/navigation';
-import { Zap } from 'lucide-react'; // For the new button
+import { Zap } from 'lucide-react';
 
 interface CategorySelectorProps {
-  onSelectCategory: (categoryPath: string) => void;
+  onCategoryAction: (categoryPath: string, isLeafNode: boolean) => void; // Updated prop
+  onStartRandomQuiz: () => void; // Specific handler for random quiz
 }
 
 export const ALL_QUESTIONS_RANDOM_KEY = "__ALL_QUESTIONS_RANDOM__";
 
-export function CategorySelector({ onSelectCategory }: CategorySelectorProps) {
+export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: CategorySelectorProps) {
   const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
@@ -54,10 +55,6 @@ export function CategorySelector({ onSelectCategory }: CategorySelectorProps) {
     );
   }
 
-  const handleSelectAllRandom = () => {
-    onSelectCategory(ALL_QUESTIONS_RANDOM_KEY);
-  };
-
   if (categoryTree.length === 0) {
     return (
       <Card className="w-full max-w-md mx-auto shadow-lg">
@@ -79,12 +76,14 @@ export function CategorySelector({ onSelectCategory }: CategorySelectorProps) {
   return (
     <Card className="w-full max-w-lg mx-auto shadow-xl">
       <CardHeader>
-        <CardTitle className="font-headline text-3xl">Select a Quiz</CardTitle>
-        <CardDescription>Choose a category, sub-category, or try a random mix of all questions.</CardDescription>
+        <CardTitle className="font-headline text-3xl">Select a Quiz or Manage Category</CardTitle>
+        <CardDescription>
+          Choose a category branch to start a quiz, a specific sub-category to manage its questions, or try a random mix.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <Button
-          onClick={handleSelectAllRandom}
+          onClick={onStartRandomQuiz}
           variant="default"
           size="lg"
           className="w-full shadow-md hover:scale-105 transition-transform"
@@ -98,7 +97,7 @@ export function CategorySelector({ onSelectCategory }: CategorySelectorProps) {
             <CategoryTreeItem
               key={node.path}
               node={node}
-              onSelectCategory={onSelectCategory}
+              onSelectNode={onCategoryAction} // Pass the updated handler
               level={0}
             />
           ))}

@@ -9,29 +9,30 @@ import { cn } from '@/lib/utils';
 
 interface CategoryTreeItemProps {
   node: CategoryTreeNode;
-  onSelectCategory: (path: string) => void;
+  onSelectNode: (path: string, isLeaf: boolean) => void; // Updated prop
   level: number;
 }
 
-export function CategoryTreeItem({ node, onSelectCategory, level }: CategoryTreeItemProps) {
+export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItemProps) {
   const [isOpen, setIsOpen] = useState(false); // Default to closed
 
   const hasChildren = node.children && node.children.length > 0;
+  const isLeafNode = !hasChildren;
 
   const handleToggleOpen = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent category selection when toggling
+    e.stopPropagation(); 
     if (hasChildren) {
       setIsOpen(!isOpen);
     }
   };
   
   const handleSelect = () => {
-    // If it has children and is currently closed, opening it by clicking the name is a nice UX.
-    // Otherwise, just select the category.
-    if (hasChildren && !isOpen) {
-        setIsOpen(true); // Optionally open when the name is clicked if it's a folder
+    // If it's a folder and is currently closed, clicking the name might also open it.
+    // However, the primary action is to notify the parent.
+    if (hasChildren && !isOpen && level < 2) { // Auto-open first few levels for UX, if desired
+        // setIsOpen(true); 
     }
-    onSelectCategory(node.path);
+    onSelectNode(node.path, isLeafNode);
   };
 
   return (
@@ -50,7 +51,7 @@ export function CategoryTreeItem({ node, onSelectCategory, level }: CategoryTree
           </Button>
         )}
         {!hasChildren && (
-            <span className="mr-1 p-1 h-auto w-[28px]"></span> // Placeholder for alignment
+            <span className="mr-1 p-1 h-auto w-[28px]"></span> 
         )}
         <Button
           onClick={handleSelect}
@@ -58,9 +59,8 @@ export function CategoryTreeItem({ node, onSelectCategory, level }: CategoryTree
           size="sm"
           className={cn(
             "w-full justify-start text-left h-auto py-2 px-3 shadow-sm hover:bg-primary/10 hover:text-primary transition-all",
-            !hasChildren && "ml-[0px]" // Adjust if no toggle button
           )}
-          title={`Select category: ${node.path}`}
+          title={`${isLeafNode ? 'Manage questions in' : 'Start quiz for'} category: ${node.path}`}
         >
           <Folder className="mr-2 h-4 w-4 text-primary/80" />
           {node.name}
@@ -72,7 +72,7 @@ export function CategoryTreeItem({ node, onSelectCategory, level }: CategoryTree
             <CategoryTreeItem
               key={childNode.path}
               node={childNode}
-              onSelectCategory={onSelectCategory}
+              onSelectNode={onSelectNode}
               level={level + 1}
             />
           ))}

@@ -2,13 +2,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { Question, QuizSession, QuizAnswer } from '@/types';
 import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession, deleteQuestionById, deleteQuestionsByCategory } from '@/lib/storage';
 import { CategorySelector, ALL_QUESTIONS_RANDOM_KEY } from '@/components/quiz/CategorySelector';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { Button } from '@/components/ui/button';
-import { Loader2, RotateCcw, Trash2, Library } from 'lucide-react'; // Added Library for delete category
+import { Loader2, RotateCcw, Trash2, Library } from 'lucide-react'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AlertDialog,
@@ -24,25 +24,39 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function QuizPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [questionsForCategory, setQuestionsForCategory] = useState<Question[]>([]);
   const [showDeleteQuestionConfirmDialog, setShowDeleteQuestionConfirmDialog] = useState(false);
   const [showDeleteCategoryConfirmDialog, setShowDeleteCategoryConfirmDialog] = useState(false);
 
-  const loadActiveSession = useCallback(() => {
+  const loadActiveSessionOrFromParams = useCallback(() => {
+    const categoryFromParams = searchParams.get('category');
+    const exactMatchFromParams = searchParams.get('exact') === 'true';
+
+    if (categoryFromParams) {
+      // Clear any potentially conflicting query params to avoid re-triggering on refresh
+      const current = new URLSearchParams(Array.from(searchParams.entries()));
+      current.delete('category');
+      current.delete('exact');
+      const query = current.toString() ? `?${current}` : '';
+      router.replace(`${window.location.pathname}${query}`, {scroll: false}); // use replace to not add to history
+
+      startQuiz(categoryFromParams, exactMatchFromParams);
+      return;
+    }
+
     const activeSession = getQuizSession();
     if (activeSession && activeSession.status === 'active') {
       setQuizSession(activeSession);
-      setQuestionsForCategory(activeSession.questions || []);
     }
     setIsLoading(false);
-  }, []);
+  }, [searchParams, router]); // Added router to dependencies
 
   useEffect(() => {
-    loadActiveSession();
-  }, [loadActiveSession]);
+    loadActiveSessionOrFromParams();
+  }, [loadActiveSessionOrFromParams]);
 
   useEffect(() => {
     if (quizSession?.status === 'completed') {
@@ -50,7 +64,7 @@ export default function QuizPage() {
     }
   }, [quizSession, router]);
 
-  const startQuiz = (selectedCategoryPath: string) => {
+  const startQuiz = (selectedCategoryPath: string, exactMatch: boolean = false) => {
     setIsLoading(true);
     const allQuestions = getQuestions();
     let filteredQuestions: Question[] = [];
@@ -59,14 +73,20 @@ export default function QuizPage() {
     if (selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY) {
       filteredQuestions = allQuestions;
       quizCategoryName = "All Categories (Random)";
+      exactMatch = false; // Ensure exactMatch is false for random all
+    } else if (exactMatch) {
+      filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category === selectedCategoryPath);
+      quizCategoryName = selectedCategoryPath; // Keep original name for exact match
     } else {
+      // Default: include sub-categories
       filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category.startsWith(selectedCategoryPath));
+      quizCategoryName = selectedCategoryPath; 
     }
     
     if (filteredQuestions.length === 0) {
       toast({
         title: "No Questions Found",
-        description: `No questions found for "${selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY ? "any category" : selectedCategoryPath}". Please add questions or select a different category.`,
+        description: `No questions found for "${quizCategoryName}". Please add questions or select a different category.`,
         variant: "destructive",
       });
       setIsLoading(false);
@@ -86,22 +106,28 @@ export default function QuizPage() {
     };
     saveQuizSession(newSession);
     setQuizSession(newSession);
-    setQuestionsForCategory(shuffledQuestions);
     setIsLoading(false);
+  };
+
+  const handleCategoryAction = (categoryPath: string, isLeafNode: boolean) => {
+    if (isLeafNode) {
+      // Navigate to manage page for leaf nodes
+      router.push(`/quiz/manage/${categoryPath.split('/').map(segment => encodeURIComponent(segment)).join('/')}`);
+    } else {
+      // Start quiz for branch nodes (includes sub-categories)
+      startQuiz(categoryPath, false);
+    }
+  };
+
+  const handleStartRandomQuiz = () => {
+    startQuiz(ALL_QUESTIONS_RANDOM_KEY, false);
   };
 
   const handleAnswer = (selectedAnswerId: string, timeTaken: number) => {
     setQuizSession(prevSession => {
       if (!prevSession) return prevSession;
-      if (prevSession.answers.find(ans => ans.questionId === (prevSession.questions[prevSession.currentQuestionIndex] || {}).id)) {
-        return prevSession;
-      }
-      const currentQuestions = prevSession.questions || [];
-      if (prevSession.currentQuestionIndex >= currentQuestions.length) {
-        return prevSession;
-      }
-      const currentQuestion = currentQuestions[prevSession.currentQuestionIndex];
-      if (!currentQuestion) {
+      const currentQuestion = prevSession.questions[prevSession.currentQuestionIndex];
+      if (!currentQuestion || prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
         return prevSession;
       }
 
@@ -125,16 +151,9 @@ export default function QuizPage() {
   const handleTimeout = (timeTaken: number) => {
     setQuizSession(prevSession => {
       if (!prevSession) return prevSession;
-      if (prevSession.answers.find(ans => ans.questionId === (prevSession.questions[prevSession.currentQuestionIndex] || {}).id)) {
+      const currentQuestion = prevSession.questions[prevSession.currentQuestionIndex];
+       if (!currentQuestion || prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
         return prevSession; 
-      }
-      const currentQuestions = prevSession.questions || [];
-      if (prevSession.currentQuestionIndex >= currentQuestions.length) {
-        return prevSession;
-      }
-      const currentQuestion = currentQuestions[prevSession.currentQuestionIndex];
-      if (!currentQuestion) {
-        return prevSession;
       }
       
       const newAnswer: QuizAnswer = {
@@ -154,10 +173,9 @@ export default function QuizPage() {
   const handleNextQuestion = () => {
     setQuizSession(prevSession => {
       if (!prevSession) return prevSession;
-      const currentQuestions = prevSession.questions || [];
       const nextIndex = prevSession.currentQuestionIndex + 1;
 
-      if (nextIndex < currentQuestions.length) {
+      if (nextIndex < prevSession.questions.length) {
         const updatedSession = { ...prevSession, currentQuestionIndex: nextIndex };
         saveQuizSession(updatedSession);
         return updatedSession;
@@ -167,6 +185,7 @@ export default function QuizPage() {
           status: 'completed' as 'completed',
           endTime: Date.now()
         };
+        // Navigation is handled by useEffect watching quizSession.status
         saveQuizSession(completedSession);
         return completedSession;
       }
@@ -176,9 +195,8 @@ export default function QuizPage() {
   const handleRestartQuiz = () => {
     clearQuizSession();
     setQuizSession(null);
-    setQuestionsForCategory([]);
     setIsLoading(true); 
-    setTimeout(() => setIsLoading(false), 50);
+    setTimeout(() => setIsLoading(false), 50); // Brief delay to allow UI to reset
   };
 
   const handleDeleteCurrentQuestionDialog = () => {
@@ -198,9 +216,9 @@ export default function QuizPage() {
   };
 
   const handleConfirmDeleteCurrentQuestion = () => {
-    if (!quizSession || questionsForCategory.length === 0) return;
+    if (!quizSession || !quizSession.questions || quizSession.questions.length === 0) return;
     
-    const currentQuestionToDelete = questionsForCategory[quizSession.currentQuestionIndex];
+    const currentQuestionToDelete = quizSession.questions[quizSession.currentQuestionIndex];
     if (!currentQuestionToDelete) {
         toast({ title: "Error", description: "Could not identify question to delete.", variant: "destructive" });
         setShowDeleteQuestionConfirmDialog(false);
@@ -214,30 +232,23 @@ export default function QuizPage() {
 
         const updatedQuestionsArray = prevSession.questions.filter(q => q.id !== currentQuestionToDelete.id);
         
-        // Ensure questionsForCategory is kept in sync
-        setQuestionsForCategory(updatedQuestionsArray);
-
         if (updatedQuestionsArray.length === 0 || prevSession.currentQuestionIndex >= updatedQuestionsArray.length) {
             const completedSession: QuizSession = {
                 ...prevSession,
                 questions: updatedQuestionsArray,
                 answers: prevSession.answers.filter(ans => updatedQuestionsArray.some(q => q.id === ans.questionId)),
-                currentQuestionIndex: 0, // Reset index
+                currentQuestionIndex: 0, 
                 status: 'completed',
                 endTime: Date.now(),
             };
             saveQuizSession(completedSession);
             return completedSession;
         }
-
-        // Current index might still be valid or effectively points to the "new" current after deletion
-        // If currentQuestionIndex was the last valid index, it's now out of bounds, handled above.
-        // Otherwise, the same index will show the next item from the filtered array.
+        
         const updatedSession: QuizSession = {
             ...prevSession,
             questions: updatedQuestionsArray,
             answers: prevSession.answers.filter(ans => updatedQuestionsArray.some(q => q.id === ans.questionId)),
-            // currentQuestionIndex: prevSession.currentQuestionIndex, // No change needed here, or it could be Math.min(prevSession.currentQuestionIndex, updatedQuestionsArray.length -1) if that makes more sense. For now, no change as the condition above handles empty/out of bounds.
             status: 'active',
         };
         saveQuizSession(updatedSession);
@@ -256,13 +267,12 @@ export default function QuizPage() {
     if (!quizSession || !quizSession.category || quizSession.category === ALL_QUESTIONS_RANDOM_KEY) return;
 
     const categoryToDelete = quizSession.category;
-    deleteQuestionsByCategory(categoryToDelete); // This deletes from global storage
+    deleteQuestionsByCategory(categoryToDelete); 
 
-    clearQuizSession(); // Clear the current session as it's based on the deleted category
+    clearQuizSession(); 
     setQuizSession(null);
-    setQuestionsForCategory([]);
     setShowDeleteCategoryConfirmDialog(false);
-    setIsLoading(true); // To re-trigger category selector
+    setIsLoading(true); 
     setTimeout(() => setIsLoading(false), 50);
 
     toast({
@@ -283,21 +293,26 @@ export default function QuizPage() {
   }
 
   if (!quizSession || quizSession.status !== 'active') {
-    return <CategorySelector onSelectCategory={startQuiz} />;
+    return <CategorySelector onCategoryAction={handleCategoryAction} onStartRandomQuiz={handleStartRandomQuiz} />;
   }
   
   if (quizSession.questions.length === 0 || quizSession.currentQuestionIndex >= quizSession.questions.length) {
+     // This block might be reached if a quiz becomes empty after deletions
+     // Or if an active session somehow has no questions or an invalid index.
      if (quizSession.status === 'active') { 
         const completedSession = { 
             ...quizSession, 
             status: 'completed' as 'completed',
             endTime: quizSession.endTime || Date.now() 
         };
-        if (quizSession.id && getQuizSession()?.id === quizSession.id && getQuizSession()?.status !== 'completed') {
+        // Check if session in storage is the one we are completing
+        if (getQuizSession()?.id === quizSession.id && getQuizSession()?.status !== 'completed') {
             saveQuizSession(completedSession);
+            // Set state to trigger useEffect for navigation
             setQuizSession(completedSession); 
         }
      }
+     // Show loader while state updates and navigation happens
      return ( 
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -308,6 +323,7 @@ export default function QuizPage() {
 
   const currentQuestion = quizSession.questions[quizSession.currentQuestionIndex];
 
+  // This check is for robustness, though the above block should handle empty questions.
   if (!currentQuestion) { 
      return (
       <Card className="w-full max-w-md mx-auto text-center shadow-lg">
