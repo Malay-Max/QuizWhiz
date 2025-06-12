@@ -25,11 +25,19 @@ export function addQuestion(question: Question): void {
   saveQuestions(questions);
 }
 
+export function deleteQuestionsByCategory(categoryPath: string): void {
+  if (typeof window === 'undefined') return;
+  let questions = getQuestions();
+  // Keep questions that do NOT start with the categoryPath
+  questions = questions.filter(q => !(typeof q.category === 'string' && q.category.startsWith(categoryPath)));
+  saveQuestions(questions);
+}
+
 export function getCategories(): string[] {
   if (typeof window === 'undefined') return [];
   const questions = getQuestions();
   const allCategories = questions.map(q => q.category);
-  return [...new Set(allCategories)].filter(c => c && c.trim() !== "").sort();
+  return [...new Set(allCategories)].filter(c => c && typeof c === 'string' && c.trim() !== "").sort();
 }
 
 // Quiz Session Functions
@@ -57,11 +65,8 @@ export function getQuestionById(id: string): Question | undefined {
 
 export function buildCategoryTree(uniquePaths: string[]): CategoryTreeNode[] {
   const treeRoot: { children: CategoryTreeNode[] } = { children: [] };
-  // Use a map to keep track of nodes already created to avoid duplicates and to link children correctly.
   const nodeMap: Record<string, CategoryTreeNode> = {};
 
-  // Sort paths to ensure parent paths are processed before their children,
-  // e.g., "A" before "A/B".
   const sortedPaths = [...new Set(uniquePaths)].sort();
 
   for (const path of sortedPaths) {
@@ -82,22 +87,20 @@ export function buildCategoryTree(uniquePaths: string[]): CategoryTreeNode[] {
         };
         nodeMap[currentPath] = node;
         
-        // Find the correct parent list to push this new node into.
-        // If i === 0, it's a root node. Otherwise, it's a child of the node from the previous part.
         if (i === 0) {
-            currentParentChildrenList.push(node);
+            if (!currentParentChildrenList.some(child => child.path === node.path)) {
+                currentParentChildrenList.push(node);
+            }
         } else {
             const parentPath = parts.slice(0, i).join('/');
             const parentNode = nodeMap[parentPath];
             if (parentNode) {
-                 // Ensure not to add duplicate children if paths are structured like "A", "A/B"
                  if (!parentNode.children.some(child => child.path === node.path)) {
                     parentNode.children.push(node);
                  }
             }
         }
       }
-      // For the next iteration, this node's children list is the new parent list.
       currentParentChildrenList = node.children;
     }
   }

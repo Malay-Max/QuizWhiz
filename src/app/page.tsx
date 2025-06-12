@@ -4,24 +4,36 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Question, QuizSession, QuizAnswer } from '@/types';
-import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession } from '@/lib/storage';
+import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession, deleteQuestionsByCategory } from '@/lib/storage';
 import { CategorySelector } from '@/components/quiz/CategorySelector';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { Button } from '@/components/ui/button';
-import { Loader2, RotateCcw } from 'lucide-react';
+import { Loader2, RotateCcw, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
 
 export default function QuizPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [questionsForCategory, setQuestionsForCategory] = useState<Question[]>([]);
+  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
 
   const loadActiveSession = useCallback(() => {
     const activeSession = getQuizSession();
     if (activeSession && activeSession.status === 'active') {
       setQuizSession(activeSession);
-      // The questions in the session are already filtered, so we just find them by ID.
       setQuestionsForCategory(activeSession.questions);
     }
     setIsLoading(false);
@@ -31,7 +43,6 @@ export default function QuizPage() {
     loadActiveSession();
   }, [loadActiveSession]);
 
-  // Effect to handle navigation when quiz is completed
   useEffect(() => {
     if (quizSession?.status === 'completed') {
       router.push('/summary');
@@ -41,8 +52,6 @@ export default function QuizPage() {
   const startQuiz = (selectedCategoryPath: string) => {
     setIsLoading(true);
     const allQuestions = getQuestions();
-    // Filter questions: include if question's category starts with the selected path
-    // e.g., if selectedCategoryPath is "Science", include "Science", "Science/Physics", "Science/Chemistry"
     const filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category.startsWith(selectedCategoryPath));
     
     if (filteredQuestions.length === 0) {
@@ -78,7 +87,6 @@ export default function QuizPage() {
         return prevSession;
       }
 
-      // Prevent duplicate answers for the same question
       if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
         return prevSession; 
       }
@@ -110,7 +118,6 @@ export default function QuizPage() {
         return prevSession;
       }
       
-      // Prevent duplicate answers (e.g. if timeout happens after manual answer)
       if (prevSession.answers.find(ans => ans.questionId === currentQuestion.id)) {
         return prevSession; 
       }
@@ -139,14 +146,12 @@ export default function QuizPage() {
         saveQuizSession(updatedSession);
         return updatedSession;
       } else {
-        // This is the last question, mark as completed
         const completedSession = { 
           ...prevSession, 
           status: 'completed' as 'completed',
-          endTime: Date.now() // Set end time
+          endTime: Date.now()
         };
         saveQuizSession(completedSession);
-        // Navigation to /summary will be handled by useEffect
         return completedSession;
       }
     });
@@ -157,10 +162,29 @@ export default function QuizPage() {
     setQuizSession(null);
     setQuestionsForCategory([]);
     setIsLoading(true); 
-    // Short delay to ensure state reset before CategorySelector re-evaluates
     setTimeout(() => setIsLoading(false), 50);
   };
 
+  const handleDeleteCurrentQuiz = () => {
+    setShowDeleteConfirmDialog(true);
+  };
+
+  const handleConfirmDeleteQuiz = () => {
+    if (quizSession) {
+      deleteQuestionsByCategory(quizSession.category);
+      toast({
+        title: "Quiz Deleted",
+        description: `All questions in category "${quizSession.category}" (and its sub-categories) have been removed.`,
+        variant: "default",
+      });
+      clearQuizSession();
+      setQuizSession(null);
+      setQuestionsForCategory([]);
+      setShowDeleteConfirmDialog(false);
+      setIsLoading(true); // To re-trigger category selector
+      setTimeout(() => setIsLoading(false), 50);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -175,18 +199,14 @@ export default function QuizPage() {
     return <CategorySelector onSelectCategory={startQuiz} />;
   }
   
-  // This case should ideally be caught by the useEffect navigating to /summary
-  // or by the next condition if currentQuestionIndex is out of bounds.
   if (quizSession.currentQuestionIndex >= questionsForCategory.length && quizSession.status === 'active') {
-     // Attempt to finalize, but useEffect should catch 'completed' status for navigation
      const completedSession = { 
         ...quizSession, 
         status: 'completed' as 'completed',
         endTime: quizSession.endTime || Date.now() 
       };
       saveQuizSession(completedSession);
-      setQuizSession(completedSession); // This should trigger the useEffect for navigation
-     // Show a loader while the useEffect picks up the change and navigates
+      setQuizSession(completedSession);
      return ( 
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -195,12 +215,9 @@ export default function QuizPage() {
     );
   }
 
-
   const currentQuestion = questionsForCategory[quizSession.currentQuestionIndex];
 
-  // If currentQuestion is undefined, but session is active, it's an error state
   if (!currentQuestion && quizSession.status === 'active') {
-     // This might indicate an issue with questionsForCategory or currentQuestionIndex
      return (
       <Card className="w-full max-w-md mx-auto text-center shadow-lg">
         <CardHeader>
@@ -218,10 +235,7 @@ export default function QuizPage() {
     );
   }
   
-  // General loading/error state if quiz session status is not 'active' or question is missing
-  // This should ideally not be hit if other conditions are correctly handled.
   if (quizSession.status !== 'active' || !currentQuestion) {
-     // Fallback loader, implies an unexpected state
      return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -230,21 +244,45 @@ export default function QuizPage() {
     );
   }
 
-
   return (
-    <div className="flex flex-col items-center">
-      <QuestionCard
-        key={currentQuestion.id} // Ensure QuestionCard re-mounts/re-initializes for new questions
-        question={currentQuestion}
-        onAnswer={handleAnswer}
-        onTimeout={handleTimeout}
-        onNext={handleNextQuestion}
-        questionNumber={quizSession.currentQuestionIndex + 1}
-        totalQuestions={questionsForCategory.length}
-      />
-       <Button onClick={handleRestartQuiz} variant="outline" className="mt-8">
-        <RotateCcw className="mr-2 h-4 w-4" /> Select Different Quiz
-      </Button>
-    </div>
+    <>
+      <div className="flex flex-col items-center">
+        <QuestionCard
+          key={currentQuestion.id}
+          question={currentQuestion}
+          onAnswer={handleAnswer}
+          onTimeout={handleTimeout}
+          onNext={handleNextQuestion}
+          questionNumber={quizSession.currentQuestionIndex + 1}
+          totalQuestions={questionsForCategory.length}
+        />
+        <div className="mt-8 flex flex-col sm:flex-row gap-4 w-full max-w-3xl justify-center">
+          <Button onClick={handleRestartQuiz} variant="outline" className="flex-1">
+            <RotateCcw className="mr-2 h-4 w-4" /> Select Different Quiz
+          </Button>
+          <Button onClick={handleDeleteCurrentQuiz} variant="destructive" className="flex-1">
+            <Trash2 className="mr-2 h-4 w-4" /> Delete Current Quiz
+          </Button>
+        </div>
+      </div>
+
+      <AlertDialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete all questions
+              associated with the category <strong className="text-primary">{quizSession?.category}</strong> and its sub-categories.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteQuiz} className="bg-destructive hover:bg-destructive/90">
+              Delete Quiz
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
