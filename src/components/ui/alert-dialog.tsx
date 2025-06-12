@@ -87,14 +87,18 @@ const AlertDialogTitle = React.forwardRef<
 AlertDialogTitle.displayName = AlertDialogPrimitive.Title.displayName
 
 const AlertDialogDescription = React.forwardRef<
-  React.ElementRef<typeof AlertDialogPrimitive.Description>,
+  HTMLDivElement, // Changed from HTMLParagraphElement to HTMLDivElement
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Description>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <AlertDialogPrimitive.Description
-    ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
-    {...props}
-  />
+    asChild // Instruct Radix primitive to render as its child
+    ref={ref} // Ref will now point to the div
+    {...props} // Spread other props (like potential ID for aria-describedby)
+  >
+    <div className={cn("text-sm text-muted-foreground", className)}> {/* This div is now rendered */}
+      {children}
+    </div>
+  </AlertDialogPrimitive.Description>
 ))
 AlertDialogDescription.displayName =
   AlertDialogPrimitive.Description.displayName
