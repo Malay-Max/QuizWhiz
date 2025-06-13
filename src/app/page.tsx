@@ -31,7 +31,7 @@ function QuizPageContent() {
   const [showDeleteQuestionConfirmDialog, setShowDeleteQuestionConfirmDialog] = useState(false);
   const [showDeleteCategoryConfirmDialog, setShowDeleteCategoryConfirmDialog] = useState(false);
 
-  const startQuiz = useCallback(async (selectedCategoryPath: string, exactMatch: boolean = false) => {
+  const startQuiz = useCallback(async (selectedCategoryPath: string, exactMatch: boolean = false, limit?: number) => {
     setIsLoading(true);
     const allQuestions = await getQuestions();
     let filteredQuestions: Question[] = [];
@@ -68,9 +68,18 @@ function QuizPageContent() {
       return newArray;
     };
 
-    const shuffledQuestions = shuffleArray(filteredQuestions);
+    let questionsForSession = shuffleArray(filteredQuestions);
 
-    const questionsWithShuffledOptions = shuffledQuestions.map(question => ({
+    if (limit && limit > 0 && limit < questionsForSession.length) {
+      questionsForSession = questionsForSession.slice(0, limit);
+      quizCategoryName = `${limit} Random Questions`; // Update category name if limited
+    } else if (selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY && limit && limit > 0) {
+      // If limit is specified but >= total questions, adjust name
+      quizCategoryName = `${questionsForSession.length} Random Questions (All Available)`;
+    }
+
+
+    const questionsWithShuffledOptions = questionsForSession.map(question => ({
       ...question,
       options: shuffleArray([...question.options]),
     }));
@@ -102,15 +111,18 @@ function QuizPageContent() {
   const loadActiveSessionOrFromParams = useCallback(async () => {
     const categoryFromParams = searchParams.get('category');
     const exactMatchFromParams = searchParams.get('exact') === 'true';
+    const limitFromParams = searchParams.get('limit');
 
     if (categoryFromParams) {
       const current = new URLSearchParams(Array.from(searchParams.entries()));
       current.delete('category');
       current.delete('exact');
+      current.delete('limit');
       const query = current.toString() ? `?${current}` : '';
       router.replace(`${window.location.pathname}${query}`, {scroll: false}); 
 
-      await startQuiz(categoryFromParams, exactMatchFromParams);
+      const numLimit = limitFromParams ? parseInt(limitFromParams, 10) : undefined;
+      await startQuiz(categoryFromParams, exactMatchFromParams, numLimit);
       return;
     }
 
@@ -141,7 +153,30 @@ function QuizPageContent() {
   };
 
   const handleStartRandomQuiz = async () => {
-    await startQuiz(ALL_QUESTIONS_RANDOM_KEY, false);
+    const numInput = window.prompt("Enter the number of random questions you'd like (leave blank or enter 0 for all questions):", "");
+    let questionLimit: number | undefined = undefined;
+
+    if (numInput === null) { // User cancelled
+      questionLimit = undefined;
+    } else {
+      const trimmedInput = numInput.trim();
+      if (trimmedInput === "" || trimmedInput === "0") {
+        questionLimit = undefined; // All questions
+      } else {
+        const parsedNum = parseInt(trimmedInput, 10);
+        if (isNaN(parsedNum) || parsedNum < 1) {
+          toast({
+            title: "Invalid Number",
+            description: "Using all available questions as an invalid number was entered.",
+            variant: "default",
+          });
+          questionLimit = undefined; // Default to all on invalid input
+        } else {
+          questionLimit = parsedNum;
+        }
+      }
+    }
+    await startQuiz(ALL_QUESTIONS_RANDOM_KEY, false, questionLimit);
   };
 
   const handleAnswer = (selectedAnswerId: string, timeTaken: number) => {
@@ -164,7 +199,7 @@ function QuizPageContent() {
       const updatedAnswers = [...prevSession.answers, newAnswer];
       const updatedSession = { ...prevSession, answers: updatedAnswers };
       
-      saveQuizSession(updatedSession).then(res => { // Check save result
+      saveQuizSession(updatedSession).then(res => { 
           if (!res.success) {
             toast({ title: "Save Error", description: res.error || "Failed to save answer progress.", variant: "destructive" });
           }
@@ -242,10 +277,10 @@ function QuizPageContent() {
   };
 
   const handleDeleteCategoryDialog = () => {
-     if (quizSession?.category === "All Categories (Random)") {
+     if (quizSession?.category && quizSession.category.toLowerCase().includes("random")) {
         toast({
             title: "Action Not Allowed",
-            description: "Cannot delete 'All Categories (Random)' quiz. This is a dynamic collection.",
+            description: "Cannot delete a dynamically generated 'Random Questions' quiz category.",
             variant: "destructive"
         });
         return;
@@ -304,7 +339,7 @@ function QuizPageContent() {
             status: 'active', 
           };
         }
-        saveQuizSession(newSessionState).then(res => { // Save the updated session state
+        saveQuizSession(newSessionState).then(res => { 
             if(!res.success){
                 toast({ title: "Session Update Failed", description: res.error || "Could not update session after question deletion.", variant: "destructive" });
             }
@@ -314,7 +349,12 @@ function QuizPageContent() {
   };
 
   const handleConfirmDeleteCategory = async () => {
-    if (!quizSession || !quizSession.category || quizSession.category === ALL_QUESTIONS_RANDOM_KEY) return;
+    if (!quizSession || !quizSession.category || quizSession.category.toLowerCase().includes("random")) {
+      toast({ title: "Invalid Category", description: "Cannot delete a random quiz category.", variant: "destructive" });
+      setShowDeleteCategoryConfirmDialog(false);
+      return;
+    }
+
 
     const categoryToDelete = quizSession.category;
     const deleteResult = await deleteQuestionsByCategory(categoryToDelete);
@@ -416,7 +456,7 @@ function QuizPageContent() {
           <Button onClick={handleDeleteCurrentQuestionDialog} variant="destructive" className="flex-1">
             <Trash2 className="mr-2 h-4 w-4" /> Delete This Question
           </Button>
-           {quizSession.category !== "All Categories (Random)" && (
+           {quizSession.category && !quizSession.category.toLowerCase().includes("random") && (
             <Button onClick={handleDeleteCategoryDialog} variant="destructive" className="flex-1 bg-red-700 hover:bg-red-800">
               <Library className="mr-2 h-4 w-4" /> Delete Entire Quiz Category
             </Button>
@@ -480,3 +520,6 @@ export default function QuizPage() {
     </Suspense>
   );
 }
+
+
+    
