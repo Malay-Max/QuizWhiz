@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { Question, QuizSession, QuizAnswer } from '@/types';
 import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession, deleteQuestionById, deleteQuestionsByCategory } from '@/lib/storage';
@@ -25,7 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 // This page is very similar to src/app/page.tsx. 
 // Consider refactoring shared quiz logic into a custom hook or utility functions if complexity grows.
 
-export default function QuizPlayPage() {
+function QuizPlayPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -108,7 +108,7 @@ export default function QuizPlayPage() {
     
     const questionsWithShuffledOptions = shuffledQuestions.map(question => ({
       ...question,
-      options: shuffleArray(question.options),
+      options: shuffleArray([...question.options]), // Ensure options are shuffled too
     }));
 
     const newSession: QuizSession = {
@@ -419,3 +419,19 @@ export default function QuizPlayPage() {
     </>
   );
 }
+
+
+export default function QuizPlayPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Loading Quiz Page...</p>
+      </div>
+    }>
+      <QuizPlayPageContent />
+    </Suspense>
+  );
+}
+
+    
