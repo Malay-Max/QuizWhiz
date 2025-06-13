@@ -1,5 +1,6 @@
 
 import { z } from 'genkit';
+import type { Timestamp } from 'firebase/firestore'; // Added Timestamp import
 
 export interface AnswerOption {
   id: string;
@@ -31,8 +32,22 @@ export interface QuizSession {
   startTime: number; // timestamp
   endTime?: number; // timestamp
   status: 'active' | 'completed';
-  userId?: string; // Added for Firebase Auth
+  userId?: string; // Optional: for authenticated users
 }
+
+// Represents the QuizSession as stored in Firestore, with Timestamps
+export interface StorableQuizSession {
+  id: string;
+  category: string;
+  questions: Question[];
+  currentQuestionIndex: number;
+  answers: QuizAnswer[];
+  startTime: Timestamp; // Firestore Timestamp
+  endTime?: Timestamp; // Firestore Timestamp, optional
+  status: 'active' | 'completed';
+  userId?: string; // Optional: for authenticated users
+}
+
 
 // Schemas for explainAnswerFlow
 export const ExplainAnswerInputSchema = z.object({
