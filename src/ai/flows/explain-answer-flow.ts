@@ -216,42 +216,55 @@ const explainAnswerFlow = ai.defineFlow(
     outputSchema: ImportedExplainAnswerOutputSchema,
   },
   async (input) => {
-    const correctAnswerOption = input.options.find(opt => opt.id === input.correctAnswerId);
-    if (!correctAnswerOption) {
-      return { explanation: "Error: Could not find the correct answer details to generate an explanation." };
-    }
-
-    let selectedAnswerOptionText: string | null = null;
-    let wasUserCorrect: boolean | null = null;
-
-    if (input.selectedAnswerId) {
-      const selectedOpt = input.options.find(opt => opt.id === input.selectedAnswerId);
-      if (selectedOpt) {
-        selectedAnswerOptionText = selectedOpt.text;
-        wasUserCorrect = input.selectedAnswerId === input.correctAnswerId;
-      } else {
-        selectedAnswerOptionText = "An unlisted or invalid option was recorded.";
-        wasUserCorrect = false;
-      }
-    }
-
-    const promptInternalInput: z.infer<typeof PromptInputSchema> = {
-      questionText: input.questionText,
-      allOptionsText: input.options.map(opt => opt.text),
-      correctAnswerText: correctAnswerOption.text,
-      selectedAnswerText: selectedAnswerOptionText,
-      wasCorrect: wasUserCorrect,
-    };
-    
     try {
-        const {output} = await explainAnswerPrompt(promptInternalInput);
-        if (!output) {
-            return { explanation: "Sorry, I couldn't generate a structured explanation at this time. The model might have had an issue." };
+      const correctAnswerOption = input.options.find(opt => opt.id === input.correctAnswerId);
+      if (!correctAnswerOption) {
+        // This ensures that if essential data is missing, we return a specific error.
+        console.error("explainAnswerFlow: Correct answer details not found in input options.");
+        return { explanation: "Error: Could not find the correct answer details from the provided options to generate an explanation." };
+      }
+
+      let selectedAnswerOptionText: string | null = null;
+      let wasUserCorrect: boolean | null = null;
+
+      if (input.selectedAnswerId) {
+        const selectedOpt = input.options.find(opt => opt.id === input.selectedAnswerId);
+        if (selectedOpt) {
+          selectedAnswerOptionText = selectedOpt.text;
+          wasUserCorrect = input.selectedAnswerId === input.correctAnswerId;
+        } else {
+          // Log if the selectedAnswerId is present but not found in options.
+          console.warn(`explainAnswerFlow: Selected answer ID "${input.selectedAnswerId}" not found in options array.`);
+          selectedAnswerOptionText = "An unlisted or invalid option was recorded by the user."; // More descriptive for the prompt
+          wasUserCorrect = false;
         }
-        return output;
-    } catch (error) {
-        console.error("Error during explainAnswerPrompt execution:", error);
-        return { explanation: "An error occurred while generating the explanation. Please try again." };
+      }
+
+      const promptInternalInput: z.infer<typeof PromptInputSchema> = {
+        questionText: input.questionText,
+        allOptionsText: input.options.map(opt => opt.text),
+        correctAnswerText: correctAnswerOption.text,
+        selectedAnswerText: selectedAnswerOptionText,
+        wasCorrect: wasUserCorrect,
+      };
+      
+      // This inner try-catch handles errors specifically from the prompt execution.
+      try {
+          const {output} = await explainAnswerPrompt(promptInternalInput);
+          if (!output) {
+              console.warn("explainAnswerFlow: explainAnswerPrompt returned no output. Model might have refused or an issue occurred.");
+              return { explanation: "Sorry, I couldn't generate a structured explanation at this time. The AI model might have had an issue providing content." };
+          }
+          return output; // output is already validated against ExplainAnswerOutputSchema by the prompt
+      } catch (promptError) {
+          console.error("Error during explainAnswerPrompt execution inside flow:", promptError);
+          return { explanation: "An error occurred while the AI was processing the request for explanation. Please try again." };
+      }
+
+    } catch (flowError) {
+      // This outer try-catch handles any other unexpected errors within the flow's logic.
+      console.error("Critical unhandled error in explainAnswerFlow:", flowError);
+      return { explanation: "A critical system error occurred while preparing to generate the explanation. Please report this." };
     }
   }
 );
