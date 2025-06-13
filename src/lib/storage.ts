@@ -1,15 +1,23 @@
 
 "use client";
 
-import type { Question, QuizSession, CategoryTreeNode, AnswerOption } from '@/types';
-import { db } from './firebase';
+import type { Question, QuizSession, CategoryTreeNode } from '@/types';
+import { db, auth } from './firebase'; // Import auth
 import { 
-  collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, runTransaction, Timestamp
+  collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, writeBatch, Timestamp 
 } from 'firebase/firestore';
 
 const QUESTIONS_COLLECTION = 'questions';
 const QUIZ_SESSIONS_COLLECTION = 'quizSessions';
 const ACTIVE_QUIZ_SESSION_ID_KEY = 'quizcraft_active_session_id'; // Used for localStorage
+
+// Internal StorableQuizSession type
+interface StorableQuizSession extends Omit<QuizSession, 'startTime' | 'endTime' | 'userId'> {
+  startTime: Timestamp | number;
+  endTime?: Timestamp | number;
+  userId?: string; // Added for Firebase Auth
+}
+
 
 // --- Question Functions ---
 export async function getQuestions(): Promise<Question[]> {
@@ -29,6 +37,7 @@ export async function getQuestions(): Promise<Question[]> {
 
 export async function addQuestion(question: Omit<Question, 'id'> & { id?: string }): Promise<string | null> {
   if (typeof window === 'undefined') return null;
+  // Add Firestore rule check simulation: if (!auth.currentUser) throw new Error("User must be authenticated to add questions");
   try {
     const newQuestionRef = doc(collection(db, QUESTIONS_COLLECTION), question.id || crypto.randomUUID());
     const questionData: Question = {
@@ -65,9 +74,9 @@ export async function getQuestionById(id: string): Promise<Question | undefined>
 
 export async function updateQuestion(updatedQuestion: Question): Promise<void> {
   if (typeof window === 'undefined') return;
+  // Add Firestore rule check simulation: if (!auth.currentUser) throw new Error("User must be authenticated to update questions");
   try {
     const questionRef = doc(db, QUESTIONS_COLLECTION, updatedQuestion.id);
-    // Ensure we don't write the id field inside the document itself if it's already the doc ID
     const { id, ...dataToUpdate } = updatedQuestion;
     await setDoc(questionRef, dataToUpdate, { merge: true });
   } catch (error) {
@@ -77,6 +86,7 @@ export async function updateQuestion(updatedQuestion: Question): Promise<void> {
 
 export async function deleteQuestionById(questionId: string): Promise<void> {
   if (typeof window === 'undefined') return;
+  // Add Firestore rule check simulation: if (!auth.currentUser) throw new Error("User must be authenticated to delete questions");
   try {
     await deleteDoc(doc(db, QUESTIONS_COLLECTION, questionId));
   } catch (error) {
@@ -86,46 +96,31 @@ export async function deleteQuestionById(questionId: string): Promise<void> {
 
 export async function deleteQuestionsByCategory(categoryPath: string): Promise<void> {
   if (typeof window === 'undefined') return;
+  // Add Firestore rule check simulation: if (!auth.currentUser) throw new Error("User must be authenticated to delete categories");
   try {
-    // Firestore doesn't directly support 'startsWith' for string fields in queries for deletions.
-    // A common pattern is to fetch all questions, filter client-side, then delete.
-    // For very large datasets, this is inefficient. A more robust solution might involve
-    // structuring categories differently (e.g., array of path segments) or using Cloud Functions.
-    // For now, we'll fetch and delete, which matches previous localStorage logic.
-    
-    // Create a query that finds questions where the category starts with categoryPath
     const q = query(collection(db, QUESTIONS_COLLECTION), 
                     where("category", ">=", categoryPath),
                     where("category", "<=", categoryPath + '\uf8ff'));
     
     const querySnapshot = await getDocs(q);
-    const questionsToDelete: Question[] = [];
+    const questionsToDeleteIds: string[] = [];
     querySnapshot.forEach((docSnap) => {
-        // Additional client-side check to ensure it's a true prefix match,
-        // as Firestore's range query for strings can sometimes include unintended matches
-        // if not careful with the end range character.
         const data = docSnap.data() as Question;
         if (typeof data.category === 'string' && data.category.startsWith(categoryPath)) {
-            questionsToDelete.push({ id: docSnap.id, ...data });
+            questionsToDeleteIds.push(docSnap.id);
         }
     });
 
-
-    // Use a transaction or batched write for deleting multiple documents
-    // Batched write is simpler here if we don't need to read during the transaction
-    if (questionsToDelete.length > 0) {
-        const { writeBatch } = await import('firebase/firestore'); // Dynamically import if not already top-level
+    if (questionsToDeleteIds.length > 0) {
         const batch = writeBatch(db);
-        questionsToDelete.forEach(questionDoc => {
-            const docRef = doc(db, QUESTIONS_COLLECTION, questionDoc.id);
-            batch.delete(docRef);
+        questionsToDeleteIds.forEach(id => {
+            batch.delete(doc(db, QUESTIONS_COLLECTION, id));
         });
         await batch.commit();
-        console.log(`Deleted ${questionsToDelete.length} questions from category ${categoryPath} and its sub-categories.`);
+        console.log(`Deleted ${questionsToDeleteIds.length} questions from category ${categoryPath} and its sub-categories.`);
     } else {
         console.log(`No questions found for deletion in category ${categoryPath} and its sub-categories.`);
     }
-
   } catch (error) {
     console.error("Error deleting questions by category from Firestore:", error);
   }
@@ -135,27 +130,26 @@ export async function getCategories(): Promise<string[]> {
   if (typeof window === 'undefined') return [];
   const questions = await getQuestions();
   const allCategories = questions.map(q => q.category);
-  // Filter out empty or non-string categories and sort
   return [...new Set(allCategories)].filter(c => c && typeof c === 'string' && c.trim() !== "").sort();
 }
 
 // --- Quiz Session Functions ---
-// Note: Timestamps are now handled more explicitly for Firestore
-interface StorableQuizSession extends Omit<QuizSession, 'startTime' | 'endTime'> {
-  startTime: Timestamp | number; // Allow number for initial save, convert to Timestamp
-  endTime?: Timestamp | number;
-}
-
-
 export async function saveQuizSession(session: QuizSession): Promise<void> {
   if (typeof window === 'undefined') return;
   try {
     const sessionRef = doc(db, QUIZ_SESSIONS_COLLECTION, session.id);
-    
+    const user = auth.currentUser; // Get current user from Firebase Auth
+
     const sessionToStore: StorableQuizSession = {
-      ...session,
+      id: session.id,
+      category: session.category,
+      questions: session.questions, // Storing full questions might be heavy, consider storing IDs and fetching. For now, keeping as is.
+      currentQuestionIndex: session.currentQuestionIndex,
+      answers: session.answers,
+      status: session.status,
       startTime: typeof session.startTime === 'number' ? Timestamp.fromMillis(session.startTime) : session.startTime,
       endTime: session.endTime ? (typeof session.endTime === 'number' ? Timestamp.fromMillis(session.endTime) : session.endTime) : undefined,
+      ...(user && { userId: user.uid }), // Conditionally add userId
     };
     
     await setDoc(sessionRef, sessionToStore);
@@ -176,32 +170,40 @@ export async function getQuizSession(): Promise<QuizSession | null> {
     if (docSnap.exists()) {
       const data = docSnap.data() as StorableQuizSession;
       // Convert Firestore Timestamps back to numbers (milliseconds)
-      return {
-        ...data,
+      const quizSession: QuizSession = {
         id: docSnap.id,
+        category: data.category,
+        questions: data.questions,
+        currentQuestionIndex: data.currentQuestionIndex,
+        answers: data.answers,
         startTime: (data.startTime as Timestamp).toMillis(),
         endTime: data.endTime ? (data.endTime as Timestamp).toMillis() : undefined,
-      } as QuizSession;
+        status: data.status,
+        userId: data.userId, // Include userId
+      };
+      return quizSession;
     } else {
-      console.log("No such active session document!");
+      console.log("No such active session document found in Firestore!");
       localStorage.removeItem(ACTIVE_QUIZ_SESSION_ID_KEY); // Clean up stale ID
       return null;
     }
   } catch (error) {
     console.error("Error fetching active quiz session from Firestore:", error);
+    // Potentially clear local storage if there's an auth error or permissions issue fetching
+    // For now, just log and return null.
     return null;
   }
 }
 
 export function clearQuizSession(): void {
   if (typeof window === 'undefined') return;
-  const activeSessionId = localStorage.getItem(ACTIVE_QUIZ_SESSION_ID_KEY);
-  if (activeSessionId) {
-    // Optionally, delete the session document from Firestore if desired
-    // For now, just clearing the local reference is enough to "clear" the active session for the user
-    // deleteDoc(doc(db, QUIZ_SESSIONS_COLLECTION, activeSessionId)).catch(err => console.error("Error deleting session from Firestore:", err));
-  }
   localStorage.removeItem(ACTIVE_QUIZ_SESSION_ID_KEY);
+  // Note: This does not delete the session from Firestore, only clears the local "active" pointer.
+  // If you want to delete from Firestore, you'd call:
+  // const activeSessionId = localStorage.getItem(ACTIVE_QUIZ_SESSION_ID_KEY);
+  // if (activeSessionId && auth.currentUser) { // Check if user is auth'd for delete rules
+  //   deleteDoc(doc(db, QUIZ_SESSIONS_COLLECTION, activeSessionId)).catch(err => console.error("Error deleting session doc:", err));
+  // }
 }
 
 
@@ -230,8 +232,7 @@ export function buildCategoryTree(uniquePaths: string[]): CategoryTreeNode[] {
         };
         nodeMap[currentPath] = node;
         
-        // Add to correct parent's children list
-        if (i === 0) { // Top-level node
+        if (i === 0) { 
             if (!treeRoot.children.some(child => child.path === node.path)) {
                  treeRoot.children.push(node);
             }
@@ -248,4 +249,3 @@ export function buildCategoryTree(uniquePaths: string[]): CategoryTreeNode[] {
   }
   return treeRoot.children;
 }
-

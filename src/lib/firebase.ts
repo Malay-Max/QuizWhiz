@@ -1,6 +1,7 @@
 
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getAuth, type Auth } from 'firebase/auth';
 
 // Your web app's Firebase configuration
 const firebaseConfigValues: {
@@ -18,7 +19,7 @@ const firebaseConfigValues: {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Optional
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 let app: FirebaseApp;
@@ -28,7 +29,7 @@ if (!getApps().length) {
   if (!firebaseConfigValues.projectId) {
     throw new Error(
       `Firebase initialization failed: 'projectId' is missing. ` +
-      "Please ensure the 'NEXT_PUBLIC_FIREBASE_PROJECT_ID' environment variable is set correctly in your Vercel project settings for the build environment."
+      "Please ensure the 'NEXT_PUBLIC_FIREBASE_PROJECT_ID' environment variable is set correctly, especially in your Vercel project settings for the build environment."
     );
   }
 
@@ -46,5 +47,6 @@ if (!getApps().length) {
 }
 
 const db: Firestore = getFirestore(app);
+const auth: Auth = getAuth(app);
 
-export { app, db };
+export { app, db, auth };

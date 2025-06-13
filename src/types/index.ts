@@ -31,6 +31,7 @@ export interface QuizSession {
   startTime: number; // timestamp
   endTime?: number; // timestamp
   status: 'active' | 'completed';
+  userId?: string; // Added for Firebase Auth
 }
 
 // Schemas for explainAnswerFlow
