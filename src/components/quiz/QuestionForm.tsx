@@ -40,7 +40,8 @@ export function QuestionForm() {
   const router = useRouter();
 
   const [isGeneratingDistractors, setIsGeneratingDistractors] = useState(false);
-  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [allCategories, setAllCategories] = useState<string[]>([]);
+  const [filteredCategorySuggestions, setFilteredCategorySuggestions] = useState<string[]>([]);
   
   const [batchInput, setBatchInput] = useState('');
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
@@ -64,14 +65,28 @@ export function QuestionForm() {
     name: 'options',
   });
 
-  const fetchAndSetLimitedCategories = async () => {
-    const allCats = await getCategories(); // Returns all unique, sorted categories
-    setAvailableCategories(allCats.slice(-3)); // Take the last 3
+  const currentCategoryInput = form.watch('category');
+
+  const refreshAllCategories = async () => {
+    const cats = await getCategories(); 
+    setAllCategories(cats);
   };
 
   useEffect(() => {
-    fetchAndSetLimitedCategories();
+    refreshAllCategories();
   }, []);
+
+  useEffect(() => {
+    if (currentCategoryInput && currentCategoryInput.trim() !== '') {
+      const lowercasedInput = currentCategoryInput.toLowerCase();
+      const suggestions = allCategories
+        .filter(cat => cat.toLowerCase().includes(lowercasedInput))
+        .slice(0, 5); 
+      setFilteredCategorySuggestions(suggestions);
+    } else {
+      setFilteredCategorySuggestions([]); 
+    }
+  }, [currentCategoryInput, allCategories]);
 
   useEffect(() => {
     const editId = searchParams.get('editId');
@@ -138,6 +153,7 @@ export function QuestionForm() {
   
   const handleCategoryClick = (category: string) => {
     form.setValue('category', category, { shouldValidate: true, shouldDirty: true });
+    setFilteredCategorySuggestions([]); // Hide suggestions after selection
   };
 
   const handleGenerateDistractors = async () => {
@@ -242,7 +258,7 @@ export function QuestionForm() {
                 variant: 'default',
                 className: 'bg-accent text-accent-foreground'
             });
-            await fetchAndSetLimitedCategories();
+            await refreshAllCategories();
             router.replace('/add-question', { scroll: false }); 
         } else {
             toast({
@@ -266,7 +282,7 @@ export function QuestionForm() {
                 variant: 'default',
                 className: 'bg-accent text-accent-foreground'
             });
-            await fetchAndSetLimitedCategories();
+            await refreshAllCategories();
             form.reset({
                 text: '',
                 options: defaultAnswerOptions.map(opt => ({...opt})),
@@ -407,7 +423,7 @@ export function QuestionForm() {
 
     if (questionsAddedCount > 0) {
       setBatchInput(''); 
-      await fetchAndSetLimitedCategories();
+      await refreshAllCategories();
     }
   };
 
@@ -506,13 +522,14 @@ export function QuestionForm() {
               placeholder="e.g., Science or TopFolder/SubFolder"
               className="mt-1 text-base"
               aria-invalid={form.formState.errors.category ? "true" : "false"}
+              autoComplete="off"
             />
             {form.formState.errors.category && <p className="text-sm text-destructive mt-1">{form.formState.errors.category.message}</p>}
-             {availableCategories.length > 0 && (
-              <div className="mt-2">
-                <p className="text-sm text-muted-foreground">Existing categories (click to use):</p>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {availableCategories.map(cat => (
+             {filteredCategorySuggestions.length > 0 && (
+              <div className="mt-2 border rounded-md bg-background shadow-md p-2">
+                <p className="text-sm text-muted-foreground mb-1">Suggestions (click to use):</p>
+                <div className="flex flex-wrap gap-1">
+                  {filteredCategorySuggestions.map(cat => (
                     <Button
                       key={cat}
                       type="button"
