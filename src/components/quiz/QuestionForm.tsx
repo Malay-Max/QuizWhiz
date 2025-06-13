@@ -49,7 +49,6 @@ export function QuestionForm() {
   const [pageTitle, setPageTitle] = useState('Add New Question');
   const [submitButtonText, setSubmitButtonText] = useState('Add Single Question');
 
-
   const form = useForm<QuestionFormData>({
     resolver: zodResolver(questionFormSchema),
     defaultValues: {
@@ -65,12 +64,13 @@ export function QuestionForm() {
     name: 'options',
   });
 
+  const fetchAndSetLimitedCategories = async () => {
+    const allCats = await getCategories(); // Returns all unique, sorted categories
+    setAvailableCategories(allCats.slice(-3)); // Take the last 3
+  };
+
   useEffect(() => {
-    const fetchCategories = async () => {
-      const cats = await getCategories();
-      setAvailableCategories(cats);
-    };
-    fetchCategories();
+    fetchAndSetLimitedCategories();
   }, []);
 
   useEffect(() => {
@@ -242,6 +242,7 @@ export function QuestionForm() {
                 variant: 'default',
                 className: 'bg-accent text-accent-foreground'
             });
+            await fetchAndSetLimitedCategories();
             router.replace('/add-question', { scroll: false }); 
         } else {
             toast({
@@ -259,14 +260,13 @@ export function QuestionForm() {
         };
         result = await addQuestion(newQuestionData);
         if (result.success) {
-            const cats = await getCategories(); 
-            setAvailableCategories(cats); 
             toast({
                 title: 'Question Added!',
                 description: 'Your new question has been saved.',
                 variant: 'default',
                 className: 'bg-accent text-accent-foreground'
             });
+            await fetchAndSetLimitedCategories();
             form.reset({
                 text: '',
                 options: defaultAnswerOptions.map(opt => ({...opt})),
@@ -389,7 +389,7 @@ export function QuestionForm() {
      if (questionsAddedCount === 0 && questionsFailedCount === 0 && lines.length > 0) {
         finalToastTitle = 'No Valid Questions Processed';
         finalToastDescription = 'The batch input did not contain any valid questions or all lines had errors.';
-        finalToastVariant = 'default'; // Keep default if no actual error, just no valid input
+        finalToastVariant = 'default'; 
         finalToastClassName = '';
     } else if (lines.length === 0) {
         finalToastTitle = 'No Questions Processed';
@@ -397,7 +397,6 @@ export function QuestionForm() {
         finalToastVariant = 'default';
         finalToastClassName = '';
     }
-
 
     toast({
         title: finalToastTitle,
@@ -408,8 +407,7 @@ export function QuestionForm() {
 
     if (questionsAddedCount > 0) {
       setBatchInput(''); 
-      const cats = await getCategories(); 
-      setAvailableCategories(cats); 
+      await fetchAndSetLimitedCategories();
     }
   };
 
@@ -578,3 +576,5 @@ export function QuestionForm() {
     </Card>
   );
 }
+
+    
