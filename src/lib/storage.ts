@@ -25,6 +25,22 @@ export function addQuestion(question: Question): void {
   saveQuestions(questions);
 }
 
+export function getQuestionById(id: string): Question | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const questions = getQuestions();
+  return questions.find(q => q.id === id);
+}
+
+export function updateQuestion(updatedQuestion: Question): void {
+  if (typeof window === 'undefined') return;
+  let questions = getQuestions();
+  const questionIndex = questions.findIndex(q => q.id === updatedQuestion.id);
+  if (questionIndex > -1) {
+    questions[questionIndex] = updatedQuestion;
+    saveQuestions(questions);
+  }
+}
+
 export function deleteQuestionById(questionId: string): void {
   if (typeof window === 'undefined') return;
   let questions = getQuestions();
@@ -62,12 +78,6 @@ export function getQuizSession(): QuizSession | null {
 export function clearQuizSession(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(SESSION_KEY);
-}
-
-export function getQuestionById(id: string): Question | undefined {
-  if (typeof window === 'undefined') return undefined;
-  const questions = getQuestions();
-  return questions.find(q => q.id === id);
 }
 
 export function buildCategoryTree(uniquePaths: string[]): CategoryTreeNode[] {

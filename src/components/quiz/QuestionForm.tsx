@@ -12,10 +12,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText } from 'lucide-react';
-import { addQuestion, getCategories } from '@/lib/storage';
+import { addQuestion, getCategories, getQuestionById, updateQuestion } from '@/lib/storage';
 import type { Question, AnswerOption as QuestionAnswerOption } from '@/types'; // Renamed to avoid conflict
 import { useToast } from '@/hooks/use-toast';
 import { generateDistractorsAction } from '@/app/actions';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 const answerOptionSchema = z.object({
   id: z.string().default(() => crypto.randomUUID()),
@@ -35,11 +36,18 @@ const defaultAnswerOptions = Array(2).fill(null).map(() => ({ id: crypto.randomU
 
 export function QuestionForm() {
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const [isGeneratingDistractors, setIsGeneratingDistractors] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   
   const [batchInput, setBatchInput] = useState('');
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+  const [pageTitle, setPageTitle] = useState('Add New Question');
+  const [submitButtonText, setSubmitButtonText] = useState('Add Single Question');
 
 
   const form = useForm<QuestionFormData>({
@@ -60,6 +68,37 @@ export function QuestionForm() {
   useEffect(() => {
     setAvailableCategories(getCategories());
   }, []);
+
+  useEffect(() => {
+    const editId = searchParams.get('editId');
+    if (editId) {
+        const questionToEdit = getQuestionById(editId);
+        if (questionToEdit) {
+            setEditingQuestionId(editId);
+            // Ensure options are fresh for react-hook-form field array
+            const optionsWithFreshIds = questionToEdit.options.map(opt => ({...opt}));
+            form.reset({ ...questionToEdit, options: optionsWithFreshIds });
+            setPageTitle('Edit Question');
+            setSubmitButtonText('Update Question');
+        } else {
+            toast({ title: "Error", description: "Question not found for editing.", variant: "destructive" });
+            router.replace('/add-question', { scroll: false }); // Clear invalid editId
+        }
+    } else {
+        if (editingQuestionId) { // Was editing, but editId removed from URL
+             form.reset({
+                text: '',
+                options: defaultAnswerOptions.map(opt => ({...opt})), // Fresh default options
+                correctAnswerId: '',
+                category: '',
+            });
+        }
+        setEditingQuestionId(null);
+        setPageTitle('Add New Question');
+        setSubmitButtonText('Add Single Question');
+    }
+  }, [searchParams, form, toast, router, editingQuestionId]);
+
 
   const watchQuestionText = form.watch('text');
   const watchCorrectAnswerId = form.watch('correctAnswerId');
@@ -178,27 +217,45 @@ export function QuestionForm() {
   };
 
   const onSubmit = (data: QuestionFormData) => {
-    const newQuestion: Question = {
-      id: crypto.randomUUID(),
-      text: data.text,
-      options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
-      correctAnswerId: data.correctAnswerId,
-      category: data.category.trim().replace(/\s*\/\s*/g, '/'), 
-    };
-    addQuestion(newQuestion);
-    setAvailableCategories(getCategories()); 
-    toast({
-      title: 'Question Added!',
-      description: 'Your new question has been saved.',
-      variant: 'default',
-      className: 'bg-accent text-accent-foreground'
-    });
-    form.reset({
-      text: '',
-      options: Array(2).fill(null).map(() => ({ id: crypto.randomUUID(), text: '' })),
-      correctAnswerId: '',
-      category: ''
-    });
+    if (editingQuestionId) {
+        const updatedQuestionData: Question = {
+            id: editingQuestionId,
+            text: data.text,
+            options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
+            correctAnswerId: data.correctAnswerId,
+            category: data.category.trim().replace(/\s*\/\s*/g, '/'),
+        };
+        updateQuestion(updatedQuestionData);
+        toast({
+            title: 'Question Updated!',
+            description: 'Your question has been successfully updated.',
+            variant: 'default',
+            className: 'bg-accent text-accent-foreground'
+        });
+        router.replace('/add-question', { scroll: false }); // Clears editId, useEffect will reset form state
+    } else {
+        const newQuestion: Question = {
+            id: crypto.randomUUID(),
+            text: data.text,
+            options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
+            correctAnswerId: data.correctAnswerId,
+            category: data.category.trim().replace(/\s*\/\s*/g, '/'), 
+        };
+        addQuestion(newQuestion);
+        setAvailableCategories(getCategories()); 
+        toast({
+            title: 'Question Added!',
+            description: 'Your new question has been saved.',
+            variant: 'default',
+            className: 'bg-accent text-accent-foreground'
+        });
+        form.reset({
+            text: '',
+            options: defaultAnswerOptions.map(opt => ({...opt})),
+            correctAnswerId: '',
+            category: ''
+        });
+    }
   };
   
   useEffect(() => {
@@ -287,8 +344,8 @@ export function QuestionForm() {
         variant: 'default',
         className: 'bg-accent text-accent-foreground'
       });
-      setBatchInput(''); // Clear input only if some were successful
-      setAvailableCategories(getCategories()); // Refresh category list
+      setBatchInput(''); 
+      setAvailableCategories(getCategories()); 
     } else if (questionsFailedCount > 0) {
        toast({
         title: 'Batch Processing Failed',
@@ -308,8 +365,10 @@ export function QuestionForm() {
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
-        <CardTitle className="font-headline text-3xl">Add New Question</CardTitle>
-        <CardDescription>Fill in the details for your multiple-choice question, or use the batch add feature below.</CardDescription>
+        <CardTitle className="font-headline text-3xl">{pageTitle}</CardTitle>
+        <CardDescription>
+            {editingQuestionId ? "Modify the details of this question." : "Fill in the details for your multiple-choice question, or use the batch add feature below."}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -425,43 +484,45 @@ export function QuestionForm() {
           <CardFooter className="px-0 pt-6">
             <Button type="submit" size="lg" className="w-full text-lg shadow-md" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-              Add Single Question
+              {submitButtonText}
             </Button>
           </CardFooter>
         </form>
 
-        {/* Batch Add Section */}
-        <div className="mt-10 pt-6 border-t">
-          <div className="flex items-center mb-3">
-            <FileText className="h-6 w-6 mr-2 text-primary" />
-            <h3 className="text-xl font-semibold">Batch Add Questions</h3>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Format: <code className="font-code bg-muted px-1 py-0.5 rounded text-xs">;;Question Text;; {'{OptionA - OptionB - OptionC}'} [Correct Option Text]</code>
-          </p>
-          <p className="text-sm text-muted-foreground mb-1">
-            Enter one question per line. Uses the category specified above.
-          </p>
-           <p className="text-xs text-muted-foreground mb-4">
-            Example: <code className="font-code bg-muted px-1 py-0.5 rounded">;;What is 2+2?;; {'{Three - Four - Five}'} [Four]</code>
-          </p>
-          <Textarea
-            value={batchInput}
-            onChange={handleBatchInputChange}
-            placeholder=";;What is the capital of France?;; {Paris - London - Rome} [Paris]\n;;Which planet is known as the Red Planet?;; {Earth - Mars - Jupiter} [Mars]"
-            className="min-h-[150px] text-sm font-code"
-            disabled={isProcessingBatch}
-            aria-label="Batch question input"
-          />
-          <Button 
-            onClick={handleProcessBatch} 
-            className="mt-4 w-full sm:w-auto" 
-            disabled={isProcessingBatch || !batchInput.trim()}
-          >
-            {isProcessingBatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-            Process Batch Questions
-          </Button>
-        </div>
+        {/* Batch Add Section - Not shown when editing a question */}
+        {!editingQuestionId && (
+            <div className="mt-10 pt-6 border-t">
+            <div className="flex items-center mb-3">
+                <FileText className="h-6 w-6 mr-2 text-primary" />
+                <h3 className="text-xl font-semibold">Batch Add Questions</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">
+                Format: <code className="font-code bg-muted px-1 py-0.5 rounded text-xs">;;Question Text;; {'{OptionA - OptionB - OptionC}'} [Correct Option Text]</code>
+            </p>
+            <p className="text-sm text-muted-foreground mb-1">
+                Enter one question per line. Uses the category specified above.
+            </p>
+            <p className="text-xs text-muted-foreground mb-4">
+                Example: <code className="font-code bg-muted px-1 py-0.5 rounded">;;What is 2+2?;; {'{Three - Four - Five}'} [Four]</code>
+            </p>
+            <Textarea
+                value={batchInput}
+                onChange={handleBatchInputChange}
+                placeholder=";;What is the capital of France?;; {Paris - London - Rome} [Paris]\n;;Which planet is known as the Red Planet?;; {Earth - Mars - Jupiter} [Mars]"
+                className="min-h-[150px] text-sm font-code"
+                disabled={isProcessingBatch}
+                aria-label="Batch question input"
+            />
+            <Button 
+                onClick={handleProcessBatch} 
+                className="mt-4 w-full sm:w-auto" 
+                disabled={isProcessingBatch || !batchInput.trim()}
+            >
+                {isProcessingBatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                Process Batch Questions
+            </Button>
+            </div>
+        )}
       </CardContent>
     </Card>
   );

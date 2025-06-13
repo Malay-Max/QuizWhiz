@@ -86,11 +86,27 @@ export default function ManageCategoryPage() {
 
     clearQuizSession(); // Clear any existing session
 
-    const shuffledQuestions = [...questions].sort(() => Math.random() - 0.5);
+    // Fisher-Yates shuffle function
+    const shuffleArray = (array: any[]) => {
+      const newArray = [...array];
+      for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+      }
+      return newArray;
+    };
+    
+    const shuffledQuestions = shuffleArray(questions);
+
+    const questionsWithShuffledOptions = shuffledQuestions.map(question => ({
+      ...question,
+      options: shuffleArray([...question.options]),
+    }));
+
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
       category: categoryPath, // Use the exact path
-      questions: shuffledQuestions,
+      questions: questionsWithShuffledOptions,
       currentQuestionIndex: 0,
       answers: [],
       startTime: Date.now(),
@@ -100,14 +116,8 @@ export default function ManageCategoryPage() {
     router.push('/'); // Navigate to the main quiz playing page
   };
   
-  // Placeholder for edit functionality
   const handleEditClick = (question: Question) => {
-    toast({
-        title: "Edit Feature",
-        description: "Editing questions from here will be implemented soon!",
-        variant: "default"
-    });
-    // Future: router.push(`/add-question?editId=${question.id}`); or open modal
+    router.push(`/add-question?editId=${question.id}`);
   };
 
 
@@ -167,7 +177,7 @@ export default function ManageCategoryPage() {
                         </ul>
                       </div>
                       <div className="flex flex-col sm:flex-row gap-2 ml-4 shrink-0">
-                        <Button variant="outline" size="sm" onClick={() => handleEditClick(q)} title="Edit Question (coming soon)">
+                        <Button variant="outline" size="sm" onClick={() => handleEditClick(q)} title="Edit Question">
                           <Edit className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Edit</span>
                         </Button>
                         <Button variant="destructive" size="sm" onClick={() => handleDeleteClick(q)} title="Delete Question">
