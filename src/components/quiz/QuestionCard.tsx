@@ -275,14 +275,14 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
             {!isExplanationLoading && explanation && (
               <ReactMarkdown
                 components={{
-                  h1: ({node, ...props}) => <h1 className="text-2xl font-bold my-4" {...props} />,
-                  h2: ({node, ...props}) => <h2 className="text-xl font-semibold my-3" {...props} />,
-                  h3: ({node, ...props}) => <h3 className="text-lg font-semibold my-2" {...props} />,
-                  p: ({node, ...props}) => <p className="mb-2 leading-relaxed" {...props} />,
+                  h1: ({node, ...props}) => <h1 className="text-2xl font-bold my-4 text-foreground" {...props} />,
+                  h2: ({node, ...props}) => <h2 className="text-xl font-semibold my-3 text-foreground" {...props} />,
+                  h3: ({node, ...props}) => <h3 className="text-lg font-semibold my-2 text-foreground" {...props} />,
+                  p: ({node, ...props}) => <p className="mb-2 leading-relaxed text-foreground" {...props} />,
                   ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2 space-y-1" {...props} />,
-                  li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
-                  strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
-                  em: ({node, ...props}) => <em className="italic" {...props} />,
+                  li: ({node, ...props}) => <li className="leading-relaxed text-foreground" {...props} />,
+                  strong: ({node, ...props}) => <strong className="font-bold text-foreground" {...props} />,
+                  em: ({node, ...props}) => <em className="italic text-foreground" {...props} />,
                 }}
               >
                 {explanation}
