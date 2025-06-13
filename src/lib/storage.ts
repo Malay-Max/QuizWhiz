@@ -4,7 +4,7 @@
 import type { Question, QuizSession, CategoryTreeNode, AnswerOption } from '@/types';
 import { db } from './firebase';
 import { 
-  collection, doc, getDoc, getDocs, writeDoc, deleteDoc, query, where, runTransaction, Timestamp
+  collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, runTransaction, Timestamp
 } from 'firebase/firestore';
 
 const QUESTIONS_COLLECTION = 'questions';
@@ -38,7 +38,7 @@ export async function addQuestion(question: Omit<Question, 'id'> & { id?: string
       correctAnswerId: question.correctAnswerId,
       category: question.category,
     };
-    await writeDoc(newQuestionRef, questionData);
+    await setDoc(newQuestionRef, questionData);
     return newQuestionRef.id;
   } catch (error) {
     console.error("Error adding question to Firestore:", error);
@@ -69,7 +69,7 @@ export async function updateQuestion(updatedQuestion: Question): Promise<void> {
     const questionRef = doc(db, QUESTIONS_COLLECTION, updatedQuestion.id);
     // Ensure we don't write the id field inside the document itself if it's already the doc ID
     const { id, ...dataToUpdate } = updatedQuestion;
-    await writeDoc(questionRef, dataToUpdate, { merge: true });
+    await setDoc(questionRef, dataToUpdate, { merge: true });
   } catch (error) {
     console.error("Error updating question in Firestore:", error);
   }
@@ -92,19 +92,40 @@ export async function deleteQuestionsByCategory(categoryPath: string): Promise<v
     // For very large datasets, this is inefficient. A more robust solution might involve
     // structuring categories differently (e.g., array of path segments) or using Cloud Functions.
     // For now, we'll fetch and delete, which matches previous localStorage logic.
-    const allQuestions = await getQuestions();
-    const questionsToDelete = allQuestions.filter(q => 
-      typeof q.category === 'string' && q.category.startsWith(categoryPath)
-    );
+    
+    // Create a query that finds questions where the category starts with categoryPath
+    const q = query(collection(db, QUESTIONS_COLLECTION), 
+                    where("category", ">=", categoryPath),
+                    where("category", "<=", categoryPath + '\uf8ff'));
+    
+    const querySnapshot = await getDocs(q);
+    const questionsToDelete: Question[] = [];
+    querySnapshot.forEach((docSnap) => {
+        // Additional client-side check to ensure it's a true prefix match,
+        // as Firestore's range query for strings can sometimes include unintended matches
+        // if not careful with the end range character.
+        const data = docSnap.data() as Question;
+        if (typeof data.category === 'string' && data.category.startsWith(categoryPath)) {
+            questionsToDelete.push({ id: docSnap.id, ...data });
+        }
+    });
+
 
     // Use a transaction or batched write for deleting multiple documents
-    await runTransaction(db, async (transaction) => {
-      questionsToDelete.forEach(q => {
-        const docRef = doc(db, QUESTIONS_COLLECTION, q.id);
-        transaction.delete(docRef);
-      });
-    });
-    console.log(`Deleted ${questionsToDelete.length} questions from category ${categoryPath}`);
+    // Batched write is simpler here if we don't need to read during the transaction
+    if (questionsToDelete.length > 0) {
+        const { writeBatch } = await import('firebase/firestore'); // Dynamically import if not already top-level
+        const batch = writeBatch(db);
+        questionsToDelete.forEach(questionDoc => {
+            const docRef = doc(db, QUESTIONS_COLLECTION, questionDoc.id);
+            batch.delete(docRef);
+        });
+        await batch.commit();
+        console.log(`Deleted ${questionsToDelete.length} questions from category ${categoryPath} and its sub-categories.`);
+    } else {
+        console.log(`No questions found for deletion in category ${categoryPath} and its sub-categories.`);
+    }
+
   } catch (error) {
     console.error("Error deleting questions by category from Firestore:", error);
   }
@@ -137,7 +158,7 @@ export async function saveQuizSession(session: QuizSession): Promise<void> {
       endTime: session.endTime ? (typeof session.endTime === 'number' ? Timestamp.fromMillis(session.endTime) : session.endTime) : undefined,
     };
     
-    await writeDoc(sessionRef, sessionToStore);
+    await setDoc(sessionRef, sessionToStore);
     localStorage.setItem(ACTIVE_QUIZ_SESSION_ID_KEY, session.id);
   } catch (error) {
     console.error("Error saving quiz session to Firestore:", error);
@@ -227,3 +248,4 @@ export function buildCategoryTree(uniquePaths: string[]): CategoryTreeNode[] {
   }
   return treeRoot.children;
 }
+
