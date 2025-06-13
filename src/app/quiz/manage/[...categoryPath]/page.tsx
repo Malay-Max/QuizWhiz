@@ -38,7 +38,7 @@ export default function ManageCategoryPage() {
   const loadQuestionsForCategory = useCallback(async () => {
     if (!categoryPath) return;
     setIsLoading(true);
-    const allQuestions = await getQuestions(); // Now async
+    const allQuestions = await getQuestions();
     const filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category === categoryPath);
     setQuestions(filteredQuestions);
     setIsLoading(false);
@@ -64,14 +64,23 @@ export default function ManageCategoryPage() {
 
   const handleConfirmDelete = async () => {
     if (!questionToDelete) return;
-    await deleteQuestionById(questionToDelete.id); // Now async
-    toast({
-      title: 'Question Deleted',
-      description: `"${questionToDelete.text.substring(0, 30)}..." has been removed.`,
-    });
-    setQuestionToDelete(null);
+    const deleteResult = await deleteQuestionById(questionToDelete.id);
     setShowDeleteConfirm(false);
-    await loadQuestionsForCategory(); // Refresh the list
+    setQuestionToDelete(null);
+
+    if (deleteResult.success) {
+        toast({
+          title: 'Question Deleted',
+          description: `"${questionToDelete.text.substring(0, 30)}..." has been removed.`,
+        });
+        await loadQuestionsForCategory(); 
+    } else {
+        toast({
+          title: 'Deletion Failed',
+          description: deleteResult.error || 'Could not delete the question.',
+          variant: 'destructive',
+        });
+    }
   };
 
   const handleStartQuizForThisCategory = async () => {
@@ -84,9 +93,8 @@ export default function ManageCategoryPage() {
       return;
     }
 
-    clearQuizSession(); // This might also become async if it interacts with Firestore directly
+    clearQuizSession(); 
 
-    // Fisher-Yates shuffle function
     const shuffleArray = (array: any[]) => {
       const newArray = [...array];
       for (let i = newArray.length - 1; i > 0; i--) {
@@ -112,8 +120,16 @@ export default function ManageCategoryPage() {
       startTime: Date.now(),
       status: 'active',
     };
-    await saveQuizSession(newSession); // Now async
-    router.push('/'); 
+    const saveResult = await saveQuizSession(newSession);
+    if (saveResult.success) {
+        router.push('/'); 
+    } else {
+        toast({
+            title: "Error Starting Quiz",
+            description: saveResult.error || "Could not save the new quiz session.",
+            variant: "destructive",
+        });
+    }
   };
   
   const handleEditClick = (question: Question) => {
@@ -165,7 +181,7 @@ export default function ManageCategoryPage() {
               </Button>
             </div>
           ) : (
-            <ScrollArea className="h-[calc(100vh-25rem)] pr-4"> {/* Adjust height as needed */}
+            <ScrollArea className="h-[calc(100vh-25rem)] pr-4">
               <div className="space-y-4">
                 {questions.map((q, index) => (
                   <Card key={q.id} className="p-4 shadow-md hover:shadow-lg transition-shadow">

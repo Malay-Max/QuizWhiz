@@ -54,7 +54,7 @@ export function QuestionForm() {
     resolver: zodResolver(questionFormSchema),
     defaultValues: {
       text: '',
-      options: defaultAnswerOptions.map(opt => ({...opt})), // Ensure fresh objects
+      options: defaultAnswerOptions.map(opt => ({...opt})),
       correctAnswerId: '',
       category: '',
     },
@@ -79,24 +79,23 @@ export function QuestionForm() {
         const questionToEdit = await getQuestionById(id);
         if (questionToEdit) {
             setEditingQuestionId(id);
-            // Ensure options are fresh for react-hook-form field array
             const optionsWithFreshIds = questionToEdit.options.map(opt => ({...opt}));
             form.reset({ ...questionToEdit, options: optionsWithFreshIds });
             setPageTitle('Edit Question');
             setSubmitButtonText('Update Question');
         } else {
             toast({ title: "Error", description: "Question not found for editing.", variant: "destructive" });
-            router.replace('/add-question', { scroll: false }); // Clear invalid editId
+            router.replace('/add-question', { scroll: false });
         }
     };
 
     if (editId) {
         loadQuestionForEditing(editId);
     } else {
-        if (editingQuestionId) { // Was editing, but editId removed from URL
+        if (editingQuestionId) {
              form.reset({
                 text: '',
-                options: defaultAnswerOptions.map(opt => ({...opt})), // Fresh default options
+                options: defaultAnswerOptions.map(opt => ({...opt})),
                 correctAnswerId: '',
                 category: '',
             });
@@ -106,7 +105,7 @@ export function QuestionForm() {
         setSubmitButtonText('Add Single Question');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, router, toast]); // form removed from deps to avoid re-triggering on internal form state changes
+  }, [searchParams, router, toast]); 
 
 
   const watchQuestionText = form.watch('text');
@@ -209,7 +208,7 @@ export function QuestionForm() {
         });
       } else {
         toast({
-          title: "Error",
+          title: "Error Generating Distractors",
           description: result.error || "Could not generate distractors.",
           variant: "destructive",
         });
@@ -226,6 +225,7 @@ export function QuestionForm() {
   };
 
   const onSubmit = async (data: QuestionFormData) => {
+    let result;
     if (editingQuestionId) {
         const updatedQuestionData: Question = {
             id: editingQuestionId,
@@ -234,14 +234,22 @@ export function QuestionForm() {
             correctAnswerId: data.correctAnswerId,
             category: data.category.trim().replace(/\s*\/\s*/g, '/'),
         };
-        await updateQuestion(updatedQuestionData);
-        toast({
-            title: 'Question Updated!',
-            description: 'Your question has been successfully updated.',
-            variant: 'default',
-            className: 'bg-accent text-accent-foreground'
-        });
-        router.replace('/add-question', { scroll: false }); 
+        result = await updateQuestion(updatedQuestionData);
+        if (result.success) {
+            toast({
+                title: 'Question Updated!',
+                description: 'Your question has been successfully updated.',
+                variant: 'default',
+                className: 'bg-accent text-accent-foreground'
+            });
+            router.replace('/add-question', { scroll: false }); 
+        } else {
+            toast({
+                title: 'Update Failed',
+                description: result.error || 'Could not update question.',
+                variant: 'destructive',
+            });
+        }
     } else {
         const newQuestionData: Omit<Question, 'id'> = {
             text: data.text,
@@ -249,21 +257,29 @@ export function QuestionForm() {
             correctAnswerId: data.correctAnswerId,
             category: data.category.trim().replace(/\s*\/\s*/g, '/'), 
         };
-        await addQuestion(newQuestionData);
-        const cats = await getCategories(); 
-        setAvailableCategories(cats); 
-        toast({
-            title: 'Question Added!',
-            description: 'Your new question has been saved.',
-            variant: 'default',
-            className: 'bg-accent text-accent-foreground'
-        });
-        form.reset({
-            text: '',
-            options: defaultAnswerOptions.map(opt => ({...opt})),
-            correctAnswerId: '',
-            category: '' 
-        });
+        result = await addQuestion(newQuestionData);
+        if (result.success) {
+            const cats = await getCategories(); 
+            setAvailableCategories(cats); 
+            toast({
+                title: 'Question Added!',
+                description: 'Your new question has been saved.',
+                variant: 'default',
+                className: 'bg-accent text-accent-foreground'
+            });
+            form.reset({
+                text: '',
+                options: defaultAnswerOptions.map(opt => ({...opt})),
+                correctAnswerId: '',
+                category: data.category // Keep category for subsequent adds
+            });
+        } else {
+            toast({
+                title: 'Add Failed',
+                description: result.error || 'Could not add question.',
+                variant: 'destructive',
+            });
+        }
     }
   };
   
@@ -293,6 +309,7 @@ export function QuestionForm() {
     const lines = batchInput.split('\n').filter(line => line.trim() !== '');
     let questionsAddedCount = 0;
     let questionsFailedCount = 0;
+    let permissionErrorOccurred = false;
 
     for (const line of lines) { 
       try {
@@ -335,9 +352,17 @@ export function QuestionForm() {
           category: categoryValue.trim().replace(/\s*\/\s*/g, '/'),
         };
 
-        await addQuestion(newQuestionData);
-        questionsAddedCount++;
-      } catch (e) {
+        const result = await addQuestion(newQuestionData);
+        if (result.success) {
+            questionsAddedCount++;
+        } else {
+            questionsFailedCount++;
+            console.error(`Failed to add question from line: ${line}. Error: ${result.error}`);
+            if (result.error?.toLowerCase().includes('permission denied')) {
+                permissionErrorOccurred = true;
+            }
+        }
+      } catch (e) { // Catch any other unexpected errors during processing of a line
         console.error(`Error processing line: ${line}`, e);
         questionsFailedCount++;
       }
@@ -345,28 +370,44 @@ export function QuestionForm() {
 
     setIsProcessingBatch(false);
 
+    let finalToastTitle = 'Batch Processing Complete';
+    let finalToastVariant: "default" | "destructive" = 'default';
+    let finalToastClassName = 'bg-accent text-accent-foreground';
+    let finalToastDescription = `${questionsAddedCount} questions added.`;
+    if (questionsFailedCount > 0) {
+        finalToastDescription += ` ${questionsFailedCount} failed.`;
+        finalToastVariant = 'destructive';
+        finalToastClassName = ''; // Use default destructive styling
+    }
+    if (permissionErrorOccurred) {
+        finalToastDescription += ' Some operations failed due to insufficient permissions.';
+        finalToastVariant = 'destructive';
+    }
+    if (questionsAddedCount === 0 && questionsFailedCount > 0) {
+        finalToastTitle = 'Batch Processing Failed';
+    }
+     if (questionsAddedCount === 0 && questionsFailedCount === 0 && lines.length > 0) {
+        finalToastTitle = 'No Valid Questions Processed';
+        finalToastDescription = 'The batch input did not contain any valid questions or all lines had errors.';
+        finalToastVariant = 'default';
+    } else if (lines.length === 0) {
+        finalToastTitle = 'No Questions Processed';
+        finalToastDescription = 'The batch input was empty.';
+        finalToastVariant = 'default';
+    }
+
+
+    toast({
+        title: finalToastTitle,
+        description: finalToastDescription,
+        variant: finalToastVariant,
+        className: finalToastClassName
+    });
+
     if (questionsAddedCount > 0) {
-      toast({
-        title: 'Batch Processing Complete',
-        description: `${questionsAddedCount} questions added successfully. ${questionsFailedCount > 0 ? `${questionsFailedCount} failed.` : ''}`,
-        variant: 'default',
-        className: 'bg-accent text-accent-foreground'
-      });
       setBatchInput(''); 
       const cats = await getCategories(); 
       setAvailableCategories(cats); 
-    } else if (questionsFailedCount > 0) {
-       toast({
-        title: 'Batch Processing Failed',
-        description: `No questions were added. ${questionsFailedCount} entries had errors. Check console for details.`,
-        variant: 'destructive',
-      });
-    } else {
-       toast({
-        title: 'No Questions Processed',
-        description: 'The batch input was empty or no valid questions were found.',
-        variant: 'default',
-      });
     }
   };
 
@@ -381,7 +422,6 @@ export function QuestionForm() {
       </CardHeader>
       <CardContent>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* Single Question Form Fields */}
           <div>
             <Label htmlFor="text" className="text-lg">Question Text</Label>
             <Textarea
@@ -498,7 +538,6 @@ export function QuestionForm() {
           </CardFooter>
         </form>
 
-        {/* Batch Add Section - Not shown when editing a question */}
         {!editingQuestionId && (
             <div className="mt-10 pt-6 border-t">
             <div className="flex items-center mb-3">
@@ -525,7 +564,7 @@ export function QuestionForm() {
             <Button 
                 onClick={handleProcessBatch} 
                 className="mt-4 w-full sm:w-auto" 
-                disabled={isProcessingBatch || !batchInput.trim()}
+                disabled={isProcessingBatch || !batchInput.trim() || !form.getValues('category').trim()}
             >
                 {isProcessingBatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
                 Process Batch Questions

@@ -33,7 +33,7 @@ function QuizPageContent() {
 
   const startQuiz = useCallback(async (selectedCategoryPath: string, exactMatch: boolean = false) => {
     setIsLoading(true);
-    const allQuestions = await getQuestions(); // Now async
+    const allQuestions = await getQuestions();
     let filteredQuestions: Question[] = [];
     let quizCategoryName = selectedCategoryPath;
 
@@ -84,11 +84,20 @@ function QuizPageContent() {
       startTime: Date.now(),
       status: 'active',
     };
-    await saveQuizSession(newSession); // Now async
+    const saveResult = await saveQuizSession(newSession);
+    if (!saveResult.success) {
+        toast({
+            title: "Error Starting Quiz",
+            description: saveResult.error || "Could not save the new quiz session.",
+            variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+    }
     setQuizSession(newSession);
     setIsLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast]); // Removed router from deps as it's stable, reduces re-creations of startQuiz
+  }, [toast]); 
 
   const loadActiveSessionOrFromParams = useCallback(async () => {
     const categoryFromParams = searchParams.get('category');
@@ -105,7 +114,7 @@ function QuizPageContent() {
       return;
     }
 
-    const activeSession = await getQuizSession(); // Now async
+    const activeSession = await getQuizSession();
     if (activeSession && activeSession.status === 'active') {
       setQuizSession(activeSession);
     }
@@ -155,7 +164,11 @@ function QuizPageContent() {
       const updatedAnswers = [...prevSession.answers, newAnswer];
       const updatedSession = { ...prevSession, answers: updatedAnswers };
       
-      saveQuizSession(updatedSession); // Fire and forget for UI responsiveness
+      saveQuizSession(updatedSession).then(res => { // Check save result
+          if (!res.success) {
+            toast({ title: "Save Error", description: res.error || "Failed to save answer progress.", variant: "destructive" });
+          }
+      });
       return updatedSession;
     });
   };
@@ -177,7 +190,11 @@ function QuizPageContent() {
       const updatedAnswers = [...prevSession.answers, newAnswer];
       const updatedSession = { ...prevSession, answers: updatedAnswers };
 
-      saveQuizSession(updatedSession); // Fire and forget
+      saveQuizSession(updatedSession).then(res => {
+          if (!res.success) {
+            toast({ title: "Save Error", description: res.error || "Failed to save timeout progress.", variant: "destructive" });
+          }
+      });
       return updatedSession;
     });
   };
@@ -189,7 +206,11 @@ function QuizPageContent() {
 
       if (nextIndex < prevSession.questions.length) {
         const updatedSession = { ...prevSession, currentQuestionIndex: nextIndex };
-        saveQuizSession(updatedSession); // Fire and forget
+        saveQuizSession(updatedSession).then(res => {
+            if (!res.success) {
+                toast({ title: "Save Error", description: res.error || "Failed to save progress to next question.", variant: "destructive" });
+            }
+        });
         return updatedSession;
       } else {
         const completedSession = { 
@@ -197,19 +218,22 @@ function QuizPageContent() {
           status: 'completed' as 'completed',
           endTime: Date.now() 
         };
-        saveQuizSession(completedSession); // Fire and forget
+        saveQuizSession(completedSession).then(res => {
+             if (!res.success) {
+                toast({ title: "Save Error", description: res.error || "Failed to save completed quiz session.", variant: "destructive" });
+            }
+        });
         return completedSession;
       }
     });
   };
   
   const handleRestartQuiz = async () => {
-    clearQuizSession(); // This might also become async later
+    clearQuizSession();
     setQuizSession(null);
     setIsLoading(true); 
-    // Give UI a chance to show loader before potential re-fetch in loadActiveSessionOrFromParams
     setTimeout(() => {
-        loadActiveSessionOrFromParams(); // Re-check if any session should be loaded (likely not after clear)
+        loadActiveSessionOrFromParams();
     }, 50);
   };
 
@@ -239,7 +263,23 @@ function QuizPageContent() {
         return;
     }
 
-    await deleteQuestionById(currentQuestionToDelete.id); // Now async
+    const deleteResult = await deleteQuestionById(currentQuestionToDelete.id);
+    setShowDeleteQuestionConfirmDialog(false);
+
+    if (!deleteResult.success) {
+        toast({
+            title: "Deletion Failed",
+            description: deleteResult.error || "Could not delete the question.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    toast({
+        title: "Question Deleted",
+        description: `The question "${currentQuestionToDelete.text.substring(0,30)}..." has been removed.`,
+        variant: "default",
+    });
 
     setQuizSession(prevSession => {
         if (!prevSession) return null;
@@ -261,22 +301,15 @@ function QuizPageContent() {
             ...prevSession,
             questions: updatedQuestionsArray,
             answers: prevSession.answers.filter(ans => updatedQuestionsArray.some(q => q.id === ans.questionId)),
-            // currentQuestionIndex remains, or adjust if it was the last one.
-            // If it was the last one and deleted, the above block handles completion.
-            // If not, the index might need adjustment if it points beyond new array length,
-            // but the check 'prevSession.currentQuestionIndex >= updatedQuestionsArray.length' handles this by completing.
             status: 'active', 
           };
         }
-        saveQuizSession(newSessionState); // Fire and forget
+        saveQuizSession(newSessionState).then(res => { // Save the updated session state
+            if(!res.success){
+                toast({ title: "Session Update Failed", description: res.error || "Could not update session after question deletion.", variant: "destructive" });
+            }
+        });
         return newSessionState;
-    });
-
-    setShowDeleteQuestionConfirmDialog(false);
-    toast({
-        title: "Question Deleted",
-        description: `The question "${currentQuestionToDelete.text.substring(0,30)}..." has been removed.`,
-        variant: "default",
     });
   };
 
@@ -284,21 +317,30 @@ function QuizPageContent() {
     if (!quizSession || !quizSession.category || quizSession.category === ALL_QUESTIONS_RANDOM_KEY) return;
 
     const categoryToDelete = quizSession.category;
-    await deleteQuestionsByCategory(categoryToDelete); // Now async
-
-    clearQuizSession();
-    setQuizSession(null);
+    const deleteResult = await deleteQuestionsByCategory(categoryToDelete);
     setShowDeleteCategoryConfirmDialog(false);
-    setIsLoading(true); 
-    setTimeout(() => {
-       loadActiveSessionOrFromParams(); // Re-check state
-    }, 50);
+
+    if (!deleteResult.success) {
+        toast({
+            title: "Category Deletion Failed",
+            description: deleteResult.error || "Could not delete the quiz category.",
+            variant: "destructive",
+        });
+        return;
+    }
 
     toast({
       title: "Quiz Category Deleted",
       description: `All questions in category "${categoryToDelete}" have been removed.`,
       variant: "default",
     });
+
+    clearQuizSession();
+    setQuizSession(null);
+    setIsLoading(true); 
+    setTimeout(() => {
+       loadActiveSessionOrFromParams();
+    }, 50);
   };
 
   if (isLoading) {
@@ -315,19 +357,18 @@ function QuizPageContent() {
   }
   
   if (quizSession.questions.length === 0 || quizSession.currentQuestionIndex >= quizSession.questions.length) {
-     // This block might need to be async if getQuizSession was called again
      if (quizSession.status === 'active') {
         const completedSession = { 
             ...quizSession, 
             status: 'completed' as 'completed',
             endTime: quizSession.endTime || Date.now() 
         };
-        // Check if this session still needs saving (e.g., if getQuizSession was called to re-verify)
-        // For now, assume quizSession state is authoritative for this render pass.
-        saveQuizSession(completedSession); // Fire and forget
-        // setQuizSession(completedSession); // This will trigger router.push in useEffect
+        saveQuizSession(completedSession).then(res => {
+            if(!res.success){
+                 toast({ title: "Session Finalization Failed", description: res.error || "Could not save finalized session state.", variant: "destructive" });
+            }
+        });
      }
-     // UI will show "Finalizing Quiz..." then useEffect will redirect.
      return ( 
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

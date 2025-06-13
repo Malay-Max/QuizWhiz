@@ -34,10 +34,9 @@ function QuizPlayPageContent() {
   const [showDeleteQuestionConfirmDialog, setShowDeleteQuestionConfirmDialog] = useState(false);
   const [showDeleteCategoryConfirmDialog, setShowDeleteCategoryConfirmDialog] = useState(false);
 
-  // Duplicates startQuiz from src/app/page.tsx - consider refactoring
   const startQuiz = useCallback(async (selectedCategoryPath: string, exactMatch: boolean = false) => {
     setIsLoading(true);
-    const allQuestions = await getQuestions(); // Now async
+    const allQuestions = await getQuestions();
     let filteredQuestions: Question[] = [];
     let quizCategoryName = selectedCategoryPath;
 
@@ -88,7 +87,16 @@ function QuizPlayPageContent() {
       startTime: Date.now(),
       status: 'active',
     };
-    await saveQuizSession(newSession); // Now async
+    const saveResult = await saveQuizSession(newSession);
+    if (!saveResult.success) {
+        toast({
+            title: "Error Starting Quiz",
+            description: saveResult.error || "Could not save the new quiz session.",
+            variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+    }
     setQuizSession(newSession);
     setIsLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,7 +117,7 @@ function QuizPlayPageContent() {
       return;
     }
 
-    const activeSession = await getQuizSession(); // Now async
+    const activeSession = await getQuizSession();
     if (activeSession && activeSession.status === 'active') {
       setQuizSession(activeSession);
     }
@@ -159,7 +167,11 @@ function QuizPlayPageContent() {
       const updatedAnswers = [...prevSession.answers, newAnswer];
       const updatedSession = { ...prevSession, answers: updatedAnswers };
       
-      saveQuizSession(updatedSession); // Fire and forget
+      saveQuizSession(updatedSession).then(res => {
+          if(!res.success){
+            toast({ title: "Save Error", description: res.error || "Failed to save answer progress.", variant: "destructive" });
+          }
+      });
       return updatedSession;
     });
   };
@@ -181,7 +193,11 @@ function QuizPlayPageContent() {
       const updatedAnswers = [...prevSession.answers, newAnswer];
       const updatedSession = { ...prevSession, answers: updatedAnswers };
 
-      saveQuizSession(updatedSession); // Fire and forget
+      saveQuizSession(updatedSession).then(res => {
+           if(!res.success){
+            toast({ title: "Save Error", description: res.error || "Failed to save timeout progress.", variant: "destructive" });
+          }
+      });
       return updatedSession;
     });
   };
@@ -193,7 +209,11 @@ function QuizPlayPageContent() {
 
       if (nextIndex < prevSession.questions.length) {
         const updatedSession = { ...prevSession, currentQuestionIndex: nextIndex };
-        saveQuizSession(updatedSession); // Fire and forget
+        saveQuizSession(updatedSession).then(res => {
+            if(!res.success){
+                toast({ title: "Save Error", description: res.error || "Failed to save progress to next question.", variant: "destructive" });
+            }
+        });
         return updatedSession;
       } else {
         const completedSession = { 
@@ -201,7 +221,11 @@ function QuizPlayPageContent() {
           status: 'completed' as 'completed',
           endTime: Date.now() 
         };
-        saveQuizSession(completedSession); // Fire and forget
+        saveQuizSession(completedSession).then(res => {
+            if(!res.success){
+                toast({ title: "Save Error", description: res.error || "Failed to save completed quiz session.", variant: "destructive" });
+            }
+        });
         return completedSession;
       }
     });
@@ -242,7 +266,23 @@ function QuizPlayPageContent() {
         return;
     }
 
-    await deleteQuestionById(currentQuestionToDelete.id); // Now async
+    const deleteResult = await deleteQuestionById(currentQuestionToDelete.id);
+    setShowDeleteQuestionConfirmDialog(false);
+
+    if (!deleteResult.success) {
+        toast({
+            title: "Deletion Failed",
+            description: deleteResult.error || "Could not delete the question.",
+            variant: "destructive",
+        });
+        return;
+    }
+    
+    toast({
+        title: "Question Deleted",
+        description: `The question "${currentQuestionToDelete.text.substring(0,30)}..." has been removed.`,
+        variant: "default",
+    });
 
     setQuizSession(prevSession => {
         if (!prevSession) return null;
@@ -267,15 +307,12 @@ function QuizPlayPageContent() {
                 status: 'active',
             };
         }
-        saveQuizSession(newSessionState); // Fire and forget
+        saveQuizSession(newSessionState).then(res => {
+            if(!res.success){
+                toast({ title: "Session Update Failed", description: res.error || "Could not update session after question deletion.", variant: "destructive" });
+            }
+        });
         return newSessionState;
-    });
-
-    setShowDeleteQuestionConfirmDialog(false);
-    toast({
-        title: "Question Deleted",
-        description: `The question "${currentQuestionToDelete.text.substring(0,30)}..." has been removed.`,
-        variant: "default",
     });
   };
 
@@ -283,21 +320,30 @@ function QuizPlayPageContent() {
     if (!quizSession || !quizSession.category || quizSession.category === ALL_QUESTIONS_RANDOM_KEY) return;
 
     const categoryToDelete = quizSession.category;
-    await deleteQuestionsByCategory(categoryToDelete); // Now async
-
-    clearQuizSession();
-    setQuizSession(null);
+    const deleteResult = await deleteQuestionsByCategory(categoryToDelete);
     setShowDeleteCategoryConfirmDialog(false);
-    setIsLoading(true); 
-    setTimeout(() => {
-      loadActiveSessionOrFromParams();
-    }, 50);
+
+    if (!deleteResult.success) {
+        toast({
+            title: "Category Deletion Failed",
+            description: deleteResult.error || "Could not delete the quiz category.",
+            variant: "destructive",
+        });
+        return;
+    }
 
     toast({
       title: "Quiz Category Deleted",
       description: `All questions in category "${categoryToDelete}" have been removed.`,
       variant: "default",
     });
+
+    clearQuizSession();
+    setQuizSession(null);
+    setIsLoading(true); 
+    setTimeout(() => {
+      loadActiveSessionOrFromParams();
+    }, 50);
   };
 
   if (isLoading) {
@@ -320,8 +366,11 @@ function QuizPlayPageContent() {
             status: 'completed' as 'completed',
             endTime: quizSession.endTime || Date.now() 
         };
-        saveQuizSession(completedSession); // Fire and forget
-        // setQuizSession(completedSession); // This will trigger router.push in useEffect
+        saveQuizSession(completedSession).then(res => {
+            if(!res.success){
+                toast({ title: "Session Finalization Failed", description: res.error || "Could not save finalized session state.", variant: "destructive" });
+            }
+        });
      }
      return ( 
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">

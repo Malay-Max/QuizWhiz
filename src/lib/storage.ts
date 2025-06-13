@@ -2,22 +2,33 @@
 "use client";
 
 import type { Question, QuizSession, CategoryTreeNode } from '@/types';
-import { db, auth } from './firebase'; // Import auth
+import { db, auth } from './firebase';
 import { 
   collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, writeBatch, Timestamp 
 } from 'firebase/firestore';
+import { FirebaseError } from 'firebase/app'; // Import FirebaseError
 
 const QUESTIONS_COLLECTION = 'questions';
 const QUIZ_SESSIONS_COLLECTION = 'quizSessions';
-const ACTIVE_QUIZ_SESSION_ID_KEY = 'quizcraft_active_session_id'; // Used for localStorage
+const ACTIVE_QUIZ_SESSION_ID_KEY = 'quizcraft_active_session_id';
 
-// Internal StorableQuizSession type
 interface StorableQuizSession extends Omit<QuizSession, 'startTime' | 'endTime' | 'userId'> {
   startTime: Timestamp | number;
   endTime?: Timestamp | number;
-  userId?: string; // Added for Firebase Auth
+  userId?: string;
 }
 
+// Helper function to handle Firestore errors
+function handleFirestoreError(error: unknown, defaultMessage: string): string {
+  if (error instanceof FirebaseError) {
+    if (error.code === 'permission-denied') {
+      return 'Permission denied. You do not have the necessary rights to perform this action.';
+    }
+    // You can add more specific Firebase error codes here if needed
+    return `Firestore error: ${error.message} (Code: ${error.code})`;
+  }
+  return defaultMessage;
+}
 
 // --- Question Functions ---
 export async function getQuestions(): Promise<Question[]> {
@@ -35,9 +46,8 @@ export async function getQuestions(): Promise<Question[]> {
   }
 }
 
-export async function addQuestion(question: Omit<Question, 'id'> & { id?: string }): Promise<string | null> {
-  if (typeof window === 'undefined') return null;
-  // Add Firestore rule check simulation: if (!auth.currentUser) throw new Error("User must be authenticated to add questions");
+export async function addQuestion(question: Omit<Question, 'id'> & { id?: string }): Promise<{ success: boolean; id?: string; error?: string }> {
+  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
     const newQuestionRef = doc(collection(db, QUESTIONS_COLLECTION), question.id || crypto.randomUUID());
     const questionData: Question = {
@@ -48,10 +58,10 @@ export async function addQuestion(question: Omit<Question, 'id'> & { id?: string
       category: question.category,
     };
     await setDoc(newQuestionRef, questionData);
-    return newQuestionRef.id;
+    return { success: true, id: newQuestionRef.id };
   } catch (error) {
     console.error("Error adding question to Firestore:", error);
-    return null;
+    return { success: false, error: handleFirestoreError(error, "Could not add question.") };
   }
 }
 
@@ -72,31 +82,32 @@ export async function getQuestionById(id: string): Promise<Question | undefined>
   }
 }
 
-export async function updateQuestion(updatedQuestion: Question): Promise<void> {
-  if (typeof window === 'undefined') return;
-  // Add Firestore rule check simulation: if (!auth.currentUser) throw new Error("User must be authenticated to update questions");
+export async function updateQuestion(updatedQuestion: Question): Promise<{ success: boolean; error?: string }> {
+  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
     const questionRef = doc(db, QUESTIONS_COLLECTION, updatedQuestion.id);
     const { id, ...dataToUpdate } = updatedQuestion;
     await setDoc(questionRef, dataToUpdate, { merge: true });
+    return { success: true };
   } catch (error) {
     console.error("Error updating question in Firestore:", error);
+    return { success: false, error: handleFirestoreError(error, "Could not update question.") };
   }
 }
 
-export async function deleteQuestionById(questionId: string): Promise<void> {
-  if (typeof window === 'undefined') return;
-  // Add Firestore rule check simulation: if (!auth.currentUser) throw new Error("User must be authenticated to delete questions");
+export async function deleteQuestionById(questionId: string): Promise<{ success: boolean; error?: string }> {
+  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
     await deleteDoc(doc(db, QUESTIONS_COLLECTION, questionId));
+    return { success: true };
   } catch (error) {
     console.error("Error deleting question from Firestore:", error);
+    return { success: false, error: handleFirestoreError(error, "Could not delete question.") };
   }
 }
 
-export async function deleteQuestionsByCategory(categoryPath: string): Promise<void> {
-  if (typeof window === 'undefined') return;
-  // Add Firestore rule check simulation: if (!auth.currentUser) throw new Error("User must be authenticated to delete categories");
+export async function deleteQuestionsByCategory(categoryPath: string): Promise<{ success: boolean; count?: number; error?: string }> {
+  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
     const q = query(collection(db, QUESTIONS_COLLECTION), 
                     where("category", ">=", categoryPath),
@@ -118,11 +129,14 @@ export async function deleteQuestionsByCategory(categoryPath: string): Promise<v
         });
         await batch.commit();
         console.log(`Deleted ${questionsToDeleteIds.length} questions from category ${categoryPath} and its sub-categories.`);
+        return { success: true, count: questionsToDeleteIds.length };
     } else {
         console.log(`No questions found for deletion in category ${categoryPath} and its sub-categories.`);
+        return { success: true, count: 0 };
     }
   } catch (error) {
     console.error("Error deleting questions by category from Firestore:", error);
+    return { success: false, error: handleFirestoreError(error, "Could not delete questions by category.") };
   }
 }
 
@@ -134,28 +148,30 @@ export async function getCategories(): Promise<string[]> {
 }
 
 // --- Quiz Session Functions ---
-export async function saveQuizSession(session: QuizSession): Promise<void> {
-  if (typeof window === 'undefined') return;
+export async function saveQuizSession(session: QuizSession): Promise<{ success: boolean; error?: string }> {
+  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
     const sessionRef = doc(db, QUIZ_SESSIONS_COLLECTION, session.id);
-    const user = auth.currentUser; // Get current user from Firebase Auth
+    const user = auth.currentUser;
 
     const sessionToStore: StorableQuizSession = {
       id: session.id,
       category: session.category,
-      questions: session.questions, // Storing full questions might be heavy, consider storing IDs and fetching. For now, keeping as is.
+      questions: session.questions,
       currentQuestionIndex: session.currentQuestionIndex,
       answers: session.answers,
       status: session.status,
       startTime: typeof session.startTime === 'number' ? Timestamp.fromMillis(session.startTime) : session.startTime,
       endTime: session.endTime ? (typeof session.endTime === 'number' ? Timestamp.fromMillis(session.endTime) : session.endTime) : undefined,
-      ...(user && { userId: user.uid }), // Conditionally add userId
+      ...(user && { userId: user.uid }),
     };
     
     await setDoc(sessionRef, sessionToStore);
     localStorage.setItem(ACTIVE_QUIZ_SESSION_ID_KEY, session.id);
+    return { success: true };
   } catch (error) {
     console.error("Error saving quiz session to Firestore:", error);
+    return { success: false, error: handleFirestoreError(error, "Could not save quiz session.") };
   }
 }
 
@@ -169,7 +185,6 @@ export async function getQuizSession(): Promise<QuizSession | null> {
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const data = docSnap.data() as StorableQuizSession;
-      // Convert Firestore Timestamps back to numbers (milliseconds)
       const quizSession: QuizSession = {
         id: docSnap.id,
         category: data.category,
@@ -179,18 +194,16 @@ export async function getQuizSession(): Promise<QuizSession | null> {
         startTime: (data.startTime as Timestamp).toMillis(),
         endTime: data.endTime ? (data.endTime as Timestamp).toMillis() : undefined,
         status: data.status,
-        userId: data.userId, // Include userId
+        userId: data.userId,
       };
       return quizSession;
     } else {
       console.log("No such active session document found in Firestore!");
-      localStorage.removeItem(ACTIVE_QUIZ_SESSION_ID_KEY); // Clean up stale ID
+      localStorage.removeItem(ACTIVE_QUIZ_SESSION_ID_KEY);
       return null;
     }
   } catch (error) {
     console.error("Error fetching active quiz session from Firestore:", error);
-    // Potentially clear local storage if there's an auth error or permissions issue fetching
-    // For now, just log and return null.
     return null;
   }
 }
@@ -198,25 +211,15 @@ export async function getQuizSession(): Promise<QuizSession | null> {
 export function clearQuizSession(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(ACTIVE_QUIZ_SESSION_ID_KEY);
-  // Note: This does not delete the session from Firestore, only clears the local "active" pointer.
-  // If you want to delete from Firestore, you'd call:
-  // const activeSessionId = localStorage.getItem(ACTIVE_QUIZ_SESSION_ID_KEY);
-  // if (activeSessionId && auth.currentUser) { // Check if user is auth'd for delete rules
-  //   deleteDoc(doc(db, QUIZ_SESSIONS_COLLECTION, activeSessionId)).catch(err => console.error("Error deleting session doc:", err));
-  // }
 }
 
-
-// --- Category Tree Function (remains synchronous, operates on fetched data) ---
 export function buildCategoryTree(uniquePaths: string[]): CategoryTreeNode[] {
   const treeRoot: { children: CategoryTreeNode[] } = { children: [] };
   const nodeMap: Record<string, CategoryTreeNode> = {};
-
   const sortedPaths = [...new Set(uniquePaths)].sort();
 
   for (const path of sortedPaths) {
     const parts = path.split('/');
-    let currentParentChildrenList = treeRoot.children;
     let currentPath = '';
 
     for (let i = 0; i < parts.length; i++) {
@@ -244,7 +247,6 @@ export function buildCategoryTree(uniquePaths: string[]): CategoryTreeNode[] {
             }
         }
       }
-      currentParentChildrenList = node.children;
     }
   }
   return treeRoot.children;
