@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Edit, Trash2, Play, ListChecks, FolderOpen } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Play, ListChecks, FolderOpen, Loader2 } from 'lucide-react';
 
 
 export default function ManageCategoryPage() {
@@ -35,10 +35,10 @@ export default function ManageCategoryPage() {
 
   const categoryName = categoryPath.split('/').pop() || 'Category';
 
-  const loadQuestions = useCallback(() => {
+  const loadQuestionsForCategory = useCallback(async () => {
     if (!categoryPath) return;
     setIsLoading(true);
-    const allQuestions = getQuestions();
+    const allQuestions = await getQuestions(); // Now async
     const filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category === categoryPath);
     setQuestions(filteredQuestions);
     setIsLoading(false);
@@ -54,27 +54,27 @@ export default function ManageCategoryPage() {
   }, [params.categoryPath]);
 
   useEffect(() => {
-    loadQuestions();
-  }, [loadQuestions]);
+    loadQuestionsForCategory();
+  }, [loadQuestionsForCategory]);
 
   const handleDeleteClick = (question: Question) => {
     setQuestionToDelete(question);
     setShowDeleteConfirm(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!questionToDelete) return;
-    deleteQuestionById(questionToDelete.id);
+    await deleteQuestionById(questionToDelete.id); // Now async
     toast({
       title: 'Question Deleted',
       description: `"${questionToDelete.text.substring(0, 30)}..." has been removed.`,
     });
     setQuestionToDelete(null);
     setShowDeleteConfirm(false);
-    loadQuestions(); // Refresh the list
+    await loadQuestionsForCategory(); // Refresh the list
   };
 
-  const handleStartQuizForThisCategory = () => {
+  const handleStartQuizForThisCategory = async () => {
     if (questions.length === 0) {
       toast({
         title: "No Questions",
@@ -84,7 +84,7 @@ export default function ManageCategoryPage() {
       return;
     }
 
-    clearQuizSession(); // Clear any existing session
+    clearQuizSession(); // This might also become async if it interacts with Firestore directly
 
     // Fisher-Yates shuffle function
     const shuffleArray = (array: any[]) => {
@@ -105,15 +105,15 @@ export default function ManageCategoryPage() {
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
-      category: categoryPath, // Use the exact path
+      category: categoryPath,
       questions: questionsWithShuffledOptions,
       currentQuestionIndex: 0,
       answers: [],
       startTime: Date.now(),
       status: 'active',
     };
-    saveQuizSession(newSession);
-    router.push('/'); // Navigate to the main quiz playing page
+    await saveQuizSession(newSession); // Now async
+    router.push('/'); 
   };
   
   const handleEditClick = (question: Question) => {
@@ -140,17 +140,21 @@ export default function ManageCategoryPage() {
             </div>
             <Button 
                 onClick={handleStartQuizForThisCategory} 
-                disabled={questions.length === 0}
+                disabled={questions.length === 0 || isLoading}
                 size="lg"
                 className="w-full sm:w-auto"
             >
-                <Play className="mr-2 h-5 w-5" /> Start Quiz with this Category
+                {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Play className="mr-2 h-5 w-5" /> }
+                 Start Quiz with this Category
             </Button>
           </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p>Loading questions...</p>
+            <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
+                <p className="text-lg text-muted-foreground">Loading questions...</p>
+            </div>
           ) : questions.length === 0 ? (
             <div className="text-center py-10">
               <ListChecks className="mx-auto h-12 w-12 text-muted-foreground mb-4" />

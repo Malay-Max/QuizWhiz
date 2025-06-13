@@ -34,41 +34,10 @@ function QuizPlayPageContent() {
   const [showDeleteQuestionConfirmDialog, setShowDeleteQuestionConfirmDialog] = useState(false);
   const [showDeleteCategoryConfirmDialog, setShowDeleteCategoryConfirmDialog] = useState(false);
 
-  const loadActiveSessionOrFromParams = useCallback(() => {
-    const categoryFromParams = searchParams.get('category');
-    const exactMatchFromParams = searchParams.get('exact') === 'true';
-
-    if (categoryFromParams) {
-      const current = new URLSearchParams(Array.from(searchParams.entries()));
-      current.delete('category');
-      current.delete('exact');
-      const query = current.toString() ? `?${current}` : '';
-      router.replace(`${window.location.pathname}${query}`, {scroll: false});
-
-      startQuiz(categoryFromParams, exactMatchFromParams);
-      return;
-    }
-
-    const activeSession = getQuizSession();
-    if (activeSession && activeSession.status === 'active') {
-      setQuizSession(activeSession);
-    }
-    setIsLoading(false);
-  }, [searchParams, router, toast]);
-
-  useEffect(() => {
-    loadActiveSessionOrFromParams();
-  }, [loadActiveSessionOrFromParams]);
-
-  useEffect(() => {
-    if (quizSession?.status === 'completed') {
-      router.push('/summary');
-    }
-  }, [quizSession, router]);
-
-  const startQuiz = (selectedCategoryPath: string, exactMatch: boolean = false) => {
+  // Duplicates startQuiz from src/app/page.tsx - consider refactoring
+  const startQuiz = useCallback(async (selectedCategoryPath: string, exactMatch: boolean = false) => {
     setIsLoading(true);
-    const allQuestions = getQuestions();
+    const allQuestions = await getQuestions(); // Now async
     let filteredQuestions: Question[] = [];
     let quizCategoryName = selectedCategoryPath;
 
@@ -94,7 +63,6 @@ function QuizPlayPageContent() {
       return;
     }
 
-    // Fisher-Yates shuffle function
     const shuffleArray = (array: any[]) => {
       const newArray = [...array];
       for (let i = newArray.length - 1; i > 0; i--) {
@@ -108,7 +76,7 @@ function QuizPlayPageContent() {
     
     const questionsWithShuffledOptions = shuffledQuestions.map(question => ({
       ...question,
-      options: shuffleArray([...question.options]), // Ensure options are shuffled too
+      options: shuffleArray([...question.options]),
     }));
 
     const newSession: QuizSession = {
@@ -120,21 +88,55 @@ function QuizPlayPageContent() {
       startTime: Date.now(),
       status: 'active',
     };
-    saveQuizSession(newSession);
+    await saveQuizSession(newSession); // Now async
     setQuizSession(newSession);
     setIsLoading(false);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast]);
 
-  const handleCategoryAction = (categoryPath: string, isLeafNode: boolean) => {
+  const loadActiveSessionOrFromParams = useCallback(async () => {
+    const categoryFromParams = searchParams.get('category');
+    const exactMatchFromParams = searchParams.get('exact') === 'true';
+
+    if (categoryFromParams) {
+      const current = new URLSearchParams(Array.from(searchParams.entries()));
+      current.delete('category');
+      current.delete('exact');
+      const query = current.toString() ? `?${current}` : '';
+      router.replace(`${window.location.pathname}${query}`, {scroll: false});
+
+      await startQuiz(categoryFromParams, exactMatchFromParams);
+      return;
+    }
+
+    const activeSession = await getQuizSession(); // Now async
+    if (activeSession && activeSession.status === 'active') {
+      setQuizSession(activeSession);
+    }
+    setIsLoading(false);
+  }, [searchParams, router, startQuiz]);
+
+  useEffect(() => {
+    loadActiveSessionOrFromParams();
+  }, [loadActiveSessionOrFromParams]);
+
+  useEffect(() => {
+    if (quizSession?.status === 'completed') {
+      router.push('/summary');
+    }
+  }, [quizSession, router]);
+
+
+  const handleCategoryAction = async (categoryPath: string, isLeafNode: boolean) => {
     if (isLeafNode) {
       router.push(`/quiz/manage/${categoryPath.split('/').map(segment => encodeURIComponent(segment)).join('/')}`);
     } else {
-      startQuiz(categoryPath, false);
+      await startQuiz(categoryPath, false);
     }
   };
 
-  const handleStartRandomQuiz = () => {
-    startQuiz(ALL_QUESTIONS_RANDOM_KEY, false);
+  const handleStartRandomQuiz = async () => {
+    await startQuiz(ALL_QUESTIONS_RANDOM_KEY, false);
   };
 
   const handleAnswer = (selectedAnswerId: string, timeTaken: number) => {
@@ -157,7 +159,7 @@ function QuizPlayPageContent() {
       const updatedAnswers = [...prevSession.answers, newAnswer];
       const updatedSession = { ...prevSession, answers: updatedAnswers };
       
-      saveQuizSession(updatedSession);
+      saveQuizSession(updatedSession); // Fire and forget
       return updatedSession;
     });
   };
@@ -179,7 +181,7 @@ function QuizPlayPageContent() {
       const updatedAnswers = [...prevSession.answers, newAnswer];
       const updatedSession = { ...prevSession, answers: updatedAnswers };
 
-      saveQuizSession(updatedSession);
+      saveQuizSession(updatedSession); // Fire and forget
       return updatedSession;
     });
   };
@@ -191,7 +193,7 @@ function QuizPlayPageContent() {
 
       if (nextIndex < prevSession.questions.length) {
         const updatedSession = { ...prevSession, currentQuestionIndex: nextIndex };
-        saveQuizSession(updatedSession);
+        saveQuizSession(updatedSession); // Fire and forget
         return updatedSession;
       } else {
         const completedSession = { 
@@ -199,17 +201,19 @@ function QuizPlayPageContent() {
           status: 'completed' as 'completed',
           endTime: Date.now() 
         };
-        saveQuizSession(completedSession);
+        saveQuizSession(completedSession); // Fire and forget
         return completedSession;
       }
     });
   };
   
-  const handleRestartQuiz = () => {
+  const handleRestartQuiz = async () => {
     clearQuizSession();
     setQuizSession(null);
     setIsLoading(true); 
-    setTimeout(() => setIsLoading(false), 50);
+    setTimeout(() => {
+      loadActiveSessionOrFromParams();
+    }, 50);
   };
 
   const handleDeleteCurrentQuestionDialog = () => {
@@ -228,7 +232,7 @@ function QuizPlayPageContent() {
     setShowDeleteCategoryConfirmDialog(true);
   };
 
-  const handleConfirmDeleteCurrentQuestion = () => {
+  const handleConfirmDeleteCurrentQuestion = async () => {
     if (!quizSession || !quizSession.questions || quizSession.questions.length === 0) return;
     
     const currentQuestionToDelete = quizSession.questions[quizSession.currentQuestionIndex];
@@ -238,15 +242,16 @@ function QuizPlayPageContent() {
         return;
     }
 
-    deleteQuestionById(currentQuestionToDelete.id);
+    await deleteQuestionById(currentQuestionToDelete.id); // Now async
 
     setQuizSession(prevSession => {
         if (!prevSession) return null;
 
         const updatedQuestionsArray = prevSession.questions.filter(q => q.id !== currentQuestionToDelete.id);
+        let newSessionState: QuizSession;
 
         if (updatedQuestionsArray.length === 0 || prevSession.currentQuestionIndex >= updatedQuestionsArray.length) {
-            const completedSession: QuizSession = {
+             newSessionState = {
                 ...prevSession,
                 questions: updatedQuestionsArray,
                 answers: prevSession.answers.filter(ans => updatedQuestionsArray.some(q => q.id === ans.questionId)),
@@ -254,18 +259,16 @@ function QuizPlayPageContent() {
                 status: 'completed',
                 endTime: Date.now(),
             };
-            saveQuizSession(completedSession);
-            return completedSession;
+        } else {
+            newSessionState = {
+                ...prevSession,
+                questions: updatedQuestionsArray,
+                answers: prevSession.answers.filter(ans => updatedQuestionsArray.some(q => q.id === ans.questionId)),
+                status: 'active',
+            };
         }
-        
-        const updatedSession: QuizSession = {
-            ...prevSession,
-            questions: updatedQuestionsArray,
-            answers: prevSession.answers.filter(ans => updatedQuestionsArray.some(q => q.id === ans.questionId)),
-            status: 'active',
-        };
-        saveQuizSession(updatedSession);
-        return updatedSession;
+        saveQuizSession(newSessionState); // Fire and forget
+        return newSessionState;
     });
 
     setShowDeleteQuestionConfirmDialog(false);
@@ -276,17 +279,19 @@ function QuizPlayPageContent() {
     });
   };
 
-  const handleConfirmDeleteCategory = () => {
+  const handleConfirmDeleteCategory = async () => {
     if (!quizSession || !quizSession.category || quizSession.category === ALL_QUESTIONS_RANDOM_KEY) return;
 
     const categoryToDelete = quizSession.category;
-    deleteQuestionsByCategory(categoryToDelete);
+    await deleteQuestionsByCategory(categoryToDelete); // Now async
 
     clearQuizSession();
     setQuizSession(null);
     setShowDeleteCategoryConfirmDialog(false);
     setIsLoading(true); 
-    setTimeout(() => setIsLoading(false), 50);
+    setTimeout(() => {
+      loadActiveSessionOrFromParams();
+    }, 50);
 
     toast({
       title: "Quiz Category Deleted",
@@ -315,11 +320,8 @@ function QuizPlayPageContent() {
             status: 'completed' as 'completed',
             endTime: quizSession.endTime || Date.now() 
         };
-        const storedSession = getQuizSession();
-        if (storedSession?.id === quizSession.id && storedSession?.status !== 'completed') {
-            saveQuizSession(completedSession);
-            setQuizSession(completedSession);
-        }
+        saveQuizSession(completedSession); // Fire and forget
+        // setQuizSession(completedSession); // This will trigger router.push in useEffect
      }
      return ( 
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
@@ -433,5 +435,3 @@ export default function QuizPlayPage() {
     </Suspense>
   );
 }
-
-    

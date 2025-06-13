@@ -13,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText } from 'lucide-react';
 import { addQuestion, getCategories, getQuestionById, updateQuestion } from '@/lib/storage';
-import type { Question, AnswerOption as QuestionAnswerOption } from '@/types'; // Renamed to avoid conflict
+import type { Question, AnswerOption as QuestionAnswerOptionType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { generateDistractorsAction } from '@/app/actions';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -54,7 +54,7 @@ export function QuestionForm() {
     resolver: zodResolver(questionFormSchema),
     defaultValues: {
       text: '',
-      options: defaultAnswerOptions,
+      options: defaultAnswerOptions.map(opt => ({...opt})), // Ensure fresh objects
       correctAnswerId: '',
       category: '',
     },
@@ -66,15 +66,19 @@ export function QuestionForm() {
   });
 
   useEffect(() => {
-    setAvailableCategories(getCategories());
+    const fetchCategories = async () => {
+      const cats = await getCategories();
+      setAvailableCategories(cats);
+    };
+    fetchCategories();
   }, []);
 
   useEffect(() => {
     const editId = searchParams.get('editId');
-    if (editId) {
-        const questionToEdit = getQuestionById(editId);
+    const loadQuestionForEditing = async (id: string) => {
+        const questionToEdit = await getQuestionById(id);
         if (questionToEdit) {
-            setEditingQuestionId(editId);
+            setEditingQuestionId(id);
             // Ensure options are fresh for react-hook-form field array
             const optionsWithFreshIds = questionToEdit.options.map(opt => ({...opt}));
             form.reset({ ...questionToEdit, options: optionsWithFreshIds });
@@ -84,6 +88,10 @@ export function QuestionForm() {
             toast({ title: "Error", description: "Question not found for editing.", variant: "destructive" });
             router.replace('/add-question', { scroll: false }); // Clear invalid editId
         }
+    };
+
+    if (editId) {
+        loadQuestionForEditing(editId);
     } else {
         if (editingQuestionId) { // Was editing, but editId removed from URL
              form.reset({
@@ -97,7 +105,8 @@ export function QuestionForm() {
         setPageTitle('Add New Question');
         setSubmitButtonText('Add Single Question');
     }
-  }, [searchParams, form, toast, router, editingQuestionId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, router, toast]); // form removed from deps to avoid re-triggering on internal form state changes
 
 
   const watchQuestionText = form.watch('text');
@@ -216,7 +225,8 @@ export function QuestionForm() {
     }
   };
 
-  const onSubmit = (data: QuestionFormData) => {
+  const onSubmit = async (data: QuestionFormData) => {
+    form.formState.isSubmitting = true;
     if (editingQuestionId) {
         const updatedQuestionData: Question = {
             id: editingQuestionId,
@@ -225,7 +235,7 @@ export function QuestionForm() {
             correctAnswerId: data.correctAnswerId,
             category: data.category.trim().replace(/\s*\/\s*/g, '/'),
         };
-        updateQuestion(updatedQuestionData);
+        await updateQuestion(updatedQuestionData);
         toast({
             title: 'Question Updated!',
             description: 'Your question has been successfully updated.',
@@ -234,15 +244,15 @@ export function QuestionForm() {
         });
         router.replace('/add-question', { scroll: false }); // Clears editId, useEffect will reset form state
     } else {
-        const newQuestion: Question = {
-            id: crypto.randomUUID(),
+        const newQuestionData: Omit<Question, 'id'> = {
             text: data.text,
             options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
             correctAnswerId: data.correctAnswerId,
             category: data.category.trim().replace(/\s*\/\s*/g, '/'), 
         };
-        addQuestion(newQuestion);
-        setAvailableCategories(getCategories()); 
+        await addQuestion(newQuestionData);
+        const cats = await getCategories(); // Refresh categories
+        setAvailableCategories(cats); 
         toast({
             title: 'Question Added!',
             description: 'Your new question has been saved.',
@@ -253,9 +263,10 @@ export function QuestionForm() {
             text: '',
             options: defaultAnswerOptions.map(opt => ({...opt})),
             correctAnswerId: '',
-            category: ''
+            category: '' // Keep category or clear based on preference, clearing for now
         });
     }
+    form.formState.isSubmitting = false;
   };
   
   useEffect(() => {
@@ -269,7 +280,7 @@ export function QuestionForm() {
     setBatchInput(e.target.value);
   };
 
-  const handleProcessBatch = () => {
+  const handleProcessBatch = async () => {
     const categoryValue = form.getValues('category');
     if (!categoryValue.trim()) {
       toast({
@@ -285,16 +296,16 @@ export function QuestionForm() {
     let questionsAddedCount = 0;
     let questionsFailedCount = 0;
 
-    lines.forEach((line, index) => {
+    for (const line of lines) { // Changed to for...of for await
       try {
         const questionMatch = line.match(/;;(.*?);;/);
         const optionsMatch = line.match(/\{(.*?)\}/);
         const correctMatch = line.match(/\[(.*?)\]/);
 
         if (!questionMatch || !optionsMatch || !correctMatch) {
-          console.warn(`Skipping malformed line ${index + 1}: ${line}`);
+          console.warn(`Skipping malformed line: ${line}`);
           questionsFailedCount++;
-          return;
+          continue;
         }
 
         const questionText = questionMatch[1].trim();
@@ -302,38 +313,37 @@ export function QuestionForm() {
         const correctAnswerText = correctMatch[1].trim();
 
         if (!questionText || optionTexts.length < 2 || !correctAnswerText) {
-          console.warn(`Skipping invalid data in line ${index + 1}: ${line}`);
+          console.warn(`Skipping invalid data in line: ${line}`);
           questionsFailedCount++;
-          return;
+          continue;
         }
 
-        const answerOptions: QuestionAnswerOption[] = optionTexts.map(text => ({
+        const answerOptions: QuestionAnswerOptionType[] = optionTexts.map(text => ({
           id: crypto.randomUUID(),
           text: text,
         }));
 
         const correctOption = answerOptions.find(opt => opt.text === correctAnswerText);
         if (!correctOption) {
-          console.warn(`Correct answer text "${correctAnswerText}" not found in options for line ${index + 1}: ${line}`);
+          console.warn(`Correct answer text "${correctAnswerText}" not found in options for line: ${line}`);
           questionsFailedCount++;
-          return;
+          continue;
         }
 
-        const newQuestion: Question = {
-          id: crypto.randomUUID(),
+        const newQuestionData: Omit<Question, 'id'> = {
           text: questionText,
           options: answerOptions,
           correctAnswerId: correctOption.id,
           category: categoryValue.trim().replace(/\s*\/\s*/g, '/'),
         };
 
-        addQuestion(newQuestion);
+        await addQuestion(newQuestionData);
         questionsAddedCount++;
       } catch (e) {
-        console.error(`Error processing line ${index + 1}: ${line}`, e);
+        console.error(`Error processing line: ${line}`, e);
         questionsFailedCount++;
       }
-    });
+    }
 
     setIsProcessingBatch(false);
 
@@ -345,7 +355,8 @@ export function QuestionForm() {
         className: 'bg-accent text-accent-foreground'
       });
       setBatchInput(''); 
-      setAvailableCategories(getCategories()); 
+      const cats = await getCategories(); // Refresh categories
+      setAvailableCategories(cats); 
     } else if (questionsFailedCount > 0) {
        toast({
         title: 'Batch Processing Failed',

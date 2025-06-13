@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { CategoryTreeItem } from './CategoryTreeItem';
 import { useRouter } from 'next/navigation';
-import { Zap } from 'lucide-react';
+import { Zap, Loader2 } from 'lucide-react'; // Added Loader2
 
 interface CategorySelectorProps {
-  onCategoryAction: (categoryPath: string, isLeafNode: boolean) => void; // Updated prop
-  onStartRandomQuiz: () => void; // Specific handler for random quiz
+  onCategoryAction: (categoryPath: string, isLeafNode: boolean) => void;
+  onStartRandomQuiz: () => void;
 }
 
 export const ALL_QUESTIONS_RANDOM_KEY = "__ALL_QUESTIONS_RANDOM__";
@@ -23,10 +23,11 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
   const router = useRouter();
 
   useEffect(() => {
-    const loadCategories = () => {
+    const loadCategoriesData = async () => {
+      setIsLoading(true);
       try {
-        const flatCategories = getCategories();
-        const tree = buildCategoryTree(flatCategories);
+        const flatCategories = await getCategories(); // Now async
+        const tree = buildCategoryTree(flatCategories); // Stays sync, operates on fetched data
         setCategoryTree(tree);
       } catch (error) {
         console.error("Failed to load or build category tree:", error);
@@ -35,20 +36,22 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
         setIsLoading(false);
       }
     };
-    loadCategories();
+    loadCategoriesData();
   }, []);
 
   if (isLoading) {
     return (
       <Card className="w-full max-w-md mx-auto shadow-lg">
         <CardHeader>
-          <CardTitle className="font-headline text-2xl">Loading Categories...</CardTitle>
+          <CardTitle className="font-headline text-2xl flex items-center">
+            <Loader2 className="mr-2 h-6 w-6 animate-spin" /> Loading Categories...
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="animate-pulse space-y-2">
-            <div className="h-8 bg-muted rounded-md"></div>
-            <div className="h-8 bg-muted rounded-md w-5/6"></div>
-            <div className="h-8 bg-muted rounded-md w-4/6"></div>
+          <div className="space-y-2 pt-4">
+            <div className="h-8 bg-muted rounded-md animate-pulse"></div>
+            <div className="h-8 bg-muted rounded-md w-5/6 animate-pulse delay-75"></div>
+            <div className="h-8 bg-muted rounded-md w-4/6 animate-pulse delay-150"></div>
           </div>
         </CardContent>
       </Card>
@@ -97,7 +100,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
             <CategoryTreeItem
               key={node.path}
               node={node}
-              onSelectNode={onCategoryAction} // Pass the updated handler
+              onSelectNode={onCategoryAction}
               level={0}
             />
           ))}
