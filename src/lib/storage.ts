@@ -1,22 +1,16 @@
 
 "use client";
 
-import type { Question, QuizSession, CategoryTreeNode } from '@/types';
+import type { Question, QuizSession, CategoryTreeNode, StorableQuizSession } from '@/types'; // Added StorableQuizSession
 import { db, auth } from './firebase';
 import { 
   collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, writeBatch, Timestamp 
 } from 'firebase/firestore';
-import { FirebaseError } from 'firebase/app'; // Import FirebaseError
+import { FirebaseError } from 'firebase/app';
 
 const QUESTIONS_COLLECTION = 'questions';
 const QUIZ_SESSIONS_COLLECTION = 'quizSessions';
 const ACTIVE_QUIZ_SESSION_ID_KEY = 'quizcraft_active_session_id';
-
-interface StorableQuizSession extends Omit<QuizSession, 'startTime' | 'endTime' | 'userId'> {
-  startTime: Timestamp | number;
-  endTime?: Timestamp | number;
-  userId?: string;
-}
 
 // Helper function to handle Firestore errors
 function handleFirestoreError(error: unknown, defaultMessage: string): string {
@@ -24,7 +18,6 @@ function handleFirestoreError(error: unknown, defaultMessage: string): string {
     if (error.code === 'permission-denied') {
       return 'Permission denied. You do not have the necessary rights to perform this action.';
     }
-    // You can add more specific Firebase error codes here if needed
     return `Firestore error: ${error.message} (Code: ${error.code})`;
   }
   return defaultMessage;
@@ -154,7 +147,8 @@ export async function saveQuizSession(session: QuizSession): Promise<{ success: 
     const sessionRef = doc(db, QUIZ_SESSIONS_COLLECTION, session.id);
     const user = auth.currentUser;
 
-    const sessionToStore: StorableQuizSession = {
+    // Start with a base object containing non-optional fields that are always present
+    const dataToStore: Partial<StorableQuizSession> = {
       id: session.id,
       category: session.category,
       questions: session.questions,
@@ -162,11 +156,20 @@ export async function saveQuizSession(session: QuizSession): Promise<{ success: 
       answers: session.answers,
       status: session.status,
       startTime: typeof session.startTime === 'number' ? Timestamp.fromMillis(session.startTime) : session.startTime,
-      endTime: session.endTime ? (typeof session.endTime === 'number' ? Timestamp.fromMillis(session.endTime) : session.endTime) : undefined,
-      ...(user && { userId: user.uid }),
     };
+
+    // Conditionally add endTime only if it has a value
+    if (session.endTime) {
+      dataToStore.endTime = typeof session.endTime === 'number' ? Timestamp.fromMillis(session.endTime) : session.endTime;
+    }
+
+    // Conditionally add userId only if a user is authenticated
+    if (user && user.uid) {
+      dataToStore.userId = user.uid;
+    }
     
-    await setDoc(sessionRef, sessionToStore);
+    // Pass the constructed object to setDoc. Firestore will only write fields that are present.
+    await setDoc(sessionRef, dataToStore);
     localStorage.setItem(ACTIVE_QUIZ_SESSION_ID_KEY, session.id);
     return { success: true };
   } catch (error) {
@@ -184,15 +187,15 @@ export async function getQuizSession(): Promise<QuizSession | null> {
     const docRef = doc(db, QUIZ_SESSIONS_COLLECTION, activeSessionId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      const data = docSnap.data() as StorableQuizSession;
+      const data = docSnap.data() as StorableQuizSession; // Cast to StorableQuizSession
       const quizSession: QuizSession = {
         id: docSnap.id,
         category: data.category,
         questions: data.questions,
         currentQuestionIndex: data.currentQuestionIndex,
         answers: data.answers,
-        startTime: (data.startTime as Timestamp).toMillis(),
-        endTime: data.endTime ? (data.endTime as Timestamp).toMillis() : undefined,
+        startTime: (data.startTime as Timestamp).toMillis(), // Ensure conversion if startTime is Timestamp
+        endTime: data.endTime ? (data.endTime as Timestamp).toMillis() : undefined, // Ensure conversion for endTime
         status: data.status,
         userId: data.userId,
       };
@@ -216,7 +219,7 @@ export function clearQuizSession(): void {
 export function buildCategoryTree(uniquePaths: string[]): CategoryTreeNode[] {
   const treeRoot: { children: CategoryTreeNode[] } = { children: [] };
   const nodeMap: Record<string, CategoryTreeNode> = {};
-  const sortedPaths = [...new Set(uniquePaths)].sort();
+  const sortedPaths = [...new Set(uniquePaths)].filter(Boolean).sort(); // Added .filter(Boolean) to remove empty/null paths
 
   for (const path of sortedPaths) {
     const parts = path.split('/');
