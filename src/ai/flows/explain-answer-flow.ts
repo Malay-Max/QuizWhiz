@@ -199,35 +199,35 @@ const explainAnswerPrompt = ai.definePrompt({
 
 **2. Contextual Enrichment (If Applicable):**
    Identify any specific entities mentioned in the question or options, such as book titles, author names, or historical events.
-   For each identified entity, provide relevant details using the following format:
+   For each identified entity, use the tools to fetch information and present it in the following format:
 
    **For Books:**
-   If a book (e.g., "{{Book Title}}") is mentioned:
-   ### About the Book: {{Book Title}}
-   - **Author:** [Author's Name]
-   - **Publication Year:** [Year]
+   If a book (e.g., "Moby Dick") is mentioned:
+   ### About the Book: [Actual Book Title from Tool]
+   - **Author:** [Author's Name from Tool]
+   - **Publication Year:** [Year from Tool]
    - **Summary:**
-     - [Brief summary point 1]
-     - [Brief summary point 2, if applicable]
+     - [Brief summary point 1 from Tool]
+     - [Brief summary point 2, if applicable, from Tool]
 
    **For Authors:**
-   If an author (e.g., "{{Author's Name}}") is mentioned:
-   ### About the Author: {{Author's Name}}
+   If an author (e.g., "Jane Austen") is mentioned:
+   ### About the Author: [Actual Author Name from Tool]
    - **Major Works:**
      - [Work Title 1] ([Year])
      - [Work Title 2] ([Year])
      - [Work Title 3] ([Year, if available])
-   - **Biographical Summary:** [Brief bio]
+   - **Biographical Summary:** [Brief bio from Tool]
 
    **For Events:**
-   If an event (e.g., "{{Event Name}}") is mentioned:
-   ### About the Event: {{Event Name}}
-   - **Date:** [Date or Date Range]
+   If an event (e.g., "French Revolution") is mentioned:
+   ### About the Event: [Actual Event Name from Tool]
+   - **Date:** [Date or Date Range from Tool]
    - **Key Facts:**
-     - [Fact 1]
-     - [Fact 2]
-     - [Fact 3, if applicable]
-   - **Significance:** [Brief statement on significance]
+     - [Fact 1 from Tool]
+     - [Fact 2 from Tool]
+     - [Fact 3, if applicable, from Tool]
+   - **Significance:** [Brief statement on significance from Tool]
 
 **Important Instructions:**
 - Present all information as part of a natural, engaging, and easy-to-understand narrative.
