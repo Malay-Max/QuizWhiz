@@ -226,7 +226,6 @@ export function QuestionForm() {
   };
 
   const onSubmit = async (data: QuestionFormData) => {
-    form.formState.isSubmitting = true;
     if (editingQuestionId) {
         const updatedQuestionData: Question = {
             id: editingQuestionId,
@@ -266,7 +265,6 @@ export function QuestionForm() {
             category: '' // Keep category or clear based on preference, clearing for now
         });
     }
-    form.formState.isSubmitting = false;
   };
   
   useEffect(() => {
@@ -303,7 +301,7 @@ export function QuestionForm() {
         const correctMatch = line.match(/\[(.*?)\]/);
 
         if (!questionMatch || !optionsMatch || !correctMatch) {
-          console.warn(`Skipping malformed line: ${line}`);
+          console.warn(\`Skipping malformed line: \${line}\`);
           questionsFailedCount++;
           continue;
         }
@@ -313,7 +311,7 @@ export function QuestionForm() {
         const correctAnswerText = correctMatch[1].trim();
 
         if (!questionText || optionTexts.length < 2 || !correctAnswerText) {
-          console.warn(`Skipping invalid data in line: ${line}`);
+          console.warn(\`Skipping invalid data in line: \${line}\`);
           questionsFailedCount++;
           continue;
         }
@@ -325,7 +323,7 @@ export function QuestionForm() {
 
         const correctOption = answerOptions.find(opt => opt.text === correctAnswerText);
         if (!correctOption) {
-          console.warn(`Correct answer text "${correctAnswerText}" not found in options for line: ${line}`);
+          console.warn(\`Correct answer text "\${correctAnswerText}" not found in options for line: \${line}\`);
           questionsFailedCount++;
           continue;
         }
@@ -340,7 +338,7 @@ export function QuestionForm() {
         await addQuestion(newQuestionData);
         questionsAddedCount++;
       } catch (e) {
-        console.error(`Error processing line: ${line}`, e);
+        console.error(\`Error processing line: \${line}\`, e);
         questionsFailedCount++;
       }
     }
@@ -350,7 +348,7 @@ export function QuestionForm() {
     if (questionsAddedCount > 0) {
       toast({
         title: 'Batch Processing Complete',
-        description: `${questionsAddedCount} questions added successfully. ${questionsFailedCount > 0 ? `${questionsFailedCount} failed.` : ''}`,
+        description: \`\${questionsAddedCount} questions added successfully. \${questionsFailedCount > 0 ? \`\${questionsFailedCount} failed.\` : ''}\`,
         variant: 'default',
         className: 'bg-accent text-accent-foreground'
       });
@@ -360,7 +358,7 @@ export function QuestionForm() {
     } else if (questionsFailedCount > 0) {
        toast({
         title: 'Batch Processing Failed',
-        description: `No questions were added. ${questionsFailedCount} entries had errors. Check console for details.`,
+        description: \`No questions were added. \${questionsFailedCount} entries had errors. Check console for details.\`,
         variant: 'destructive',
       });
     } else {
@@ -400,14 +398,14 @@ export function QuestionForm() {
             {fields.map((field, index) => (
               <div key={field.id} className="flex items-center gap-2">
                 <Input
-                  {...form.register(`options.${index}.text`)}
-                  placeholder={`Option ${index + 1}`}
+                  {...form.register(\`options.\${index}.text\`)}
+                  placeholder={\`Option \${index + 1}\`}
                   className="flex-grow text-base"
-                  aria-label={`Answer option ${index + 1}`}
+                  aria-label={\`Answer option \${index + 1}\`}
                   aria-invalid={form.formState.errors.options?.[index]?.text ? "true" : "false"}
                 />
                 {fields.length > 2 && (
-                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveOption(index)} aria-label={`Remove option ${index + 1}`}>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveOption(index)} aria-label={\`Remove option \${index + 1}\`}>
                     <Trash2 className="h-5 w-5 text-destructive" />
                   </Button>
                 )}
@@ -448,8 +446,8 @@ export function QuestionForm() {
                   {form.getValues('options').map((option, index) => (
                     option.text.trim() && ( 
                     <div key={option.id} className="flex items-center space-x-2 p-2 border rounded-md hover:bg-secondary/50 transition-colors">
-                      <RadioGroupItem value={option.id} id={`option-${option.id}`} />
-                      <Label htmlFor={`option-${option.id}`} className="flex-grow cursor-pointer">{option.text || `Option ${index + 1}`}</Label>
+                      <RadioGroupItem value={option.id} id={\`option-\${option.id}\`} />
+                      <Label htmlFor={\`option-\${option.id}\`} className="flex-grow cursor-pointer">{option.text || \`Option \${index + 1}\`}</Label>
                     </div>
                     )
                   ))}
@@ -481,7 +479,7 @@ export function QuestionForm() {
                       size="sm"
                       onClick={() => handleCategoryClick(cat)}
                       className="text-xs px-2 py-1 h-auto"
-                      title={`Use category: ${cat}`}
+                      title={\`Use category: \${cat}\`}
                     >
                       <Folder className="mr-1.5 h-3 w-3" />
                       {cat}
@@ -538,3 +536,5 @@ export function QuestionForm() {
     </Card>
   );
 }
+
+    
