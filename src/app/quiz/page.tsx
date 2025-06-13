@@ -38,24 +38,24 @@ function QuizPlayPageContent() {
     setIsLoading(true);
     const allQuestions = await getQuestions();
     let filteredQuestions: Question[] = [];
-    let quizCategoryName = selectedCategoryPath;
+    let baseCategoryName = selectedCategoryPath;
 
     if (selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY) {
       filteredQuestions = allQuestions;
-      quizCategoryName = "All Categories (Random)";
+      baseCategoryName = "All Categories (Random)"; // Default name for random
       exactMatch = false;
     } else if (exactMatch) {
       filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category === selectedCategoryPath);
-      quizCategoryName = selectedCategoryPath;
+      // baseCategoryName remains selectedCategoryPath
     } else {
       filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category.startsWith(selectedCategoryPath));
-      quizCategoryName = selectedCategoryPath;
+      // baseCategoryName remains selectedCategoryPath
     }
     
     if (filteredQuestions.length === 0) {
       toast({
         title: "No Questions Found",
-        description: `No questions found for "${quizCategoryName}". Please add questions or select a different category.`,
+        description: `No questions found for "${baseCategoryName}". Please add questions or select a different category.`,
         variant: "destructive",
       });
       setIsLoading(false);
@@ -72,12 +72,26 @@ function QuizPlayPageContent() {
     };
 
     let questionsForSession = shuffleArray(filteredQuestions);
+    let finalQuizCategoryName = baseCategoryName;
 
-    if (limit && limit > 0 && limit < questionsForSession.length) {
-      questionsForSession = questionsForSession.slice(0, limit);
-      quizCategoryName = `${limit} Random Questions`; // Update category name
-    } else if (selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY && limit && limit > 0) {
-      quizCategoryName = `${questionsForSession.length} Random Questions (All Available)`;
+    if (selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY) {
+        if (questionsForSession.length > 0) {
+            finalQuizCategoryName = `All ${questionsForSession.length} Random Questions`; // Default if no valid limit
+            if (limit && limit > 0) {
+                if (limit < questionsForSession.length) {
+                    questionsForSession = questionsForSession.slice(0, limit);
+                    finalQuizCategoryName = `${questionsForSession.length} Random Questions`;
+                } else { // limit >= questionsForSession.length
+                    finalQuizCategoryName = `${questionsForSession.length} Random Questions (All Available)`;
+                }
+            }
+        } else {
+             // Handles case where allQuestions might be empty.
+            finalQuizCategoryName = "Random Quiz (No Questions Available)";
+        }
+    } else if (limit && limit > 0 && limit < questionsForSession.length) { // Non-random quiz with a limit
+        questionsForSession = questionsForSession.slice(0, limit);
+        // Optionally append to category name, e.g., `${baseCategoryName} (Top ${limit})`
     }
     
     const questionsWithShuffledOptions = questionsForSession.map(question => ({
@@ -87,7 +101,7 @@ function QuizPlayPageContent() {
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
-      category: quizCategoryName,
+      category: finalQuizCategoryName,
       questions: questionsWithShuffledOptions, 
       currentQuestionIndex: 0,
       answers: [],
@@ -132,6 +146,7 @@ function QuizPlayPageContent() {
       setQuizSession(activeSession);
     }
     setIsLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router, startQuiz]);
 
   useEffect(() => {
@@ -521,6 +536,3 @@ export default function QuizPlayPage() {
     </Suspense>
   );
 }
-
-
-    
