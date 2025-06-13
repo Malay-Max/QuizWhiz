@@ -358,11 +358,11 @@ export function QuestionForm() {
         } else {
             questionsFailedCount++;
             console.error(`Failed to add question from line: ${line}. Error: ${result.error}`);
-            if (result.error?.toLowerCase().includes('permission denied')) {
+            if (result.error?.toLowerCase().includes('permission denied') || result.error?.toLowerCase().includes('insufficient permissions')) {
                 permissionErrorOccurred = true;
             }
         }
-      } catch (e) { // Catch any other unexpected errors during processing of a line
+      } catch (e) { 
         console.error(`Error processing line: ${line}`, e);
         questionsFailedCount++;
       }
@@ -377,7 +377,7 @@ export function QuestionForm() {
     if (questionsFailedCount > 0) {
         finalToastDescription += ` ${questionsFailedCount} failed.`;
         finalToastVariant = 'destructive';
-        finalToastClassName = ''; // Use default destructive styling
+        finalToastClassName = ''; 
     }
     if (permissionErrorOccurred) {
         finalToastDescription += ' Some operations failed due to insufficient permissions.';
@@ -389,11 +389,13 @@ export function QuestionForm() {
      if (questionsAddedCount === 0 && questionsFailedCount === 0 && lines.length > 0) {
         finalToastTitle = 'No Valid Questions Processed';
         finalToastDescription = 'The batch input did not contain any valid questions or all lines had errors.';
-        finalToastVariant = 'default';
+        finalToastVariant = 'default'; // Keep default if no actual error, just no valid input
+        finalToastClassName = '';
     } else if (lines.length === 0) {
         finalToastTitle = 'No Questions Processed';
         finalToastDescription = 'The batch input was empty.';
         finalToastVariant = 'default';
+        finalToastClassName = '';
     }
 
 
@@ -454,8 +456,8 @@ export function QuestionForm() {
             {form.formState.errors.options?.root && <p className="text-sm text-destructive mt-1">{form.formState.errors.options.root.message}</p>}
             {form.formState.errors.options?.map((error, index) => error?.text && <p key={index} className="text-sm text-destructive mt-1">{error.text.message}</p>)}
 
-            <div className="flex gap-2 mt-2">
-                <Button type="button" variant="outline" onClick={handleAddOption} disabled={fields.length >= 6}>
+            <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                <Button type="button" variant="outline" onClick={handleAddOption} disabled={fields.length >= 6} className="w-full sm:w-auto">
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Option
                 </Button>
                  <Button
@@ -463,6 +465,7 @@ export function QuestionForm() {
                     variant="outline"
                     onClick={handleGenerateDistractors}
                     disabled={!canGenerateDistractors || isGeneratingDistractors || fields.length >=6 }
+                    className="w-full sm:w-auto"
                   >
                     {isGeneratingDistractors ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
                     Suggest Distractors

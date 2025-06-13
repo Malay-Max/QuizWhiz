@@ -69,7 +69,7 @@ export function AuthDisplay() {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <Button variant="outline" size="sm" asChild>
         <Link href="/login" className="flex items-center">
           <LogInIcon className="mr-1.5 h-4 w-4" /> Login
