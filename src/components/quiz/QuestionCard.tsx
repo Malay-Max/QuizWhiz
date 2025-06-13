@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import ReactMarkdown from 'react-markdown';
 
 
 interface QuestionCardProps {
@@ -142,6 +143,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
         toast({ title: "Explanation Error", description: result.error || "Could not generate explanation.", variant: "destructive"});
       }
     } catch (error) {
+      console.error("Error in handleShowExplanation:", error);
       setExplanation("An unexpected error occurred while fetching the explanation.");
       toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive"});
     } finally {
@@ -175,12 +177,12 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
           <div className="flex justify-between items-center mb-2">
             <CardTitle className="font-headline text-2xl md:text-3xl">Question {questionNumber}/{totalQuestions}</CardTitle>
             <Timer
-              key={question.id} 
+              key={`${question.id}-${questionNumber}`} // Ensure Timer resets correctly for same question in different session
               duration={QUESTION_DURATION}
               onTimeout={handleTimeout}
               onTick={setTimeLeft}
               isPaused={isAnswered}
-              isExternallyAnsweredRef={isAnsweredRef} // Pass the ref here
+              isExternallyAnsweredRef={isAnsweredRef} 
             />
           </div>
           <CardDescription className="text-lg md:text-xl pt-2 min-h-[60px]">{question.text}</CardDescription>
@@ -263,9 +265,29 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
           <AlertDialogHeader>
             <AlertDialogTitle>Explanation</AlertDialogTitle>
           </AlertDialogHeader>
-          <AlertDialogDescription className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap py-2">
-            {isExplanationLoading && <span className="flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /><span className="ml-2">Generating explanation...</span></span>}
-            {!isExplanationLoading && explanation}
+          <AlertDialogDescription className="max-h-[60vh] overflow-y-auto py-2 prose prose-sm dark:prose-invert">
+            {isExplanationLoading && (
+              <div className="flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="ml-2">Generating explanation...</span>
+              </div>
+            )}
+            {!isExplanationLoading && explanation && (
+              <ReactMarkdown
+                components={{
+                  h1: ({node, ...props}) => <h1 className="text-2xl font-bold my-4" {...props} />,
+                  h2: ({node, ...props}) => <h2 className="text-xl font-semibold my-3" {...props} />,
+                  h3: ({node, ...props}) => <h3 className="text-lg font-semibold my-2" {...props} />,
+                  p: ({node, ...props}) => <p className="mb-2 leading-relaxed" {...props} />,
+                  ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2 space-y-1" {...props} />,
+                  li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
+                  strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                  em: ({node, ...props}) => <em className="italic" {...props} />,
+                }}
+              >
+                {explanation}
+              </ReactMarkdown>
+            )}
             {!isExplanationLoading && !explanation && "No explanation available or an error occurred."}
           </AlertDialogDescription>
           <AlertDialogFooter>
