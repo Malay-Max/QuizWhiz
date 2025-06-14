@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import type { Question, QuizSession } from '@/types';
+import type { Question } from '@/types'; // QuizSession removed as it's not directly used for StorableQuizSession format here
 import { getQuestions, deleteQuestionById, saveQuizSession, clearQuizSession } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,34 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Edit, Trash2, Play, ListChecks, FolderOpen, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { cn } from '@/lib/utils';
+import type { QuizSession as QuizSessionType } from '@/types'; // Renamed to avoid conflict if any
+
+// Define markdown components locally for this page
+const markdownComponents = {
+    h1: ({node, ...props}: any) => <h1 className="text-2xl font-bold my-4 text-foreground" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-xl font-semibold my-3 text-foreground" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-lg font-semibold my-2 text-foreground" {...props} />,
+    p: ({node, ...props}: any) => <p className="mb-2 leading-relaxed text-foreground" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1" {...props} />,
+    li: ({node, ...props}: any) => <li className="leading-relaxed text-foreground" {...props} />,
+    strong: ({node, ...props}: any) => <strong className="font-bold text-foreground" {...props} />,
+    em: ({node, ...props}: any) => <em className="italic text-foreground" {...props} />,
+    code: ({node, inline, className, children, ...props}: any) => {
+      const match = /language-(\w+)/.exec(className || '')
+      return !inline && match ? (
+        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code text-sm", className)} {...props}>
+          <code>{String(children).replace(/\n$/, '')}</code>
+        </pre>
+      ) : (
+        <code className={cn("px-1 py-0.5 bg-muted rounded font-code text-sm", className)} {...props}>
+          {children}
+        </code>
+      )
+    },
+};
 
 
 export default function ManageCategoryPage() {
@@ -111,7 +139,7 @@ export default function ManageCategoryPage() {
       options: shuffleArray([...question.options]),
     }));
 
-    const newSession: QuizSession = {
+    const newSession: QuizSessionType = {
       id: crypto.randomUUID(),
       category: categoryPath,
       questions: questionsWithShuffledOptions,
@@ -186,17 +214,31 @@ export default function ManageCategoryPage() {
                 {questions.map((q, index) => (
                   <Card key={q.id} className="p-4 shadow-md hover:shadow-lg transition-shadow">
                     <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold text-lg text-primary">Q{index + 1}: {q.text}</p>
+                      <div className="flex-grow mr-4 overflow-hidden"> {/* Added flex-grow, mr-4 and overflow-hidden */}
+                        <div className="flex items-start text-lg text-primary">
+                          <span className="font-semibold mr-1 shrink-0">Q{index + 1}:</span>
+                          <div className="min-w-0"> {/* Added min-w-0 to allow markdown to wrap */}
+                            <ReactMarkdown components={markdownComponents}>
+                              {q.text}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
                         <ul className="list-disc list-inside pl-4 mt-2 text-sm text-muted-foreground">
                           {q.options.map(opt => (
-                            <li key={opt.id} className={opt.id === q.correctAnswerId ? 'font-bold text-accent' : ''}>
-                              {opt.text} {opt.id === q.correctAnswerId && "(Correct)"}
+                            <li key={opt.id} className={cn('mt-1', opt.id === q.correctAnswerId ? 'font-bold text-accent' : '')}>
+                                <div className="flex items-baseline">
+                                  <div className="min-w-0"> {/* Added min-w-0 here as well */}
+                                    <ReactMarkdown components={markdownComponents}>
+                                        {opt.text}
+                                    </ReactMarkdown>
+                                  </div>
+                                  {opt.id === q.correctAnswerId && <span className="ml-2 text-xs font-medium text-accent shrink-0">(Correct Answer)</span>}
+                                </div>
                             </li>
                           ))}
                         </ul>
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2 ml-4 shrink-0">
+                      <div className="flex flex-col sm:flex-row gap-2 ml-auto sm:ml-4 shrink-0"> {/* Ensured buttons don't shrink and have margin */}
                         <Button variant="outline" size="sm" onClick={() => handleEditClick(q)} title="Edit Question">
                           <Edit className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Edit</span>
                         </Button>
@@ -225,8 +267,10 @@ export default function ManageCategoryPage() {
               <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
               <AlertDialogDescription>
                 Are you sure you want to permanently delete this question? <br />
-                <strong className="text-primary mt-2 block">
-                    {questionToDelete.text.substring(0,100)}{questionToDelete.text.length > 100 ? "..." : ""}
+                <strong className="text-primary mt-2 block max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
+                    <ReactMarkdown components={markdownComponents} className="inline">
+                        {questionToDelete.text.substring(0,100)}{questionToDelete.text.length > 100 ? "..." : ""}
+                    </ReactMarkdown>
                 </strong>
                 <br />This action cannot be undone.
               </AlertDialogDescription>
@@ -243,3 +287,6 @@ export default function ManageCategoryPage() {
     </div>
   );
 }
+
+
+    
