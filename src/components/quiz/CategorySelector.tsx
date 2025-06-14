@@ -8,11 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { CategoryTreeItem } from './CategoryTreeItem';
 import { useRouter } from 'next/navigation';
-import { Zap, Loader2 } from 'lucide-react'; // Added Loader2
+import { Zap, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input'; // Added Input
+import { Label } from '@/components/ui/label'; // Added Label
 
 interface CategorySelectorProps {
   onCategoryAction: (categoryPath: string, isLeafNode: boolean) => void;
-  onStartRandomQuiz: () => void;
+  onStartRandomQuiz: (count?: number) => void; // Updated prop to accept optional count
 }
 
 export const ALL_QUESTIONS_RANDOM_KEY = "__ALL_QUESTIONS_RANDOM__";
@@ -20,14 +22,15 @@ export const ALL_QUESTIONS_RANDOM_KEY = "__ALL_QUESTIONS_RANDOM__";
 export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: CategorySelectorProps) {
   const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [randomQuizCountInput, setRandomQuizCountInput] = useState<string>(''); // State for the input field
   const router = useRouter();
 
   useEffect(() => {
     const loadCategoriesData = async () => {
       setIsLoading(true);
       try {
-        const flatCategories = await getCategories(); // Now async
-        const tree = buildCategoryTree(flatCategories); // Stays sync, operates on fetched data
+        const flatCategories = await getCategories();
+        const tree = buildCategoryTree(flatCategories);
         setCategoryTree(tree);
       } catch (error) {
         console.error("Failed to load or build category tree:", error);
@@ -38,6 +41,11 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
     };
     loadCategoriesData();
   }, []);
+
+  const handleRandomQuizButtonClick = () => {
+    const count = parseInt(randomQuizCountInput, 10);
+    onStartRandomQuiz(isNaN(count) || count <= 0 ? undefined : count);
+  };
 
   if (isLoading) {
     return (
@@ -84,16 +92,30 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
           Choose a category branch to start a quiz, a specific sub-category to manage its questions, or try a random mix.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <Button
-          onClick={onStartRandomQuiz}
-          variant="default"
-          size="lg"
-          className="w-full shadow-md hover:scale-105 transition-transform"
-        >
-          <Zap className="mr-2 h-5 w-5" />
-          Start Random Quiz (All Questions)
-        </Button>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="random-quiz-count" className="text-sm font-medium">Number of Random Questions (Optional)</Label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              id="random-quiz-count"
+              type="number"
+              value={randomQuizCountInput}
+              onChange={(e) => setRandomQuizCountInput(e.target.value)}
+              placeholder="All"
+              className="flex-grow sm:max-w-[120px]"
+              min="1"
+            />
+            <Button
+              onClick={handleRandomQuizButtonClick}
+              variant="default"
+              size="lg"
+              className="w-full sm:flex-1 shadow-md hover:scale-105 transition-transform"
+            >
+              <Zap className="mr-2 h-5 w-5" />
+              Start Random Quiz
+            </Button>
+          </div>
+        </div>
         
         <div className="pt-3 space-y-1">
           {categoryTree.map((node) => (

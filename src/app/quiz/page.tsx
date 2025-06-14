@@ -76,22 +76,19 @@ function QuizPlayPageContent() {
 
     if (selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY) {
         if (questionsForSession.length > 0) {
-            finalQuizCategoryName = `All ${questionsForSession.length} Random Questions`; // Default if no valid limit
-            if (limit && limit > 0) {
-                if (limit < questionsForSession.length) {
-                    questionsForSession = questionsForSession.slice(0, limit);
-                    finalQuizCategoryName = `${questionsForSession.length} Random Questions`;
-                } else { // limit >= questionsForSession.length
-                    finalQuizCategoryName = `${questionsForSession.length} Random Questions (All Available)`;
-                }
+            if (limit && limit > 0 && limit < questionsForSession.length) {
+                questionsForSession = questionsForSession.slice(0, limit);
+                finalQuizCategoryName = `${questionsForSession.length} Random Questions`;
+            } else if (limit && limit > 0 && limit >= questionsForSession.length) {
+                 finalQuizCategoryName = `${questionsForSession.length} Random Questions (All Available)`;
+            } else { // No valid limit, or limit is for more than available
+                 finalQuizCategoryName = `All ${questionsForSession.length} Random Questions`;
             }
         } else {
-             // Handles case where allQuestions might be empty.
             finalQuizCategoryName = "Random Quiz (No Questions Available)";
         }
-    } else if (limit && limit > 0 && limit < questionsForSession.length) { // Non-random quiz with a limit
+    } else if (limit && limit > 0 && limit < questionsForSession.length) { 
         questionsForSession = questionsForSession.slice(0, limit);
-        // Optionally append to category name, e.g., `${baseCategoryName} (Top ${limit})`
     }
     
     const questionsWithShuffledOptions = questionsForSession.map(question => ({
@@ -168,31 +165,8 @@ function QuizPlayPageContent() {
     }
   };
 
-  const handleStartRandomQuiz = async () => {
-    const numInput = window.prompt("Enter the number of random questions you'd like (leave blank or enter 0 for all questions):", "");
-    let questionLimit: number | undefined = undefined;
-
-    if (numInput === null) { // User cancelled
-      questionLimit = undefined;
-    } else {
-      const trimmedInput = numInput.trim();
-      if (trimmedInput === "" || trimmedInput === "0") {
-        questionLimit = undefined; // All questions
-      } else {
-        const parsedNum = parseInt(trimmedInput, 10);
-        if (isNaN(parsedNum) || parsedNum < 1) {
-          toast({
-            title: "Invalid Number",
-            description: "Using all available questions as an invalid number was entered.",
-            variant: "default", 
-          });
-          questionLimit = undefined; // Default to all on invalid input
-        } else {
-          questionLimit = parsedNum;
-        }
-      }
-    }
-    await startQuiz(ALL_QUESTIONS_RANDOM_KEY, false, questionLimit);
+  const handleStartRandomQuiz = async (limit?: number) => {
+    await startQuiz(ALL_QUESTIONS_RANDOM_KEY, false, limit);
   };
 
   const handleAnswer = (selectedAnswerId: string, timeTaken: number) => {
