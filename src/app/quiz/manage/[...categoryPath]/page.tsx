@@ -214,20 +214,20 @@ export default function ManageCategoryPage() {
                 {questions.map((q, index) => (
                   <Card key={q.id} className="p-4 shadow-md hover:shadow-lg transition-shadow">
                     <div className="flex justify-between items-start">
-                      <div className="flex-grow mr-4 overflow-hidden"> {/* Added flex-grow, mr-4 and overflow-hidden */}
+                      <div className="flex-grow mr-4 overflow-hidden">
                         <div className="flex items-start text-lg text-primary">
                           <span className="font-semibold mr-1 shrink-0">Q{index + 1}:</span>
-                          <div className="min-w-0"> {/* Added min-w-0 to allow markdown to wrap */}
+                          <div className="min-w-0">
                             <ReactMarkdown components={markdownComponents}>
                               {q.text}
                             </ReactMarkdown>
                           </div>
                         </div>
-                        <ul className="list-disc list-inside pl-4 mt-2 text-sm text-muted-foreground">
+                        <ul className="list-disc list-outside pl-5 mt-2 space-y-1 text-sm text-muted-foreground">
                           {q.options.map(opt => (
-                            <li key={opt.id} className={cn('mt-1', opt.id === q.correctAnswerId ? 'font-bold text-accent' : '')}>
+                            <li key={opt.id} className={cn('break-words', opt.id === q.correctAnswerId ? 'font-bold text-accent' : '')}>
                                 <div className="flex items-baseline">
-                                  <div className="min-w-0"> {/* Added min-w-0 here as well */}
+                                  <div className="min-w-0"> 
                                     <ReactMarkdown components={markdownComponents}>
                                         {opt.text}
                                     </ReactMarkdown>
@@ -238,7 +238,7 @@ export default function ManageCategoryPage() {
                           ))}
                         </ul>
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2 ml-auto sm:ml-4 shrink-0"> {/* Ensured buttons don't shrink and have margin */}
+                      <div className="flex flex-col sm:flex-row gap-2 ml-auto sm:ml-4 shrink-0"> 
                         <Button variant="outline" size="sm" onClick={() => handleEditClick(q)} title="Edit Question">
                           <Edit className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Edit</span>
                         </Button>
@@ -287,6 +287,3 @@ export default function ManageCategoryPage() {
     </div>
   );
 }
-
-
-    
