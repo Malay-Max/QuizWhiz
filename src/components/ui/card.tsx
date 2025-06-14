@@ -1,3 +1,4 @@
+
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -30,10 +31,10 @@ const CardHeader = React.forwardRef<
 CardHeader.displayName = "CardHeader"
 
 const CardTitle = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
+  HTMLDivElement, // Corrected from HTMLParagraphElement
+  React.HTMLAttributes<HTMLHeadingElement> // Corrected from HTMLParagraphElement
 >(({ className, ...props }, ref) => (
-  <div
+  <h3 // Changed from div to h3 for semantic correctness, or h2, h1 etc.
     ref={ref}
     className={cn(
       "text-2xl font-semibold leading-none tracking-tight",
@@ -45,15 +46,20 @@ const CardTitle = React.forwardRef<
 CardTitle.displayName = "CardTitle"
 
 const CardDescription = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
-    {...props}
-  />
-))
+  HTMLParagraphElement, // Corrected from HTMLDivElement
+  React.HTMLAttributes<HTMLParagraphElement> & { asChild?: boolean }
+>(({ className, asChild, children, ...props }, ref) => {
+  const Comp = asChild ? "div" : "p"; // Use div if asChild, else p
+  return (
+    <Comp // Changed from div to p for semantic correctness unless asChild
+      ref={ref}
+      className={cn("text-sm text-muted-foreground", className)}
+      {...props}
+    >
+      {children}
+    </Comp>
+  );
+});
 CardDescription.displayName = "CardDescription"
 
 const CardContent = React.forwardRef<
@@ -77,3 +83,6 @@ const CardFooter = React.forwardRef<
 CardFooter.displayName = "CardFooter"
 
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+
+
+    

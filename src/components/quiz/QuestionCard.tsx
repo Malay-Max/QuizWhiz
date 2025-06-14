@@ -170,6 +170,31 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const IncorrectIcon = <XCircle className="mr-2 h-5 w-5" />;
   const TimeoutIcon = <AlertTriangle className="mr-2 h-5 w-5" />; 
 
+  const markdownComponents = {
+    h1: ({node, ...props}: any) => <h1 className="text-2xl font-bold my-4 text-foreground" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-xl font-semibold my-3 text-foreground" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-lg font-semibold my-2 text-foreground" {...props} />,
+    p: ({node, ...props}: any) => <p className="mb-2 leading-relaxed text-foreground" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1" {...props} />,
+    li: ({node, ...props}: any) => <li className="leading-relaxed text-foreground" {...props} />,
+    strong: ({node, ...props}: any) => <strong className="font-bold text-foreground" {...props} />,
+    em: ({node, ...props}: any) => <em className="italic text-foreground" {...props} />,
+    code: ({node, inline, className, children, ...props}: any) => {
+      const match = /language-(\w+)/.exec(className || '')
+      return !inline && match ? (
+        // For block code, you might want to add a proper syntax highlighter later
+        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code text-sm", className)} {...props}>
+          <code>{String(children).replace(/\n$/, '')}</code>
+        </pre>
+      ) : (
+        <code className={cn("px-1 py-0.5 bg-muted rounded font-code text-sm", className)} {...props}>
+          {children}
+        </code>
+      )
+    },
+  };
+
   return (
     <>
       <Card className="w-full max-w-3xl mx-auto shadow-xl transition-all duration-300 ease-in-out">
@@ -177,7 +202,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
           <div className="flex justify-between items-center mb-2">
             <CardTitle className="font-headline text-2xl md:text-3xl">Question {questionNumber}/{totalQuestions}</CardTitle>
             <Timer
-              key={`${question.id}-${questionNumber}`} // Ensure Timer resets correctly for same question in different session
+              key={`${question.id}-${questionNumber}`}
               duration={QUESTION_DURATION}
               onTimeout={handleTimeout}
               onTick={setTimeLeft}
@@ -185,7 +210,13 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               isExternallyAnsweredRef={isAnsweredRef} 
             />
           </div>
-          <CardDescription className="text-lg md:text-xl pt-2 min-h-[60px]">{question.text}</CardDescription>
+          <CardDescription asChild className="text-lg md:text-xl pt-2 min-h-[60px]">
+             <div className="prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown components={markdownComponents}>
+                    {question.text}
+                </ReactMarkdown>
+            </div>
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {question.options.map((option) => (
@@ -265,30 +296,21 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
           <AlertDialogHeader>
             <AlertDialogTitle>Explanation</AlertDialogTitle>
           </AlertDialogHeader>
-          <AlertDialogDescription className="max-h-[60vh] overflow-y-auto py-2 prose prose-sm dark:prose-invert">
-            {isExplanationLoading && (
-              <div className="flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <span className="ml-2">Generating explanation...</span>
-              </div>
-            )}
-            {!isExplanationLoading && explanation && (
-              <ReactMarkdown
-                components={{
-                  h1: ({node, ...props}) => <h1 className="text-2xl font-bold my-4 text-foreground" {...props} />,
-                  h2: ({node, ...props}) => <h2 className="text-xl font-semibold my-3 text-foreground" {...props} />,
-                  h3: ({node, ...props}) => <h3 className="text-lg font-semibold my-2 text-foreground" {...props} />,
-                  p: ({node, ...props}) => <p className="mb-2 leading-relaxed text-foreground" {...props} />,
-                  ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2 space-y-1" {...props} />,
-                  li: ({node, ...props}) => <li className="leading-relaxed text-foreground" {...props} />,
-                  strong: ({node, ...props}) => <strong className="font-bold text-foreground" {...props} />,
-                  em: ({node, ...props}) => <em className="italic text-foreground" {...props} />,
-                }}
-              >
-                {explanation}
-              </ReactMarkdown>
-            )}
-            {!isExplanationLoading && !explanation && "No explanation available or an error occurred."}
+          <AlertDialogDescription asChild className="max-h-[60vh] overflow-y-auto py-2">
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+                {isExplanationLoading && (
+                <div className="flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="ml-2">Generating explanation...</span>
+                </div>
+                )}
+                {!isExplanationLoading && explanation && (
+                <ReactMarkdown components={markdownComponents}>
+                    {explanation}
+                </ReactMarkdown>
+                )}
+                {!isExplanationLoading && !explanation && "No explanation available or an error occurred."}
+            </div>
           </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setShowExplanationDialog(false)} disabled={isExplanationLoading}>Close</AlertDialogAction>
@@ -299,3 +321,5 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   );
 }
  
+
+    
