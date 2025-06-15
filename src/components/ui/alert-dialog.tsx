@@ -87,16 +87,14 @@ const AlertDialogTitle = React.forwardRef<
 AlertDialogTitle.displayName = AlertDialogPrimitive.Title.displayName
 
 const AlertDialogDescription = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Description> & { asChild?: boolean }
->(({ className, children, asChild, ...props }, ref) => (
+  React.ElementRef<typeof AlertDialogPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Description>
+>(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Description
-    asChild={asChild}
     ref={ref}
-    {...props}
-  >
-    {asChild ? children : <div className={cn("text-sm text-muted-foreground", className)}>{children}</div>}
-  </AlertDialogPrimitive.Description>
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props} // All props, including children and asChild (if provided by user), are passed here
+  />
 ))
 AlertDialogDescription.displayName =
   AlertDialogPrimitive.Description.displayName
@@ -142,6 +140,3 @@ export {
   AlertDialogAction,
   AlertDialogCancel,
 }
-
-
-    
