@@ -95,7 +95,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="random-quiz-count" className="text-xs sm:text-sm font-medium">Number of Random Questions (Optional)</Label>
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-2">
             <Input
               id="random-quiz-count"
               type="number"
