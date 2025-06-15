@@ -72,19 +72,44 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     }
   }, [question.id]);
 
+  const startAutoAdvanceSequence = () => {
+    if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+    if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
+
+    let countdown = AUTO_ADVANCE_DELAY / 1000;
+    setAutoAdvanceMessage(`Next question in ${countdown}s...`);
+
+    visualCountdownTimerRef.current = setInterval(() => {
+      countdown -= 1;
+      if (countdown > 0) {
+        setAutoAdvanceMessage(`Next question in ${countdown}s...`);
+      } else {
+        if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
+      }
+    }, 1000);
+
+    autoAdvanceTimerRef.current = setTimeout(() => {
+      setAutoAdvanceMessage(null); 
+      if (visualCountdownTimerRef.current) { 
+          clearInterval(visualCountdownTimerRef.current);
+          visualCountdownTimerRef.current = null;
+      }
+      onNext();
+    }, AUTO_ADVANCE_DELAY);
+  };
+
   const triggerSkipOrTimeout = (currentTimeLeft: number) => {
     if (isAnsweredRef.current) return;
     isAnsweredRef.current = true;
-
-    if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
-    if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
-    setAutoAdvanceMessage(null);
     
     setIsAnswered(true);
-    setShowFeedback(true); // To show "Next Question" button and potential feedback
+    setShowFeedback(true); 
     
     const timeTaken = QUESTION_DURATION - currentTimeLeft;
-    onTimeout(timeTaken); // Parent handles setting skipped: true
+    onTimeout(timeTaken); 
+    
+    // Start auto-advance for skips/timeouts
+    startAutoAdvanceSequence();
   };
 
   const handleAnswerClick = (answerId: string) => {
@@ -100,29 +125,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     const isCorrect = question.correctAnswerId === answerId;
 
     if (isCorrect) {
-      if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
-      if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
-
-      let countdown = AUTO_ADVANCE_DELAY / 1000;
-      setAutoAdvanceMessage(`Next question in ${countdown}s...`);
-
-      visualCountdownTimerRef.current = setInterval(() => {
-        countdown -= 1;
-        if (countdown > 0) {
-          setAutoAdvanceMessage(`Next question in ${countdown}s...`);
-        } else {
-          if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
-        }
-      }, 1000);
-
-      autoAdvanceTimerRef.current = setTimeout(() => {
-        setAutoAdvanceMessage(null); 
-        if (visualCountdownTimerRef.current) { 
-            clearInterval(visualCountdownTimerRef.current);
-            visualCountdownTimerRef.current = null;
-        }
-        onNext();
-      }, AUTO_ADVANCE_DELAY);
+      startAutoAdvanceSequence();
     }
   };
 
@@ -131,7 +134,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   };
   
   const handleTimerTimeout = () => {
-    triggerSkipOrTimeout(0); // Time left is 0 when timer fully expires
+    triggerSkipOrTimeout(0); 
   };
 
   const handleShowExplanation = async () => {
@@ -144,7 +147,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
         questionText: question.text,
         options: question.options.map(opt => ({ id: opt.id, text: opt.text })),
         correctAnswerId: question.correctAnswerId,
-        selectedAnswerId: selectedAnswerId, // This will be null if skipped or timed out before selection
+        selectedAnswerId: selectedAnswerId, 
       });
 
       if (result.success && result.data) {
@@ -164,7 +167,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
 
   const getButtonVariant = (optionId: string) => {
     if (!showFeedback) return 'outline';
-    if (optionId === question.correctAnswerId) return 'default'; // Will be overridden by getButtonClassNames for accent
+    if (optionId === question.correctAnswerId) return 'default'; 
     if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return 'destructive';
     return 'outline';
   };
@@ -172,7 +175,6 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const getButtonClassNames = (optionId: string) => {
     if (!showFeedback) return '';
     if (optionId === question.correctAnswerId) return 'bg-accent hover:bg-accent/90 text-accent-foreground animate-pulse';
-    // Highlight correct answer if question was skipped (no selectedAnswerId) or answered incorrectly
     if (isAnswered && selectedAnswerId !== question.correctAnswerId && optionId === question.correctAnswerId) {
       return 'border-2 border-accent ring-2 ring-accent';
     }
@@ -215,9 +217,9 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
           <div className="flex justify-between items-center mb-2">
             <CardTitle className="font-headline text-2xl md:text-3xl">Question {questionNumber}/{totalQuestions}</CardTitle>
             <Timer
-              key={`${question.id}-${questionNumber}`} // Ensures timer resets for new question
+              key={`${question.id}-${questionNumber}`}
               duration={QUESTION_DURATION}
-              onTimeout={handleTimerTimeout} // Use the new handler
+              onTimeout={handleTimerTimeout}
               onTick={setTimeLeft}
               isPaused={isAnswered}
               isExternallyAnsweredRef={isAnsweredRef} 
@@ -238,12 +240,11 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               variant={getButtonVariant(option.id)}
               className={cn(
                 "w-full justify-start text-left h-auto py-3 px-4 text-base md:text-lg whitespace-normal transition-all duration-200 ease-in-out transform hover:scale-[1.01]",
-                "items-start", // Align icon and text to the top if text wraps
+                "items-start", 
                 getButtonClassNames(option.id),
                 selectedAnswerId === option.id && "ring-2 ring-offset-2",
                 selectedAnswerId === option.id && option.id === question.correctAnswerId && "ring-accent",
                 selectedAnswerId === option.id && option.id !== question.correctAnswerId && "ring-destructive",
-                 // If answered (by click, skip, or timeout) and this is the correct answer, ensure green highlight.
                 isAnswered && option.id === question.correctAnswerId && "bg-accent hover:bg-accent/90 text-accent-foreground",
 
               )}
@@ -268,14 +269,14 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               Correct answer: {question.options.find(opt => opt.id === question.correctAnswerId)?.text}
             </p>
           )}
-          {showFeedback && isAnswered && !selectedAnswerId && ( // This covers both skip and timeout before selection
+          {showFeedback && isAnswered && !selectedAnswerId && ( 
              <p className="text-destructive text-center font-medium">
               {timeLeft <=0 ? "Time's up! " : "Skipped. "}
               The correct answer was: {question.options.find(opt => opt.id === question.correctAnswerId)?.text}
             </p>
           )}
 
-          {isAnswered && selectedAnswerId === question.correctAnswerId && autoAdvanceMessage && (
+          {isAnswered && autoAdvanceMessage && ( // Display for correct answers, skips, and timeouts
             <p className="text-sm text-muted-foreground">{autoAdvanceMessage}</p>
           )}
           
@@ -358,3 +359,4 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     </>
   );
 }
+
