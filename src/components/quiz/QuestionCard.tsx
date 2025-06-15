@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react'; // Added React import
+import React, { useState, useEffect, useRef } from 'react';
 import type { Question } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,165 +26,30 @@ import ReactMarkdown from 'react-markdown';
 interface QuestionCardProps {
   question: Question;
   onAnswer: (selectedAnswerId: string, timeTaken: number) => void;
-  onTimeout: (timeTaken: number) => void; // This will be used for skips as well
+  onTimeout: (timeTaken: number) => void;
   onNext: () => void;
   questionNumber: number;
   totalQuestions: number;
 }
 
-const QUESTION_DURATION = 30; // seconds
-const AUTO_ADVANCE_DELAY = 5000; // milliseconds
+const QUESTION_DURATION = 30; 
+const AUTO_ADVANCE_DELAY = 5000; 
 
 export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNumber, totalQuestions }: QuestionCardProps) {
   const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
-  const isAnsweredRef = useRef(false); 
+  const isAnsweredRef = useRef(false);
   const [timeLeft, setTimeLeft] = useState(QUESTION_DURATION);
   const [showFeedback, setShowFeedback] = useState(false);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [isExplanationLoading, setIsExplanationLoading] = useState(false);
   const [showExplanationDialog, setShowExplanationDialog] = useState(false);
   const [autoAdvanceMessage, setAutoAdvanceMessage] = useState<string | null>(null);
-  
+
   const { toast } = useToast();
-  
+
   const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null); 
-
-  useEffect(() => {
-    setSelectedAnswerId(null);
-    setIsAnswered(false); 
-    isAnsweredRef.current = false; 
-    setTimeLeft(QUESTION_DURATION);
-    setShowFeedback(false);
-    setExplanation(null);
-    setIsExplanationLoading(false);
-    setShowExplanationDialog(false);
-    setAutoAdvanceMessage(null);
-
-    if (autoAdvanceTimerRef.current) {
-      clearTimeout(autoAdvanceTimerRef.current);
-      autoAdvanceTimerRef.current = null;
-    }
-    if (visualCountdownTimerRef.current) {
-      clearInterval(visualCountdownTimerRef.current);
-      visualCountdownTimerRef.current = null;
-    }
-  }, [question.id]);
-
-  const startAutoAdvanceSequence = () => {
-    if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
-    if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
-
-    let countdown = AUTO_ADVANCE_DELAY / 1000;
-    setAutoAdvanceMessage(`Next question in ${countdown}s...`);
-
-    visualCountdownTimerRef.current = setInterval(() => {
-      countdown -= 1;
-      if (countdown > 0) {
-        setAutoAdvanceMessage(`Next question in ${countdown}s...`);
-      } else {
-        if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
-      }
-    }, 1000);
-
-    autoAdvanceTimerRef.current = setTimeout(() => {
-      setAutoAdvanceMessage(null); 
-      if (visualCountdownTimerRef.current) { 
-          clearInterval(visualCountdownTimerRef.current);
-          visualCountdownTimerRef.current = null;
-      }
-      onNext();
-    }, AUTO_ADVANCE_DELAY);
-  };
-
-  const triggerSkipOrTimeout = (currentTimeLeft: number) => {
-    if (isAnsweredRef.current) return;
-    isAnsweredRef.current = true;
-    
-    setIsAnswered(true);
-    setShowFeedback(true); 
-    
-    const timeTaken = QUESTION_DURATION - currentTimeLeft;
-    onTimeout(timeTaken); 
-    
-    // Start auto-advance for skips/timeouts
-    startAutoAdvanceSequence();
-  };
-
-  const handleAnswerClick = (answerId: string) => {
-    if (isAnsweredRef.current) return; 
-    isAnsweredRef.current = true;    
-
-    const timeTaken = QUESTION_DURATION - timeLeft;
-    setSelectedAnswerId(answerId);
-    setIsAnswered(true); 
-    setShowFeedback(true);
-    onAnswer(answerId, timeTaken); 
-
-    const isCorrect = question.correctAnswerId === answerId;
-
-    if (isCorrect) {
-      startAutoAdvanceSequence();
-    }
-  };
-
-  const handleSkipButtonClick = () => {
-    triggerSkipOrTimeout(timeLeft);
-  };
-  
-  const handleTimerTimeout = () => {
-    triggerSkipOrTimeout(0); 
-  };
-
-  const handleShowExplanation = async () => {
-    setIsExplanationLoading(true);
-    setExplanation(null);
-    setShowExplanationDialog(true);
-
-    try {
-      const result = await explainAnswerAction({
-        questionText: question.text,
-        options: question.options.map(opt => ({ id: opt.id, text: opt.text })),
-        correctAnswerId: question.correctAnswerId,
-        selectedAnswerId: selectedAnswerId, 
-      });
-
-      if (result.success && result.data) {
-        setExplanation(result.data.explanation);
-      } else {
-        setExplanation(result.error || "Failed to load explanation.");
-        toast({ title: "Explanation Error", description: result.error || "Could not generate explanation.", variant: "destructive"});
-      }
-    } catch (error) {
-      console.error("Error in handleShowExplanation:", error);
-      setExplanation("An unexpected error occurred while fetching the explanation.");
-      toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive"});
-    } finally {
-      setIsExplanationLoading(false);
-    }
-  };
-
-  const getButtonVariant = (optionId: string) => {
-    if (!showFeedback) return 'outline';
-    if (optionId === question.correctAnswerId) return 'default'; 
-    if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return 'destructive';
-    return 'outline';
-  };
-
-  const getButtonClassNames = (optionId: string) => {
-    if (!showFeedback) return '';
-    if (optionId === question.correctAnswerId) return 'bg-accent hover:bg-accent/90 text-accent-foreground animate-pulse';
-    if (isAnswered && selectedAnswerId !== question.correctAnswerId && optionId === question.correctAnswerId) {
-      return 'border-2 border-accent ring-2 ring-accent';
-    }
-    if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return ''; 
-    return '';
-  };
-
-  const CorrectIcon = <CheckCircle2 className="mr-2 h-5 w-5 flex-shrink-0" />;
-  const IncorrectIcon = <XCircle className="mr-2 h-5 w-5 flex-shrink-0" />;
-  const TimeoutIcon = <AlertTriangle className="mr-2 h-5 w-5 flex-shrink-0" />; 
+  const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const markdownComponents = {
     h1: ({node, ...props}: any) => <h1 className="text-2xl font-bold my-4 text-foreground" {...props} />,
@@ -210,6 +75,170 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     },
   };
 
+  const optionMarkdownComponents = { ...markdownComponents, p: React.Fragment };
+
+
+  useEffect(() => {
+    setSelectedAnswerId(null);
+    setIsAnswered(false);
+    isAnsweredRef.current = false;
+    setTimeLeft(QUESTION_DURATION);
+    setShowFeedback(false);
+    setExplanation(null);
+    setIsExplanationLoading(false);
+    setShowExplanationDialog(false); 
+    setAutoAdvanceMessage(null);
+
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+    if (visualCountdownTimerRef.current) {
+      clearInterval(visualCountdownTimerRef.current);
+      visualCountdownTimerRef.current = null;
+    }
+  }, [question.id]);
+
+
+  const startAutoAdvanceSequence = () => {
+    if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+    if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
+
+    let countdown = AUTO_ADVANCE_DELAY / 1000;
+    setAutoAdvanceMessage(`Next question in ${countdown}s...`);
+
+    visualCountdownTimerRef.current = setInterval(() => {
+      countdown -= 1;
+      if (countdown > 0) {
+        setAutoAdvanceMessage(`Next question in ${countdown}s...`);
+      } else {
+        if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
+      }
+    }, 1000);
+
+    autoAdvanceTimerRef.current = setTimeout(() => {
+      setAutoAdvanceMessage(null);
+      if (visualCountdownTimerRef.current) {
+        clearInterval(visualCountdownTimerRef.current);
+        visualCountdownTimerRef.current = null;
+      }
+      onNext();
+    }, AUTO_ADVANCE_DELAY);
+  };
+  
+  useEffect(() => {
+    if (!showExplanationDialog && isAnsweredRef.current) {
+        const wasCorrect = selectedAnswerId === question.correctAnswerId;
+        // isAnsweredRef.current being true covers this for skips/timeouts if selectedAnswerId is null
+        const wasSkippedOrTimedOut = !selectedAnswerId; 
+
+        if (wasCorrect || wasSkippedOrTimedOut) {
+            const timeoutId = setTimeout(() => {
+                startAutoAdvanceSequence();
+            }, 100); 
+            return () => clearTimeout(timeoutId);
+        }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showExplanationDialog, selectedAnswerId, question.id, question.correctAnswerId]);
+
+  const triggerSkipOrTimeout = (currentTimeLeft: number) => {
+    if (isAnsweredRef.current) return;
+    isAnsweredRef.current = true;
+
+    setIsAnswered(true);
+    setShowFeedback(true);
+
+    const timeTaken = QUESTION_DURATION - currentTimeLeft;
+    onTimeout(timeTaken);
+
+    startAutoAdvanceSequence();
+  };
+
+  const handleAnswerClick = (answerId: string) => {
+    if (isAnsweredRef.current) return;
+    isAnsweredRef.current = true;
+
+    const timeTaken = QUESTION_DURATION - timeLeft;
+    setSelectedAnswerId(answerId);
+    setIsAnswered(true);
+    setShowFeedback(true);
+    onAnswer(answerId, timeTaken);
+
+    const isCorrect = question.correctAnswerId === answerId;
+    if (isCorrect) {
+      startAutoAdvanceSequence();
+    }
+  };
+  
+  const handleSkipButtonClick = () => {
+    triggerSkipOrTimeout(timeLeft);
+  };
+
+  const handleTimerTimeout = () => {
+    triggerSkipOrTimeout(0);
+  };
+
+  const handleShowExplanation = async () => {
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+    if (visualCountdownTimerRef.current) {
+      clearInterval(visualCountdownTimerRef.current);
+      visualCountdownTimerRef.current = null;
+    }
+    setAutoAdvanceMessage(null);
+
+    setIsExplanationLoading(true);
+    setExplanation(null);
+    setShowExplanationDialog(true);
+
+    try {
+      const result = await explainAnswerAction({
+        questionText: question.text,
+        options: question.options.map(opt => ({ id: opt.id, text: opt.text })),
+        correctAnswerId: question.correctAnswerId,
+        selectedAnswerId: selectedAnswerId,
+      });
+
+      if (result.success && result.data) {
+        setExplanation(result.data.explanation);
+      } else {
+        setExplanation(result.error || "Failed to load explanation.");
+        toast({ title: "Explanation Error", description: result.error || "Could not generate explanation.", variant: "destructive"});
+      }
+    } catch (error) {
+      console.error("Error in handleShowExplanation:", error);
+      setExplanation("An unexpected error occurred while fetching the explanation.");
+      toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive"});
+    } finally {
+      setIsExplanationLoading(false);
+    }
+  };
+
+  const getButtonVariant = (optionId: string) => {
+    if (!showFeedback) return 'outline';
+    if (optionId === question.correctAnswerId) return 'default';
+    if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return 'destructive';
+    return 'outline';
+  };
+
+  const getButtonClassNames = (optionId: string) => {
+    if (!showFeedback) return '';
+    if (optionId === question.correctAnswerId) return 'bg-accent hover:bg-accent/90 text-accent-foreground animate-pulse';
+    if (isAnswered && selectedAnswerId !== question.correctAnswerId && optionId === question.correctAnswerId) {
+      return 'border-2 border-accent ring-2 ring-accent';
+    }
+    if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return '';
+    return '';
+  };
+
+  const CorrectIcon = <CheckCircle2 className="mr-2 h-5 w-5 flex-shrink-0" />;
+  const IncorrectIcon = <XCircle className="mr-2 h-5 w-5 flex-shrink-0" />;
+  const TimeoutIcon = <AlertTriangle className="mr-2 h-5 w-5 flex-shrink-0" />;
+
+
   return (
     <>
       <Card className="w-full max-w-3xl mx-auto shadow-xl transition-all duration-300 ease-in-out">
@@ -222,7 +251,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               onTimeout={handleTimerTimeout}
               onTick={setTimeLeft}
               isPaused={isAnswered}
-              isExternallyAnsweredRef={isAnsweredRef} 
+              isExternallyAnsweredRef={isAnsweredRef}
             />
           </div>
           <CardDescription asChild className="text-lg md:text-xl pt-2 min-h-[60px]">
@@ -240,26 +269,25 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               variant={getButtonVariant(option.id)}
               className={cn(
                 "w-full justify-start text-left h-auto py-3 px-4 text-base md:text-lg whitespace-normal transition-all duration-200 ease-in-out transform hover:scale-[1.01]",
-                "items-start", 
+                "items-start",
                 getButtonClassNames(option.id),
                 selectedAnswerId === option.id && "ring-2 ring-offset-2",
                 selectedAnswerId === option.id && option.id === question.correctAnswerId && "ring-accent",
                 selectedAnswerId === option.id && option.id !== question.correctAnswerId && "ring-destructive",
                 isAnswered && option.id === question.correctAnswerId && "bg-accent hover:bg-accent/90 text-accent-foreground",
-
               )}
               onClick={() => handleAnswerClick(option.id)}
-              disabled={isAnswered} 
+              disabled={isAnswered}
               aria-pressed={selectedAnswerId === option.id}
             >
               {showFeedback && option.id === selectedAnswerId && option.id === question.correctAnswerId && CorrectIcon}
               {showFeedback && option.id === selectedAnswerId && option.id !== question.correctAnswerId && IncorrectIcon}
               {showFeedback && isAnswered && !selectedAnswerId && option.id === question.correctAnswerId && TimeoutIcon}
-              <div className="prose prose-sm dark:prose-invert max-w-none text-inherit">
-                <ReactMarkdown components={{ ...markdownComponents, p: React.Fragment }}>
-                  {option.text}
-                </ReactMarkdown>
-              </div>
+               <div className="prose prose-sm dark:prose-invert max-w-none text-inherit flex-shrink-0">
+                 <ReactMarkdown components={optionMarkdownComponents}>
+                   {option.text}
+                 </ReactMarkdown>
+               </div>
             </Button>
           ))}
         </CardContent>
@@ -269,22 +297,22 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               Correct answer: {question.options.find(opt => opt.id === question.correctAnswerId)?.text}
             </p>
           )}
-          {showFeedback && isAnswered && !selectedAnswerId && ( 
+          {showFeedback && isAnswered && !selectedAnswerId && (
              <p className="text-destructive text-center font-medium">
               {timeLeft <=0 ? "Time's up! " : "Skipped. "}
               The correct answer was: {question.options.find(opt => opt.id === question.correctAnswerId)?.text}
             </p>
           )}
 
-          {isAnswered && autoAdvanceMessage && ( // Display for correct answers, skips, and timeouts
+          {isAnswered && autoAdvanceMessage && (
             <p className="text-sm text-muted-foreground">{autoAdvanceMessage}</p>
           )}
-          
+
           <div className="flex flex-col sm:flex-row gap-2 w-full justify-center">
             {!isAnswered && (
-                <Button 
-                    variant="outline" 
-                    onClick={handleSkipButtonClick} 
+                <Button
+                    variant="outline"
+                    onClick={handleSkipButtonClick}
                     className="w-full sm:w-auto"
                     disabled={isAnswered}
                 >
@@ -305,8 +333,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
             )}
           </div>
 
-
-          {isAnswered && ( 
+          {isAnswered && (
             <Button onClick={() => {
               if (autoAdvanceTimerRef.current) {
                 clearTimeout(autoAdvanceTimerRef.current);
@@ -316,7 +343,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
                 clearInterval(visualCountdownTimerRef.current);
                 visualCountdownTimerRef.current = null;
               }
-              setAutoAdvanceMessage(null); 
+              setAutoAdvanceMessage(null);
               onNext();
             }}
             size="lg"
@@ -359,4 +386,3 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     </>
   );
 }
-
