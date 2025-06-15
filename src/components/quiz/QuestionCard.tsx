@@ -180,9 +180,9 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     return '';
   };
 
-  const CorrectIcon = <CheckCircle2 className="mr-2 h-5 w-5" />;
-  const IncorrectIcon = <XCircle className="mr-2 h-5 w-5" />;
-  const TimeoutIcon = <AlertTriangle className="mr-2 h-5 w-5" />; 
+  const CorrectIcon = <CheckCircle2 className="mr-2 h-5 w-5 flex-shrink-0" />;
+  const IncorrectIcon = <XCircle className="mr-2 h-5 w-5 flex-shrink-0" />;
+  const TimeoutIcon = <AlertTriangle className="mr-2 h-5 w-5 flex-shrink-0" />; 
 
   const markdownComponents = {
     h1: ({node, ...props}: any) => <h1 className="text-2xl font-bold my-4 text-foreground" {...props} />,
@@ -238,6 +238,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               variant={getButtonVariant(option.id)}
               className={cn(
                 "w-full justify-start text-left h-auto py-3 px-4 text-base md:text-lg whitespace-normal transition-all duration-200 ease-in-out transform hover:scale-[1.01]",
+                "items-start", // Align icon and text to the top if text wraps
                 getButtonClassNames(option.id),
                 selectedAnswerId === option.id && "ring-2 ring-offset-2",
                 selectedAnswerId === option.id && option.id === question.correctAnswerId && "ring-accent",
@@ -253,7 +254,11 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               {showFeedback && option.id === selectedAnswerId && option.id === question.correctAnswerId && CorrectIcon}
               {showFeedback && option.id === selectedAnswerId && option.id !== question.correctAnswerId && IncorrectIcon}
               {showFeedback && isAnswered && !selectedAnswerId && option.id === question.correctAnswerId && TimeoutIcon}
-              {option.text}
+              <div className="prose prose-sm dark:prose-invert max-w-none text-inherit">
+                <ReactMarkdown components={{ ...markdownComponents, p: React.Fragment }}>
+                  {option.text}
+                </ReactMarkdown>
+              </div>
             </Button>
           ))}
         </CardContent>
@@ -353,7 +358,3 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     </>
   );
 }
-
-    
-
-    
