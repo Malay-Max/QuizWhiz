@@ -52,12 +52,12 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const markdownComponents = {
-    h1: ({node, ...props}: any) => <h1 className="text-lg sm:text-xl font-bold my-2 sm:my-3 text-foreground" {...props} />,
-    h2: ({node, ...props}: any) => <h2 className="text-base sm:text-lg font-semibold my-1 sm:my-2 text-foreground" {...props} />,
+    h1: ({node, ...props}: any) => <h1 className="text-lg sm:text-xl font-bold my-2 text-foreground" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-base sm:text-lg font-semibold my-1.5 text-foreground" {...props} />,
     h3: ({node, ...props}: any) => <h3 className="text-sm sm:text-base font-semibold my-1 text-foreground" {...props} />,
-    p: ({node, ...props}: any) => <p className="mb-1 sm:mb-2 leading-relaxed text-foreground text-xs sm:text-sm" {...props} />,
-    ul: ({node, ...props}: any) => <ul className="list-disc pl-4 sm:pl-5 mb-1 sm:mb-2 space-y-0.5 sm:space-y-1 text-xs sm:text-sm" {...props} />,
-    ol: ({node, ...props}: any) => <ol className="list-decimal pl-4 sm:pl-5 mb-1 sm:mb-2 space-y-0.5 sm:space-y-1 text-xs sm:text-sm" {...props} />,
+    p: ({node, ...props}: any) => <p className="mb-1.5 leading-relaxed text-foreground text-xs sm:text-sm" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-4 sm:pl-5 mb-1.5 space-y-1 text-xs sm:text-sm" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-4 sm:pl-5 mb-1.5 space-y-1 text-xs sm:text-sm" {...props} />,
     li: ({node, ...props}: any) => <li className="leading-relaxed text-foreground" {...props} />,
     strong: ({node, ...props}: any) => <strong className="font-bold text-foreground" {...props} />,
     em: ({node, ...props}: any) => <em className="italic text-foreground" {...props} />,
@@ -126,17 +126,15 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     }, AUTO_ADVANCE_DELAY);
   };
   
-  useEffect(() => {
+   useEffect(() => {
     if (!showExplanationDialog && isAnsweredRef.current) {
         const wasCorrect = selectedAnswerId === question.correctAnswerId;
         const wasSkippedOrTimedOut = !selectedAnswerId; 
 
-        // Only auto-advance if it was correct, skipped or timed out
-        // For incorrect answers, user must click "Next Question" or "Show Explanation"
         if (wasCorrect || wasSkippedOrTimedOut) {
             const timeoutId = setTimeout(() => {
                 startAutoAdvanceSequence();
-            }, 100); // Short delay to ensure state updates are processed
+            }, 100); 
             return () => clearTimeout(timeoutId);
         }
     }
@@ -151,9 +149,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     setShowFeedback(true);
 
     const timeTaken = QUESTION_DURATION - currentTimeLeft;
-    onTimeout(timeTaken); // This now correctly calls onTimeout to record skip/timeout
-
-    startAutoAdvanceSequence(); // Now handled by useEffect based on isAnsweredRef.current and !selectedAnswerId
+    onTimeout(timeTaken); 
   };
 
   const handleAnswerClick = (answerId: string) => {
@@ -167,10 +163,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     onAnswer(answerId, timeTaken);
 
     const isCorrect = question.correctAnswerId === answerId;
-    if (isCorrect) {
-      // Auto-advance for correct answers is handled by useEffect
-    } else {
-      // For incorrect answers, stop any auto-advance sequence that might have been triggered by other means
+    if (!isCorrect) {
       if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
       if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
       setAutoAdvanceMessage(null);
@@ -236,7 +229,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     if (isAnswered && selectedAnswerId !== question.correctAnswerId && optionId === question.correctAnswerId) {
       return 'border-2 border-accent ring-2 ring-accent';
     }
-    if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return ''; // Destructive variant handles this
+    if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return ''; 
     return '';
   };
 
@@ -262,7 +255,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               />
             </div>
           </div>
-          <CardDescription asChild className="text-sm sm:text-base md:text-lg pt-1 sm:pt-2 min-h-[50px] sm:min-h-[60px]">
+          <CardDescription asChild className="text-sm sm:text-base md:text-lg pt-2">
              <div className="prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown components={markdownComponents}>
                     {question.text}
@@ -292,14 +285,14 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               {showFeedback && option.id === selectedAnswerId && option.id !== question.correctAnswerId && IncorrectIcon}
               {showFeedback && isAnswered && !selectedAnswerId && option.id === question.correctAnswerId && TimeoutIcon}
               <div className="prose prose-sm dark:prose-invert max-w-none text-inherit min-w-0">
-                <ReactMarkdown components={{ ...markdownComponents, p: React.Fragment }}>
+                <ReactMarkdown components={optionMarkdownComponents}>
                   {option.text}
                 </ReactMarkdown>
               </div>
             </Button>
           ))}
         </CardContent>
-        <CardFooter className="flex flex-col items-center pt-3 sm:pt-4 space-y-3 sm:space-y-4">
+        <CardFooter className="flex flex-col items-center pt-3 space-y-3">
           {showFeedback && selectedAnswerId && selectedAnswerId !== question.correctAnswerId && (
             <p className="text-destructive text-center font-medium text-xs sm:text-sm">
               Correct answer: {question.options.find(opt => opt.id === question.correctAnswerId)?.text}
@@ -394,3 +387,4 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     </>
   );
 }
+
