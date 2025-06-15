@@ -1,8 +1,8 @@
 
 "use client";
 
+import React, { useState, useEffect, useRef } from 'react'; // Added React import
 import type { Question } from '@/types';
-import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Timer } from '@/components/quiz/Timer';
