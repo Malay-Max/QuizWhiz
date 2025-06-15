@@ -52,23 +52,23 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const markdownComponents = {
-    h1: ({node, ...props}: any) => <h1 className="text-lg sm:text-xl md:text-2xl font-bold my-2 text-foreground" {...props} />,
-    h2: ({node, ...props}: any) => <h2 className="text-base sm:text-lg md:text-xl font-semibold my-1.5 text-foreground" {...props} />,
-    h3: ({node, ...props}: any) => <h3 className="text-sm sm:text-base md:text-lg font-semibold my-1 text-foreground" {...props} />,
-    p: ({node, ...props}: any) => <p className="mb-1.5 leading-relaxed text-sm sm:text-base md:text-lg text-foreground" {...props} />,
-    ul: ({node, ...props}: any) => <ul className="list-disc pl-4 sm:pl-5 mb-1.5 space-y-0.5 text-sm sm:text-base" {...props} />,
-    ol: ({node, ...props}: any) => <ol className="list-decimal pl-4 sm:pl-5 mb-1.5 space-y-0.5 text-sm sm:text-base" {...props} />,
+    h1: ({node, ...props}: any) => <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold my-2.5 text-foreground" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold my-2 text-foreground" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-lg sm:text-xl md:text-2xl font-semibold my-1.5 text-foreground" {...props} />,
+    p: ({node, ...props}: any) => <p className="mb-2 leading-relaxed text-base sm:text-lg md:text-xl text-foreground" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 sm:pl-6 mb-2 space-y-1 text-base sm:text-lg md:text-xl" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 sm:pl-6 mb-2 space-y-1 text-base sm:text-lg md:text-xl" {...props} />,
     li: ({node, ...props}: any) => <li className="leading-relaxed text-foreground" {...props} />,
     strong: ({node, ...props}: any) => <strong className="font-bold text-foreground" {...props} />,
     em: ({node, ...props}: any) => <em className="italic text-foreground" {...props} />,
     code: ({node, inline, className, children, ...props}: any) => {
       const match = /language-(\w+)/.exec(className || '')
       return !inline && match ? (
-        <pre className={cn("p-1.5 my-1.5 bg-muted rounded-md overflow-x-auto font-code text-xs sm:text-sm", className)} {...props}>
+        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code text-sm sm:text-base", className)} {...props}>
           <code>{String(children).replace(/\n$/, '')}</code>
         </pre>
       ) : (
-        <code className={cn("px-1 py-0.5 bg-muted rounded font-code text-xs sm:text-sm", className)} {...props}>
+        <code className={cn("px-1.5 py-0.5 bg-muted rounded font-code text-sm sm:text-base", className)} {...props}>
           {children}
         </code>
       )
@@ -394,3 +394,5 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     </>
   );
 }
+
+    
