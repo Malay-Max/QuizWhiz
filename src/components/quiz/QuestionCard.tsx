@@ -18,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ScrollArea } from '@/components/ui/scroll-area'; // Added ScrollArea import
 import { useToast } from '@/hooks/use-toast';
 import ReactMarkdown from 'react-markdown';
 
@@ -326,21 +327,23 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
           <AlertDialogHeader>
             <AlertDialogTitle>Explanation</AlertDialogTitle>
           </AlertDialogHeader>
-          <AlertDialogDescription asChild className="max-h-[60vh] overflow-y-auto py-2">
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-                {isExplanationLoading && (
-                <div className="flex items-center justify-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="ml-2">Generating explanation...</span>
-                </div>
-                )}
-                {!isExplanationLoading && explanation && (
-                <ReactMarkdown components={markdownComponents}>
-                    {explanation}
-                </ReactMarkdown>
-                )}
-                {!isExplanationLoading && !explanation && "No explanation available or an error occurred."}
-            </div>
+          <AlertDialogDescription> {/* Removed asChild and specific class, will use default div wrapper */}
+            <ScrollArea className="max-h-[55vh] w-full rounded-md">
+              <div className="prose prose-sm dark:prose-invert max-w-none p-4">
+                  {isExplanationLoading && (
+                  <div className="flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <span className="ml-2">Generating explanation...</span>
+                  </div>
+                  )}
+                  {!isExplanationLoading && explanation && (
+                  <ReactMarkdown components={markdownComponents}>
+                      {explanation}
+                  </ReactMarkdown>
+                  )}
+                  {!isExplanationLoading && !explanation && "No explanation available or an error occurred."}
+              </div>
+            </ScrollArea>
           </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setShowExplanationDialog(false)} disabled={isExplanationLoading}>Close</AlertDialogAction>
@@ -350,7 +353,5 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     </>
   );
 }
- 
-    
 
     
