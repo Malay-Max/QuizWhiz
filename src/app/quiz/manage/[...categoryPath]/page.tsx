@@ -147,9 +147,9 @@ export default function ManageCategoryPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
             <div className="flex-grow min-w-0">
-                <CardTitle className="font-headline text-xl sm:text-2xl md:text-3xl flex items-center break-words">
-                    <FolderOpen className="mr-2 sm:mr-3 h-6 w-6 sm:h-8 sm:w-8 text-primary flex-shrink-0" /> 
-                    <span className="truncate">Manage Category: {categoryName}</span>
+                <CardTitle className="font-headline text-lg sm:text-xl md:text-2xl flex items-center">
+                    <FolderOpen className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-primary flex-shrink-0" /> 
+                    <span className="break-words">Manage Category: {categoryName}</span>
                 </CardTitle>
                 <CardDescription className="mt-1 text-xs sm:text-sm break-all">
                     Path: {categoryPath}
@@ -226,7 +226,7 @@ export default function ManageCategoryPage() {
               <AlertDialogTitle className="text-lg sm:text-xl">Confirm Deletion</AlertDialogTitle>
               <AlertDialogDescription className="text-sm sm:text-base">
                 Are you sure you want to permanently delete this question? <br />
-                <strong className="text-primary mt-2 block">
+                <strong className="text-primary mt-2 block break-words">
                     {questionToDelete.text.substring(0,100)}{questionToDelete.text.length > 100 ? "..." : ""}
                 </strong>
                 <br />This action cannot be undone.

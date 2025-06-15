@@ -27,9 +27,7 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
   };
   
   const handleSelect = () => {
-    // If it's a folder and is currently closed, clicking the name might also open it.
-    // However, the primary action is to notify the parent.
-    if (hasChildren && !isOpen && level < 2) { // Auto-open first few levels for UX, if desired
+    if (hasChildren && !isOpen && level < 2) { 
         // setIsOpen(true); 
     }
     onSelectNode(node.path, isLeafNode);
@@ -43,7 +41,7 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
             variant="ghost"
             size="sm"
             onClick={handleToggleOpen}
-            className="mr-1 p-1 h-auto"
+            className="mr-1 p-1 h-auto flex-shrink-0"
             aria-label={isOpen ? `Collapse ${node.name}` : `Expand ${node.name}`}
             aria-expanded={isOpen}
           >
@@ -51,19 +49,19 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
           </Button>
         )}
         {!hasChildren && (
-            <span className="mr-1 p-1 h-auto w-[28px]"></span> 
+            <span className="mr-1 p-1 h-auto w-[28px] flex-shrink-0"></span> 
         )}
         <Button
           onClick={handleSelect}
           variant="outline"
           size="sm"
           className={cn(
-            "w-full justify-start text-left h-auto py-2 px-3 shadow-sm hover:bg-primary/10 hover:text-primary transition-all",
+            "w-full justify-start text-left h-auto py-2 px-3 shadow-sm hover:bg-primary/10 hover:text-primary transition-all whitespace-normal flex items-center min-w-0",
           )}
           title={`${isLeafNode ? 'Manage questions in' : 'Start quiz for'} category: ${node.path}`}
         >
-          <Folder className="mr-2 h-4 w-4 text-primary/80" />
-          {node.name}
+          <Folder className="mr-2 h-4 w-4 text-primary/80 flex-shrink-0" />
+          <span className="min-w-0 break-words">{node.name}</span>
         </Button>
       </div>
       {isOpen && hasChildren && (

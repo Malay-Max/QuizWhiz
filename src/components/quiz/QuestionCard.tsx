@@ -52,23 +52,23 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const markdownComponents = {
-    h1: ({node, ...props}: any) => <h1 className="text-xl sm:text-2xl font-bold my-3 sm:my-4 text-foreground" {...props} />,
-    h2: ({node, ...props}: any) => <h2 className="text-lg sm:text-xl font-semibold my-2 sm:my-3 text-foreground" {...props} />,
-    h3: ({node, ...props}: any) => <h3 className="text-base sm:text-lg font-semibold my-1 sm:my-2 text-foreground" {...props} />,
-    p: ({node, ...props}: any) => <p className="mb-2 leading-relaxed text-foreground text-sm sm:text-base" {...props} />,
-    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1 text-sm sm:text-base" {...props} />,
-    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-sm sm:text-base" {...props} />,
+    h1: ({node, ...props}: any) => <h1 className="text-lg sm:text-xl font-bold my-2 sm:my-3 text-foreground" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-base sm:text-lg font-semibold my-1 sm:my-2 text-foreground" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-sm sm:text-base font-semibold my-1 text-foreground" {...props} />,
+    p: ({node, ...props}: any) => <p className="mb-1 sm:mb-2 leading-relaxed text-foreground text-xs sm:text-sm" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-4 sm:pl-5 mb-1 sm:mb-2 space-y-0.5 sm:space-y-1 text-xs sm:text-sm" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-4 sm:pl-5 mb-1 sm:mb-2 space-y-0.5 sm:space-y-1 text-xs sm:text-sm" {...props} />,
     li: ({node, ...props}: any) => <li className="leading-relaxed text-foreground" {...props} />,
     strong: ({node, ...props}: any) => <strong className="font-bold text-foreground" {...props} />,
     em: ({node, ...props}: any) => <em className="italic text-foreground" {...props} />,
     code: ({node, inline, className, children, ...props}: any) => {
       const match = /language-(\w+)/.exec(className || '')
       return !inline && match ? (
-        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code text-xs sm:text-sm", className)} {...props}>
+        <pre className={cn("p-1 sm:p-2 my-1 sm:my-2 bg-muted rounded-md overflow-x-auto font-code text-[10px] sm:text-xs", className)} {...props}>
           <code>{String(children).replace(/\n$/, '')}</code>
         </pre>
       ) : (
-        <code className={cn("px-1 py-0.5 bg-muted rounded font-code text-xs sm:text-sm", className)} {...props}>
+        <code className={cn("px-0.5 sm:px-1 py-0.5 bg-muted rounded font-code text-[10px] sm:text-xs", className)} {...props}>
           {children}
         </code>
       )
@@ -131,15 +131,17 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
         const wasCorrect = selectedAnswerId === question.correctAnswerId;
         const wasSkippedOrTimedOut = !selectedAnswerId; 
 
+        // Only auto-advance if it was correct, skipped or timed out
+        // For incorrect answers, user must click "Next Question" or "Show Explanation"
         if (wasCorrect || wasSkippedOrTimedOut) {
             const timeoutId = setTimeout(() => {
                 startAutoAdvanceSequence();
-            }, 100); 
+            }, 100); // Short delay to ensure state updates are processed
             return () => clearTimeout(timeoutId);
         }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showExplanationDialog, selectedAnswerId, question.id, question.correctAnswerId]);
+  }, [showExplanationDialog, isAnsweredRef.current, selectedAnswerId, question.id]);
 
   const triggerSkipOrTimeout = (currentTimeLeft: number) => {
     if (isAnsweredRef.current) return;
@@ -149,9 +151,9 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     setShowFeedback(true);
 
     const timeTaken = QUESTION_DURATION - currentTimeLeft;
-    onTimeout(timeTaken);
+    onTimeout(timeTaken); // This now correctly calls onTimeout to record skip/timeout
 
-    startAutoAdvanceSequence();
+    startAutoAdvanceSequence(); // Now handled by useEffect based on isAnsweredRef.current and !selectedAnswerId
   };
 
   const handleAnswerClick = (answerId: string) => {
@@ -166,7 +168,12 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
 
     const isCorrect = question.correctAnswerId === answerId;
     if (isCorrect) {
-      startAutoAdvanceSequence();
+      // Auto-advance for correct answers is handled by useEffect
+    } else {
+      // For incorrect answers, stop any auto-advance sequence that might have been triggered by other means
+      if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+      if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
+      setAutoAdvanceMessage(null);
     }
   };
   
@@ -229,31 +236,33 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     if (isAnswered && selectedAnswerId !== question.correctAnswerId && optionId === question.correctAnswerId) {
       return 'border-2 border-accent ring-2 ring-accent';
     }
-    if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return '';
+    if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return ''; // Destructive variant handles this
     return '';
   };
 
-  const CorrectIcon = <CheckCircle2 className="mr-2 h-5 w-5 flex-shrink-0" />;
-  const IncorrectIcon = <XCircle className="mr-2 h-5 w-5 flex-shrink-0" />;
-  const TimeoutIcon = <AlertTriangle className="mr-2 h-5 w-5 flex-shrink-0" />;
+  const CorrectIcon = <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />;
+  const IncorrectIcon = <XCircle className="mr-2 h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />;
+  const TimeoutIcon = <AlertTriangle className="mr-2 h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />;
 
 
   return (
     <>
       <Card className="w-full max-w-3xl mx-auto shadow-xl transition-all duration-300 ease-in-out">
         <CardHeader>
-          <div className="flex justify-between items-center mb-2">
-            <CardTitle className="font-headline text-xl sm:text-2xl md:text-3xl">Question {questionNumber}/{totalQuestions}</CardTitle>
-            <Timer
-              key={`${question.id}-${questionNumber}`}
-              duration={QUESTION_DURATION}
-              onTimeout={handleTimerTimeout}
-              onTick={setTimeLeft}
-              isPaused={isAnswered}
-              isExternallyAnsweredRef={isAnsweredRef}
-            />
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
+            <CardTitle className="font-headline text-lg sm:text-xl md:text-2xl break-words">Question {questionNumber}/{totalQuestions}</CardTitle>
+            <div className="w-full sm:w-auto">
+              <Timer
+                key={`${question.id}-${questionNumber}`}
+                duration={QUESTION_DURATION}
+                onTimeout={handleTimerTimeout}
+                onTick={setTimeLeft}
+                isPaused={isAnswered}
+                isExternallyAnsweredRef={isAnsweredRef}
+              />
+            </div>
           </div>
-          <CardDescription asChild className="text-base sm:text-lg md:text-xl pt-2 min-h-[60px]">
+          <CardDescription asChild className="text-sm sm:text-base md:text-lg pt-1 sm:pt-2 min-h-[50px] sm:min-h-[60px]">
              <div className="prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown components={markdownComponents}>
                     {question.text}
@@ -261,14 +270,14 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
             </div>
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2 sm:space-y-3">
           {question.options.map((option) => (
             <Button
               key={option.id}
               variant={getButtonVariant(option.id)}
               className={cn(
-                "w-full justify-start text-left h-auto py-3 px-4 text-sm sm:text-base md:text-lg whitespace-normal transition-all duration-200 ease-in-out transform hover:scale-[1.01]",
-                "items-start",
+                "w-full justify-start text-left h-auto py-2.5 sm:py-3 px-3 sm:px-4 text-xs sm:text-sm md:text-base whitespace-normal transition-all duration-200 ease-in-out transform hover:scale-[1.01]",
+                "items-start", 
                 getButtonClassNames(option.id),
                 selectedAnswerId === option.id && "ring-2 ring-offset-2",
                 selectedAnswerId === option.id && option.id === question.correctAnswerId && "ring-accent",
@@ -282,22 +291,22 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               {showFeedback && option.id === selectedAnswerId && option.id === question.correctAnswerId && CorrectIcon}
               {showFeedback && option.id === selectedAnswerId && option.id !== question.correctAnswerId && IncorrectIcon}
               {showFeedback && isAnswered && !selectedAnswerId && option.id === question.correctAnswerId && TimeoutIcon}
-               <div className="prose prose-sm dark:prose-invert max-w-none text-inherit">
-                 <ReactMarkdown components={optionMarkdownComponents}>
-                   {option.text}
-                 </ReactMarkdown>
-               </div>
+              <div className="prose prose-sm dark:prose-invert max-w-none text-inherit min-w-0">
+                <ReactMarkdown components={{ ...markdownComponents, p: React.Fragment }}>
+                  {option.text}
+                </ReactMarkdown>
+              </div>
             </Button>
           ))}
         </CardContent>
-        <CardFooter className="flex flex-col items-center pt-4 space-y-4">
+        <CardFooter className="flex flex-col items-center pt-3 sm:pt-4 space-y-3 sm:space-y-4">
           {showFeedback && selectedAnswerId && selectedAnswerId !== question.correctAnswerId && (
-            <p className="text-destructive text-center font-medium text-sm sm:text-base">
+            <p className="text-destructive text-center font-medium text-xs sm:text-sm">
               Correct answer: {question.options.find(opt => opt.id === question.correctAnswerId)?.text}
             </p>
           )}
           {showFeedback && isAnswered && !selectedAnswerId && (
-             <p className="text-destructive text-center font-medium text-sm sm:text-base">
+             <p className="text-destructive text-center font-medium text-xs sm:text-sm">
               {timeLeft <=0 ? "Time's up! " : "Skipped. "}
               The correct answer was: {question.options.find(opt => opt.id === question.correctAnswerId)?.text}
             </p>
@@ -312,21 +321,21 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
                 <Button
                     variant="outline"
                     onClick={handleSkipButtonClick}
-                    className="w-full sm:w-auto text-sm sm:text-base"
+                    className="w-full sm:w-auto text-xs sm:text-sm"
                     disabled={isAnswered}
                 >
-                    <SkipForwardIcon className="mr-2 h-4 w-4" /> Skip Question
+                    <SkipForwardIcon className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Skip Question
                 </Button>
             )}
 
             {showFeedback && (
                 <Button
                 variant="outline"
-                className="w-full sm:w-auto text-sm sm:text-base"
+                className="w-full sm:w-auto text-xs sm:text-sm"
                 onClick={handleShowExplanation}
                 disabled={isExplanationLoading}
                 >
-                {isExplanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
+                {isExplanationLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" /> : <Lightbulb className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />}
                 Show Explanation
                 </Button>
             )}
@@ -346,26 +355,26 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               onNext();
             }}
             size="lg"
-            className="w-full md:w-auto shadow-md transition-transform hover:scale-105 text-base sm:text-lg"
+            className="w-full md:w-auto shadow-md transition-transform hover:scale-105 text-sm sm:text-base"
             >
-              {questionNumber === totalQuestions ? 'Finish Quiz' : 'Next Question'} <ArrowRight className="ml-2 h-5 w-5" />
+              {questionNumber === totalQuestions ? 'Finish Quiz' : 'Next Question'} <ArrowRight className="ml-1.5 h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
           )}
         </CardFooter>
       </Card>
 
       <AlertDialog open={showExplanationDialog} onOpenChange={setShowExplanationDialog}>
-        <AlertDialogContent className="max-w-lg sm:max-w-xl md:max-w-2xl">
+        <AlertDialogContent className="max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl sm:text-2xl">Explanation</AlertDialogTitle>
+            <AlertDialogTitle className="text-lg sm:text-xl md:text-2xl">Explanation</AlertDialogTitle>
           </AlertDialogHeader>
           <AlertDialogDescription asChild>
             <ScrollArea className="max-h-[50vh] sm:max-h-[60vh] w-full rounded-md">
-              <div className="prose prose-sm dark:prose-invert max-w-none p-2 sm:p-4 text-sm sm:text-base">
+              <div className="prose prose-sm dark:prose-invert max-w-none p-1 sm:p-2 md:p-4 text-xs sm:text-sm">
                   {isExplanationLoading && (
                   <div className="flex items-center justify-center">
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                      <span className="ml-2">Generating explanation...</span>
+                      <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin text-primary" />
+                      <span className="ml-2 text-xs sm:text-sm">Generating explanation...</span>
                   </div>
                   )}
                   {!isExplanationLoading && explanation && (
