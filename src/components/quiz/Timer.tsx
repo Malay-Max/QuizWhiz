@@ -74,7 +74,7 @@ export function Timer({ duration, onTimeout, onTick, isPaused, resetKey, isExter
 
   return (
     <div className="w-full p-1 sm:p-1.5 bg-card border rounded-lg shadow-sm">
-      <div className="flex items-center justify-between gap-2 mb-0.5">
+      <div className="flex items-center justify-between gap-2 mb-1">
         <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0 text-muted-foreground" />
         <div className="flex flex-1 items-baseline justify-between">
           <span className="whitespace-nowrap text-xs sm:text-sm text-muted-foreground">Time Remaining</span>
@@ -88,3 +88,4 @@ export function Timer({ duration, onTimeout, onTick, isPaused, resetKey, isExter
     </div>
   );
 }
+
