@@ -9,12 +9,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { CategoryTreeItem } from './CategoryTreeItem';
 import { useRouter } from 'next/navigation';
 import { Zap, Loader2 } from 'lucide-react';
-import { Input } from '@/components/ui/input'; // Added Input
-import { Label } from '@/components/ui/label'; // Added Label
+import { Input } from '@/components/ui/input'; 
+import { Label } from '@/components/ui/label'; 
 
 interface CategorySelectorProps {
   onCategoryAction: (categoryPath: string, isLeafNode: boolean) => void;
-  onStartRandomQuiz: (count?: number) => void; // Updated prop to accept optional count
+  onStartRandomQuiz: (count?: number) => void; 
 }
 
 export const ALL_QUESTIONS_RANDOM_KEY = "__ALL_QUESTIONS_RANDOM__";
@@ -22,7 +22,7 @@ export const ALL_QUESTIONS_RANDOM_KEY = "__ALL_QUESTIONS_RANDOM__";
 export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: CategorySelectorProps) {
   const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [randomQuizCountInput, setRandomQuizCountInput] = useState<string>(''); // State for the input field
+  const [randomQuizCountInput, setRandomQuizCountInput] = useState<string>(''); 
   const router = useRouter();
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
     return (
       <Card className="w-full max-w-md mx-auto shadow-lg">
         <CardHeader>
-          <CardTitle className="font-headline text-2xl flex items-center">
+          <CardTitle className="font-headline text-xl sm:text-2xl flex items-center">
             <Loader2 className="mr-2 h-6 w-6 animate-spin" /> Loading Categories...
           </CardTitle>
         </CardHeader>
@@ -70,13 +70,13 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
     return (
       <Card className="w-full max-w-md mx-auto shadow-lg">
         <CardHeader>
-          <CardTitle className="font-headline text-2xl">No Quizzes Available</CardTitle>
+          <CardTitle className="font-headline text-xl sm:text-2xl">No Quizzes Available</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm sm:text-base">
             It looks like there are no questions added yet. Please add some questions first.
           </p>
-          <Button onClick={() => router.push('/add-question')} className="mt-4 w-full">
+          <Button onClick={() => router.push('/add-question')} className="mt-4 w-full text-sm sm:text-base">
             Add Questions
           </Button>
         </CardContent>
@@ -87,14 +87,14 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
   return (
     <Card className="w-full max-w-lg mx-auto shadow-xl">
       <CardHeader>
-        <CardTitle className="font-headline text-3xl">Select a Quiz or Manage Category</CardTitle>
-        <CardDescription>
+        <CardTitle className="font-headline text-xl sm:text-2xl md:text-3xl">Select a Quiz or Manage Category</CardTitle>
+        <CardDescription className="text-sm sm:text-base">
           Choose a category branch to start a quiz, a specific sub-category to manage its questions, or try a random mix.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="random-quiz-count" className="text-sm font-medium">Number of Random Questions (Optional)</Label>
+          <Label htmlFor="random-quiz-count" className="text-xs sm:text-sm font-medium">Number of Random Questions (Optional)</Label>
           <div className="flex flex-col sm:flex-row gap-2">
             <Input
               id="random-quiz-count"
@@ -102,14 +102,14 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
               value={randomQuizCountInput}
               onChange={(e) => setRandomQuizCountInput(e.target.value)}
               placeholder="All"
-              className="flex-grow sm:max-w-[120px]"
+              className="flex-grow sm:max-w-[120px] text-sm sm:text-base"
               min="1"
             />
             <Button
               onClick={handleRandomQuizButtonClick}
               variant="default"
               size="lg"
-              className="w-full sm:flex-1 shadow-md hover:scale-105 transition-transform"
+              className="w-full sm:flex-1 shadow-md hover:scale-105 transition-transform text-sm sm:text-base"
             >
               <Zap className="mr-2 h-5 w-5" />
               Start Random Quiz
@@ -129,7 +129,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
         </div>
       </CardContent>
       <CardFooter>
-        <Button onClick={() => router.push('/add-question')} className="w-full" variant="outline">
+        <Button onClick={() => router.push('/add-question')} className="w-full text-sm sm:text-base" variant="outline">
             Add New Questions
         </Button>
       </CardFooter>

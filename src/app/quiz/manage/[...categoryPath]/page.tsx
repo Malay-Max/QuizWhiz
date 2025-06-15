@@ -138,19 +138,20 @@ export default function ManageCategoryPage() {
 
 
   return (
-    <div className="container mx-auto py-8">
-      <Button variant="outline" onClick={() => router.push('/')} className="mb-6">
+    <div className="container mx-auto py-4 sm:py-8">
+      <Button variant="outline" onClick={() => router.push('/')} className="mb-4 sm:mb-6 text-sm sm:text-base">
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to Quiz Selection
       </Button>
 
       <Card className="shadow-xl">
         <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-                <CardTitle className="font-headline text-3xl flex items-center">
-                    <FolderOpen className="mr-3 h-8 w-8 text-primary" /> Manage Category: {categoryName}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
+            <div className="flex-grow min-w-0">
+                <CardTitle className="font-headline text-xl sm:text-2xl md:text-3xl flex items-center break-words">
+                    <FolderOpen className="mr-2 sm:mr-3 h-6 w-6 sm:h-8 sm:w-8 text-primary flex-shrink-0" /> 
+                    <span className="truncate">Manage Category: {categoryName}</span>
                 </CardTitle>
-                <CardDescription className="mt-1">
+                <CardDescription className="mt-1 text-xs sm:text-sm break-all">
                     Path: {categoryPath}
                 </CardDescription>
             </div>
@@ -158,50 +159,50 @@ export default function ManageCategoryPage() {
                 onClick={handleStartQuizForThisCategory} 
                 disabled={questions.length === 0 || isLoading}
                 size="lg"
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto text-sm sm:text-base mt-2 sm:mt-0"
             >
-                {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Play className="mr-2 h-5 w-5" /> }
-                 Start Quiz with this Category
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" /> : <Play className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> }
+                 Start Quiz
             </Button>
           </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
-                <p className="text-lg text-muted-foreground">Loading questions...</p>
+                <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary mr-2 sm:mr-3" />
+                <p className="text-base sm:text-lg text-muted-foreground">Loading questions...</p>
             </div>
           ) : questions.length === 0 ? (
             <div className="text-center py-10">
-              <ListChecks className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-xl font-semibold text-muted-foreground">No questions found in this specific category.</p>
-              <p className="text-sm text-muted-foreground mt-1">Add questions to "{categoryName}" to see them here.</p>
-              <Button onClick={() => router.push('/add-question')} className="mt-6">
+              <ListChecks className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
+              <p className="text-lg sm:text-xl font-semibold text-muted-foreground">No questions found here.</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">Add questions to "{categoryName}" to see them.</p>
+              <Button onClick={() => router.push('/add-question')} className="mt-4 sm:mt-6 text-sm sm:text-base">
                 Add Questions
               </Button>
             </div>
           ) : (
-            <ScrollArea className="h-[calc(100vh-25rem)] pr-4">
-              <div className="space-y-4">
+            <ScrollArea className="h-[calc(100vh-22rem)] sm:h-[calc(100vh-25rem)] pr-2 sm:pr-4">
+              <div className="space-y-3 sm:space-y-4">
                 {questions.map((q, index) => (
-                  <Card key={q.id} className="p-4 shadow-md hover:shadow-lg transition-shadow">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold text-lg text-primary">Q{index + 1}: {q.text}</p>
-                        <ul className="list-disc list-inside pl-4 mt-2 text-sm text-muted-foreground">
+                  <Card key={q.id} className="p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow">
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                      <div className="flex-grow min-w-0">
+                        <p className="font-semibold text-sm sm:text-base md:text-lg text-primary break-words">Q{index + 1}: {q.text}</p>
+                        <ul className="list-disc list-inside pl-2 sm:pl-4 mt-1 sm:mt-2 text-xs sm:text-sm text-muted-foreground">
                           {q.options.map(opt => (
-                            <li key={opt.id} className={opt.id === q.correctAnswerId ? 'font-bold text-accent' : ''}>
+                            <li key={opt.id} className={`break-words ${opt.id === q.correctAnswerId ? 'font-bold text-accent' : ''}`}>
                               {opt.text} {opt.id === q.correctAnswerId && "(Correct)"}
                             </li>
                           ))}
                         </ul>
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2 ml-4 shrink-0">
-                        <Button variant="outline" size="sm" onClick={() => handleEditClick(q)} title="Edit Question">
-                          <Edit className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Edit</span>
+                      <div className="flex gap-2 ml-0 sm:ml-4 shrink-0 self-start sm:self-auto w-full sm:w-auto justify-end">
+                        <Button variant="outline" size="sm" onClick={() => handleEditClick(q)} title="Edit Question" className="flex-1 sm:flex-initial">
+                          <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" /> <span className="hidden sm:inline">Edit</span>
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => handleDeleteClick(q)} title="Delete Question">
-                          <Trash2 className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Delete</span>
+                        <Button variant="destructive" size="sm" onClick={() => handleDeleteClick(q)} title="Delete Question" className="flex-1 sm:flex-initial">
+                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" /> <span className="hidden sm:inline">Delete</span>
                         </Button>
                       </div>
                     </div>
@@ -212,7 +213,7 @@ export default function ManageCategoryPage() {
           )}
         </CardContent>
         <CardFooter>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
                 Found {questions.length} question(s) directly in category: "{categoryName}".
             </p>
         </CardFooter>
@@ -222,8 +223,8 @@ export default function ManageCategoryPage() {
         <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogTitle className="text-lg sm:text-xl">Confirm Deletion</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm sm:text-base">
                 Are you sure you want to permanently delete this question? <br />
                 <strong className="text-primary mt-2 block">
                     {questionToDelete.text.substring(0,100)}{questionToDelete.text.length > 100 ? "..." : ""}
@@ -232,8 +233,8 @@ export default function ManageCategoryPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setShowDeleteConfirm(false)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90">
+              <AlertDialogCancel onClick={() => setShowDeleteConfirm(false)} className="text-sm sm:text-base">Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90 text-sm sm:text-base">
                 Delete Question
               </AlertDialogAction>
             </AlertDialogFooter>

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -17,6 +17,8 @@ import type { Question, AnswerOption as QuestionAnswerOptionType } from '@/types
 import { useToast } from '@/hooks/use-toast';
 import { generateDistractorsAction } from '@/app/actions';
 import { useSearchParams, useRouter } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
+import { cn } from '@/lib/utils';
 
 const answerOptionSchema = z.object({
   id: z.string().default(() => crypto.randomUUID()),
@@ -33,6 +35,33 @@ const questionFormSchema = z.object({
 type QuestionFormData = z.infer<typeof questionFormSchema>;
 
 const defaultAnswerOptions = Array(2).fill(null).map(() => ({ id: crypto.randomUUID(), text: '' }));
+
+const markdownComponents = {
+    h1: ({node, ...props}: any) => <h1 className="text-xl sm:text-2xl font-bold my-3 sm:my-4" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-lg sm:text-xl font-semibold my-2 sm:my-3" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-base sm:text-lg font-semibold my-1 sm:my-2" {...props} />,
+    p: ({node, ...props}: any) => <p className="mb-2 leading-relaxed text-sm sm:text-base" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1 text-sm sm:text-base" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-sm sm:text-base" {...props} />,
+    li: ({node, ...props}: any) => <li className="leading-relaxed" {...props} />,
+    strong: ({node, ...props}: any) => <strong className="font-bold" {...props} />,
+    em: ({node, ...props}: any) => <em className="italic" {...props} />,
+    code: ({node, inline, className, children, ...props}: any) => {
+      const match = /language-(\w+)/.exec(className || '')
+      return !inline && match ? (
+        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code text-xs sm:text-sm", className)} {...props}>
+          <code>{String(children).replace(/\n$/, '')}</code>
+        </pre>
+      ) : (
+        <code className={cn("px-1 py-0.5 bg-muted rounded font-code text-xs sm:text-sm", className)} {...props}>
+          {children}
+        </code>
+      )
+    },
+  };
+  
+const optionMarkdownComponents = { ...markdownComponents, p: React.Fragment };
+
 
 export function QuestionForm() {
   const { toast } = useToast();
@@ -153,7 +182,7 @@ export function QuestionForm() {
   
   const handleCategoryClick = (category: string) => {
     form.setValue('category', category, { shouldValidate: true, shouldDirty: true });
-    setFilteredCategorySuggestions([]); // Hide suggestions after selection
+    setFilteredCategorySuggestions([]); 
   };
 
   const handleGenerateDistractors = async () => {
@@ -287,7 +316,7 @@ export function QuestionForm() {
                 text: '',
                 options: defaultAnswerOptions.map(opt => ({...opt})),
                 correctAnswerId: '',
-                category: data.category // Keep category for subsequent adds
+                category: data.category 
             });
         } else {
             toast({
@@ -431,32 +460,32 @@ export function QuestionForm() {
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
-        <CardTitle className="font-headline text-3xl">{pageTitle}</CardTitle>
-        <CardDescription>
+        <CardTitle className="font-headline text-2xl sm:text-3xl">{pageTitle}</CardTitle>
+        <CardDescription className="text-sm sm:text-base">
             {editingQuestionId ? "Modify the details of this question." : "Fill in the details for your multiple-choice question, or use the batch add feature below."}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div>
-            <Label htmlFor="text" className="text-lg">Question Text</Label>
+            <Label htmlFor="text" className="text-base sm:text-lg">Question Text</Label>
             <Textarea
               id="text"
               {...form.register('text')}
-              className="mt-1 min-h-[100px] text-base"
+              className="mt-1 min-h-[100px] text-sm md:text-base"
               aria-invalid={form.formState.errors.text ? "true" : "false"}
             />
             {form.formState.errors.text && <p className="text-sm text-destructive mt-1">{form.formState.errors.text.message}</p>}
           </div>
 
           <div className="space-y-4">
-            <Label className="text-lg">Answer Options</Label>
+            <Label className="text-base sm:text-lg">Answer Options</Label>
             {fields.map((field, index) => (
               <div key={field.id} className="flex items-center gap-2">
                 <Input
                   {...form.register(`options.${index}.text`)}
                   placeholder={`Option ${index + 1}`}
-                  className="flex-grow text-base"
+                  className="flex-grow text-sm md:text-base"
                   aria-label={`Answer option ${index + 1}`}
                   aria-invalid={form.formState.errors.options?.[index]?.text ? "true" : "false"}
                 />
@@ -471,7 +500,7 @@ export function QuestionForm() {
             {form.formState.errors.options?.map((error, index) => error?.text && <p key={index} className="text-sm text-destructive mt-1">{error.text.message}</p>)}
 
             <div className="flex flex-col sm:flex-row gap-2 mt-2">
-                <Button type="button" variant="outline" onClick={handleAddOption} disabled={fields.length >= 6} className="w-full sm:w-auto">
+                <Button type="button" variant="outline" onClick={handleAddOption} disabled={fields.length >= 6} className="w-full sm:w-auto text-sm sm:text-base">
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Option
                 </Button>
                  <Button
@@ -479,17 +508,17 @@ export function QuestionForm() {
                     variant="outline"
                     onClick={handleGenerateDistractors}
                     disabled={!canGenerateDistractors || isGeneratingDistractors || fields.length >=6 }
-                    className="w-full sm:w-auto"
+                    className="w-full sm:w-auto text-sm sm:text-base"
                   >
                     {isGeneratingDistractors ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
                     Suggest Distractors
                   </Button>
             </div>
-            {fields.length >= 6 && <p className="text-sm text-muted-foreground mt-1">Maximum of 6 options reached.</p>}
+            {fields.length >= 6 && <p className="text-xs sm:text-sm text-muted-foreground mt-1">Maximum of 6 options reached.</p>}
           </div>
           
           <div>
-            <Label className="text-lg">Correct Answer</Label>
+            <Label className="text-base sm:text-lg">Correct Answer</Label>
             <Controller
               control={form.control}
               name="correctAnswerId"
@@ -502,9 +531,15 @@ export function QuestionForm() {
                 >
                   {form.getValues('options').map((option, index) => (
                     option.text.trim() && ( 
-                    <div key={option.id} className="flex items-center space-x-2 p-2 border rounded-md hover:bg-secondary/50 transition-colors">
-                      <RadioGroupItem value={option.id} id={`option-${option.id}`} />
-                      <Label htmlFor={`option-${option.id}`} className="flex-grow cursor-pointer">{option.text || `Option ${index + 1}`}</Label>
+                    <div key={`${option.id}-radio-item`} className="flex items-start space-x-2 p-2 border rounded-md hover:bg-secondary/50 transition-colors">
+                      <RadioGroupItem value={option.id} id={`${option.id}-radio`} className="mt-1 flex-shrink-0" />
+                      <Label htmlFor={`${option.id}-radio`} className="flex-grow cursor-pointer font-normal">
+                        <div className="prose prose-sm dark:prose-invert max-w-none text-inherit">
+                            <ReactMarkdown components={optionMarkdownComponents}>
+                                {option.text || `Option ${index + 1}`}
+                            </ReactMarkdown>
+                        </div>
+                      </Label>
                     </div>
                     )
                   ))}
@@ -515,19 +550,19 @@ export function QuestionForm() {
           </div>
 
           <div>
-            <Label htmlFor="category" className="text-lg">Category (for single & batch)</Label>
+            <Label htmlFor="category" className="text-base sm:text-lg">Category (for single & batch)</Label>
             <Input
               id="category"
               {...form.register('category')}
               placeholder="e.g., Science or TopFolder/SubFolder"
-              className="mt-1 text-base"
+              className="mt-1 text-sm md:text-base"
               aria-invalid={form.formState.errors.category ? "true" : "false"}
               autoComplete="off"
             />
             {form.formState.errors.category && <p className="text-sm text-destructive mt-1">{form.formState.errors.category.message}</p>}
              {filteredCategorySuggestions.length > 0 && (
               <div className="mt-2 border rounded-md bg-background shadow-md p-2">
-                <p className="text-sm text-muted-foreground mb-1">Suggestions (click to use):</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Suggestions (click to use):</p>
                 <div className="flex flex-wrap gap-1">
                   {filteredCategorySuggestions.map(cat => (
                     <Button
@@ -536,11 +571,11 @@ export function QuestionForm() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleCategoryClick(cat)}
-                      className="text-xs px-2 py-1 h-auto"
+                      className="text-xs px-2 py-1 h-auto whitespace-normal"
                       title={`Use category: ${cat}`}
                     >
-                      <Folder className="mr-1.5 h-3 w-3" />
-                      {cat}
+                      <Folder className="mr-1.5 h-3 w-3 shrink-0" />
+                      <span className="min-w-0 break-all">{cat}</span>
                     </Button>
                   ))}
                 </div>
@@ -549,7 +584,7 @@ export function QuestionForm() {
           </div>
 
           <CardFooter className="px-0 pt-6">
-            <Button type="submit" size="lg" className="w-full text-lg shadow-md" disabled={form.formState.isSubmitting}>
+            <Button type="submit" size="lg" className="w-full text-base sm:text-lg shadow-md" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
               {submitButtonText}
             </Button>
@@ -560,12 +595,12 @@ export function QuestionForm() {
             <div className="mt-10 pt-6 border-t">
             <div className="flex items-center mb-3">
                 <FileText className="h-6 w-6 mr-2 text-primary" />
-                <h3 className="text-xl font-semibold">Batch Add Questions</h3>
+                <h3 className="text-lg sm:text-xl font-semibold">Batch Add Questions</h3>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
                 Format: <code className="font-code bg-muted px-1 py-0.5 rounded text-xs">;;Question Text;; {'{OptionA - OptionB - OptionC}'} [Correct Option Text]</code>
             </p>
-            <p className="text-sm text-muted-foreground mb-1">
+            <p className="text-xs sm:text-sm text-muted-foreground mb-1">
                 Enter one question per line. Uses the category specified above.
             </p>
             <p className="text-xs text-muted-foreground mb-4">
@@ -575,13 +610,13 @@ export function QuestionForm() {
                 value={batchInput}
                 onChange={handleBatchInputChange}
                 placeholder=";;What is the capital of France?;; {Paris - London - Rome} [Paris]\n;;Which planet is known as the Red Planet?;; {Earth - Mars - Jupiter} [Mars]"
-                className="min-h-[150px] text-sm font-code"
+                className="min-h-[150px] text-xs sm:text-sm font-code"
                 disabled={isProcessingBatch}
                 aria-label="Batch question input"
             />
             <Button 
                 onClick={handleProcessBatch} 
-                className="mt-4 w-full sm:w-auto" 
+                className="mt-4 w-full sm:w-auto text-sm sm:text-base" 
                 disabled={isProcessingBatch || !batchInput.trim() || !form.getValues('category').trim()}
             >
                 {isProcessingBatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
@@ -593,5 +628,3 @@ export function QuestionForm() {
     </Card>
   );
 }
-
-    

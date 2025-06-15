@@ -52,29 +52,29 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const markdownComponents = {
-    h1: ({node, ...props}: any) => <h1 className="text-2xl font-bold my-4 text-foreground" {...props} />,
-    h2: ({node, ...props}: any) => <h2 className="text-xl font-semibold my-3 text-foreground" {...props} />,
-    h3: ({node, ...props}: any) => <h3 className="text-lg font-semibold my-2 text-foreground" {...props} />,
-    p: ({node, ...props}: any) => <p className="mb-2 leading-relaxed text-foreground" {...props} />,
-    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1" {...props} />,
-    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1" {...props} />,
+    h1: ({node, ...props}: any) => <h1 className="text-xl sm:text-2xl font-bold my-3 sm:my-4 text-foreground" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-lg sm:text-xl font-semibold my-2 sm:my-3 text-foreground" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-base sm:text-lg font-semibold my-1 sm:my-2 text-foreground" {...props} />,
+    p: ({node, ...props}: any) => <p className="mb-2 leading-relaxed text-foreground text-sm sm:text-base" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1 text-sm sm:text-base" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-sm sm:text-base" {...props} />,
     li: ({node, ...props}: any) => <li className="leading-relaxed text-foreground" {...props} />,
     strong: ({node, ...props}: any) => <strong className="font-bold text-foreground" {...props} />,
     em: ({node, ...props}: any) => <em className="italic text-foreground" {...props} />,
     code: ({node, inline, className, children, ...props}: any) => {
       const match = /language-(\w+)/.exec(className || '')
       return !inline && match ? (
-        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code text-sm", className)} {...props}>
+        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code text-xs sm:text-sm", className)} {...props}>
           <code>{String(children).replace(/\n$/, '')}</code>
         </pre>
       ) : (
-        <code className={cn("px-1 py-0.5 bg-muted rounded font-code text-sm", className)} {...props}>
+        <code className={cn("px-1 py-0.5 bg-muted rounded font-code text-xs sm:text-sm", className)} {...props}>
           {children}
         </code>
       )
     },
   };
-
+  
   const optionMarkdownComponents = { ...markdownComponents, p: React.Fragment };
 
 
@@ -129,7 +129,6 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   useEffect(() => {
     if (!showExplanationDialog && isAnsweredRef.current) {
         const wasCorrect = selectedAnswerId === question.correctAnswerId;
-        // isAnsweredRef.current being true covers this for skips/timeouts if selectedAnswerId is null
         const wasSkippedOrTimedOut = !selectedAnswerId; 
 
         if (wasCorrect || wasSkippedOrTimedOut) {
@@ -244,7 +243,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
       <Card className="w-full max-w-3xl mx-auto shadow-xl transition-all duration-300 ease-in-out">
         <CardHeader>
           <div className="flex justify-between items-center mb-2">
-            <CardTitle className="font-headline text-2xl md:text-3xl">Question {questionNumber}/{totalQuestions}</CardTitle>
+            <CardTitle className="font-headline text-xl sm:text-2xl md:text-3xl">Question {questionNumber}/{totalQuestions}</CardTitle>
             <Timer
               key={`${question.id}-${questionNumber}`}
               duration={QUESTION_DURATION}
@@ -254,7 +253,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               isExternallyAnsweredRef={isAnsweredRef}
             />
           </div>
-          <CardDescription asChild className="text-lg md:text-xl pt-2 min-h-[60px]">
+          <CardDescription asChild className="text-base sm:text-lg md:text-xl pt-2 min-h-[60px]">
              <div className="prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown components={markdownComponents}>
                     {question.text}
@@ -268,7 +267,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               key={option.id}
               variant={getButtonVariant(option.id)}
               className={cn(
-                "w-full justify-start text-left h-auto py-3 px-4 text-base md:text-lg whitespace-normal transition-all duration-200 ease-in-out transform hover:scale-[1.01]",
+                "w-full justify-start text-left h-auto py-3 px-4 text-sm sm:text-base md:text-lg whitespace-normal transition-all duration-200 ease-in-out transform hover:scale-[1.01]",
                 "items-start",
                 getButtonClassNames(option.id),
                 selectedAnswerId === option.id && "ring-2 ring-offset-2",
@@ -283,7 +282,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               {showFeedback && option.id === selectedAnswerId && option.id === question.correctAnswerId && CorrectIcon}
               {showFeedback && option.id === selectedAnswerId && option.id !== question.correctAnswerId && IncorrectIcon}
               {showFeedback && isAnswered && !selectedAnswerId && option.id === question.correctAnswerId && TimeoutIcon}
-               <div className="prose prose-sm dark:prose-invert max-w-none text-inherit flex-shrink-0">
+               <div className="prose prose-sm dark:prose-invert max-w-none text-inherit">
                  <ReactMarkdown components={optionMarkdownComponents}>
                    {option.text}
                  </ReactMarkdown>
@@ -293,19 +292,19 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
         </CardContent>
         <CardFooter className="flex flex-col items-center pt-4 space-y-4">
           {showFeedback && selectedAnswerId && selectedAnswerId !== question.correctAnswerId && (
-            <p className="text-destructive text-center font-medium">
+            <p className="text-destructive text-center font-medium text-sm sm:text-base">
               Correct answer: {question.options.find(opt => opt.id === question.correctAnswerId)?.text}
             </p>
           )}
           {showFeedback && isAnswered && !selectedAnswerId && (
-             <p className="text-destructive text-center font-medium">
+             <p className="text-destructive text-center font-medium text-sm sm:text-base">
               {timeLeft <=0 ? "Time's up! " : "Skipped. "}
               The correct answer was: {question.options.find(opt => opt.id === question.correctAnswerId)?.text}
             </p>
           )}
 
           {isAnswered && autoAdvanceMessage && (
-            <p className="text-sm text-muted-foreground">{autoAdvanceMessage}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">{autoAdvanceMessage}</p>
           )}
 
           <div className="flex flex-col sm:flex-row gap-2 w-full justify-center">
@@ -313,7 +312,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
                 <Button
                     variant="outline"
                     onClick={handleSkipButtonClick}
-                    className="w-full sm:w-auto"
+                    className="w-full sm:w-auto text-sm sm:text-base"
                     disabled={isAnswered}
                 >
                     <SkipForwardIcon className="mr-2 h-4 w-4" /> Skip Question
@@ -323,7 +322,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
             {showFeedback && (
                 <Button
                 variant="outline"
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto text-sm sm:text-base"
                 onClick={handleShowExplanation}
                 disabled={isExplanationLoading}
                 >
@@ -347,7 +346,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               onNext();
             }}
             size="lg"
-            className="w-full md:w-auto shadow-md transition-transform hover:scale-105"
+            className="w-full md:w-auto shadow-md transition-transform hover:scale-105 text-base sm:text-lg"
             >
               {questionNumber === totalQuestions ? 'Finish Quiz' : 'Next Question'} <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
@@ -356,13 +355,13 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
       </Card>
 
       <AlertDialog open={showExplanationDialog} onOpenChange={setShowExplanationDialog}>
-        <AlertDialogContent className="max-w-xl">
+        <AlertDialogContent className="max-w-lg sm:max-w-xl md:max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Explanation</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl sm:text-2xl">Explanation</AlertDialogTitle>
           </AlertDialogHeader>
           <AlertDialogDescription asChild>
-            <ScrollArea className="max-h-[55vh] w-full rounded-md">
-              <div className="prose prose-sm dark:prose-invert max-w-none p-4">
+            <ScrollArea className="max-h-[50vh] sm:max-h-[60vh] w-full rounded-md">
+              <div className="prose prose-sm dark:prose-invert max-w-none p-2 sm:p-4 text-sm sm:text-base">
                   {isExplanationLoading && (
                   <div className="flex items-center justify-center">
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
