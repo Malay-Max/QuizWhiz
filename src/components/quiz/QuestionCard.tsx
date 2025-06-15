@@ -52,23 +52,23 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const markdownComponents = {
-    h1: ({node, ...props}: any) => <h1 className="font-bold my-3 text-foreground" {...props} />,
-    h2: ({node, ...props}: any) => <h2 className="font-semibold my-2.5 text-foreground" {...props} />,
-    h3: ({node, ...props}: any) => <h3 className="font-semibold my-2 text-foreground" {...props} />,
-    p: ({node, ...props}: any) => <p className="mb-2 leading-relaxed text-foreground" {...props} />,
-    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1 text-foreground" {...props} />,
-    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-foreground" {...props} />,
-    li: ({node, ...props}: any) => <li className="leading-relaxed text-foreground" {...props} />,
+    h1: ({node, ...props}: any) => <h1 className="text-2xl sm:text-3xl font-bold my-3 text-foreground" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-xl sm:text-2xl font-semibold my-2.5 text-foreground" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-lg sm:text-xl font-semibold my-2 text-foreground" {...props} />,
+    p: ({node, ...props}: any) => <p className="text-base sm:text-lg mb-2 leading-relaxed text-foreground" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1 text-base sm:text-lg text-foreground" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-base sm:text-lg text-foreground" {...props} />,
+    li: ({node, ...props}: any) => <li className="leading-relaxed text-base sm:text-lg text-foreground" {...props} />,
     strong: ({node, ...props}: any) => <strong className="font-bold text-foreground" {...props} />,
     em: ({node, ...props}: any) => <em className="italic text-foreground" {...props} />,
     code: ({node, inline, className, children, ...props}: any) => {
       const match = /language-(\w+)/.exec(className || '')
       return !inline && match ? (
-        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code", className)} {...props}>
+        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code text-sm sm:text-base", className)} {...props}>
           <code>{String(children).replace(/\n$/, '')}</code>
         </pre>
       ) : (
-        <code className={cn("px-1.5 py-0.5 bg-muted rounded font-code", className)} {...props}>
+        <code className={cn("px-1.5 py-0.5 bg-muted rounded font-code text-sm sm:text-base", className)} {...props}>
           {children}
         </code>
       )
@@ -77,10 +77,9 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   
   const optionMarkdownComponents = { 
     ...markdownComponents, 
-    p: React.Fragment, // Avoids <p> tags inside buttons for cleaner rendering
-    strong: ({node, ...props}: any) => <strong className="font-bold text-inherit" {...props} />, // Ensures bold text inherits button color
-    em: ({node, ...props}: any) => <em className="italic text-inherit" {...props} />, // Ensures italic text inherits button color
-    // Explicitly remove text-foreground for options if it was inherited
+    p: React.Fragment, 
+    strong: ({node, ...props}: any) => <strong className="font-bold text-inherit" {...props} />, 
+    em: ({node, ...props}: any) => <em className="italic text-inherit" {...props} />, 
     h1: ({node, ...props}: any) => <h1 className="font-bold my-1 text-inherit" {...props} />,
     h2: ({node, ...props}: any) => <h2 className="font-semibold my-1 text-inherit" {...props} />,
     h3: ({node, ...props}: any) => <h3 className="font-semibold my-0.5 text-inherit" {...props} />,
@@ -153,7 +152,6 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
    useEffect(() => {
     if (!showExplanationDialog && isAnsweredRef.current) {
         const wasCorrect = selectedAnswerId === question.correctAnswerId;
-        // isAnsweredRef.current true for skip/timeout scenarios
         const wasSkippedOrTimedOut = selectedAnswerId === null && isAnsweredRef.current; 
         
         if (wasCorrect || wasSkippedOrTimedOut) {
@@ -316,7 +314,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               {showFeedback && option.id === selectedAnswerId && option.id === question.correctAnswerId && CorrectIcon}
               {showFeedback && option.id === selectedAnswerId && option.id !== question.correctAnswerId && IncorrectIcon}
               {showFeedback && isAnswered && selectedAnswerId === null && option.id === question.correctAnswerId && TimeoutIcon}
-              <div className="prose prose-base dark:prose-invert max-w-none text-inherit min-w-0"> {/* Changed from prose-sm */}
+              <div className="prose prose-base dark:prose-invert max-w-none text-inherit min-w-0">
                 <ReactMarkdown components={optionMarkdownComponents}>
                   {option.text}
                 </ReactMarkdown>
@@ -434,3 +432,4 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     
 
     
+
