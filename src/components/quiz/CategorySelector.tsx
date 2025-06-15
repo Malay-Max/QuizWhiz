@@ -87,7 +87,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
   return (
     <Card className="w-full max-w-lg mx-auto shadow-xl">
       <CardHeader>
-        <CardTitle className="font-headline text-xl sm:text-2xl md:text-3xl">Select a Quiz or Manage Category</CardTitle>
+        <CardTitle className="font-headline text-2xl sm:text-3xl">Select a Quiz or Manage Category</CardTitle>
         <CardDescription className="text-sm sm:text-base">
           Choose a category branch to start a quiz, a specific sub-category to manage its questions, or try a random mix.
         </CardDescription>
@@ -95,14 +95,14 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="random-quiz-count" className="text-xs sm:text-sm font-medium">Number of Random Questions (Optional)</Label>
-          <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <Input
               id="random-quiz-count"
               type="number"
               value={randomQuizCountInput}
               onChange={(e) => setRandomQuizCountInput(e.target.value)}
               placeholder="All"
-              className="flex-grow sm:max-w-[120px] text-sm sm:text-base"
+              className="flex-grow sm:max-w-[120px] text-sm sm:text-base h-11"
               min="1"
             />
             <Button
