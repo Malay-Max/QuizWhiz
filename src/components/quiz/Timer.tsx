@@ -73,19 +73,18 @@ export function Timer({ duration, onTimeout, onTick, isPaused, resetKey, isExter
   const progressPercentage = (timeLeft / duration) * 100;
 
   return (
-    <div className="w-full p-1.5 sm:p-2 bg-card border rounded-lg shadow-sm">
-      <div className="flex flex-col xs:flex-row xs:items-baseline xs:justify-between gap-1 mb-1">
-        <div className="flex items-center text-xs sm:text-sm text-muted-foreground">
-          <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 flex-shrink-0" />
-          <span className="whitespace-nowrap">Time Remaining</span>
-        </div>
-        <div className="text-base sm:text-lg font-semibold font-mono tabular-nums self-end xs:self-baseline">
-          {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:
-          {String(timeLeft % 60).padStart(2, '0')}
+    <div className="w-full p-1 sm:p-1.5 bg-card border rounded-lg shadow-sm">
+      <div className="flex items-center justify-between gap-2 mb-0.5">
+        <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0 text-muted-foreground" />
+        <div className="flex flex-1 items-baseline justify-between">
+          <span className="whitespace-nowrap text-xs sm:text-sm text-muted-foreground">Time Remaining</span>
+          <span className="text-base sm:text-lg font-semibold font-mono tabular-nums">
+            {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:
+            {String(timeLeft % 60).padStart(2, '0')}
+          </span>
         </div>
       </div>
-      <Progress value={progressPercentage} className="h-1.5 sm:h-2" />
+      <Progress value={progressPercentage} className="h-1 sm:h-1.5" />
     </div>
   );
 }
-
