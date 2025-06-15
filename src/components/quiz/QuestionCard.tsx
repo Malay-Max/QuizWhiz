@@ -52,53 +52,52 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const markdownComponents = {
-    h1: ({node, ...props}: any) => <h1 className="text-2xl sm:text-3xl font-bold my-3 text-foreground" {...props} />,
-    h2: ({node, ...props}: any) => <h2 className="text-xl sm:text-2xl font-semibold my-2.5 text-foreground" {...props} />,
-    h3: ({node, ...props}: any) => <h3 className="text-lg sm:text-xl font-semibold my-2 text-foreground" {...props} />,
-    p: ({node, ...props}: any) => <p className="text-base sm:text-lg mb-2 leading-relaxed text-foreground" {...props} />,
-    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1 text-base sm:text-lg text-foreground" {...props} />,
-    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-base sm:text-lg text-foreground" {...props} />,
-    li: ({node, ...props}: any) => <li className="leading-relaxed text-base sm:text-lg text-foreground" {...props} />,
+    h1: ({node, ...props}: any) => <h1 className="text-3xl sm:text-4xl font-bold my-3 text-foreground" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-2xl sm:text-3xl font-semibold my-2.5 text-foreground" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-xl sm:text-2xl font-semibold my-2 text-foreground" {...props} />,
+    p: ({node, ...props}: any) => <p className="text-lg sm:text-xl mb-2 leading-relaxed text-foreground" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1 text-lg sm:text-xl text-foreground" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-lg sm:text-xl text-foreground" {...props} />,
+    li: ({node, ...props}: any) => <li className="leading-relaxed text-lg sm:text-xl text-foreground" {...props} />,
     strong: ({node, ...props}: any) => <strong className="font-bold text-foreground" {...props} />,
     em: ({node, ...props}: any) => <em className="italic text-foreground" {...props} />,
     code: ({node, inline, className, children, ...props}: any) => {
       const match = /language-(\w+)/.exec(className || '')
       return !inline && match ? (
-        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code text-sm sm:text-base", className)} {...props}>
+        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code text-base sm:text-lg", className)} {...props}>
           <code>{String(children).replace(/\n$/, '')}</code>
         </pre>
       ) : (
-        <code className={cn("px-1.5 py-0.5 bg-muted rounded font-code text-sm sm:text-base", className)} {...props}>
+        <code className={cn("px-1.5 py-0.5 bg-muted rounded font-code text-base sm:text-lg", className)} {...props}>
           {children}
         </code>
       )
     },
   };
   
-  const optionMarkdownComponents = { 
-    ...markdownComponents, 
+const optionMarkdownComponents = { 
+    h1: ({node, ...props}: any) => <h1 className="text-2xl sm:text-3xl font-bold my-1 text-inherit" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-xl sm:text-2xl font-semibold my-1 text-inherit" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-lg sm:text-xl font-semibold my-0.5 text-inherit" {...props} />,
     p: React.Fragment, 
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-4 mb-1 space-y-0.5 text-inherit text-base sm:text-lg" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-4 mb-1 space-y-0.5 text-inherit text-base sm:text-lg" {...props} />,
+    li: ({node, ...props}: any) => <li className="leading-relaxed text-inherit text-base sm:text-lg" {...props} />,
     strong: ({node, ...props}: any) => <strong className="font-bold text-inherit" {...props} />, 
     em: ({node, ...props}: any) => <em className="italic text-inherit" {...props} />, 
-    h1: ({node, ...props}: any) => <h1 className="font-bold my-1 text-inherit" {...props} />,
-    h2: ({node, ...props}: any) => <h2 className="font-semibold my-1 text-inherit" {...props} />,
-    h3: ({node, ...props}: any) => <h3 className="font-semibold my-0.5 text-inherit" {...props} />,
-    ul: ({node, ...props}: any) => <ul className="list-disc pl-4 mb-1 space-y-0.5 text-inherit" {...props} />,
-    ol: ({node, ...props}: any) => <ol className="list-decimal pl-4 mb-1 space-y-0.5 text-inherit" {...props} />,
-    li: ({node, ...props}: any) => <li className="leading-relaxed text-inherit" {...props} />,
-     code: ({node, inline, className, children, ...props}: any) => {
-      const match = /language-(\w+)/.exec(className || '')
-      return !inline && match ? (
-        <pre className={cn("p-1 my-1 bg-muted/50 rounded text-inherit font-code", className)} {...props}>
-          <code>{String(children).replace(/\n$/, '')}</code>
+    code: ({node, inline, className, children, ...props}: any) => {
+    const match = /language-(\w+)/.exec(className || '')
+    return !inline && match ? (
+        <pre className={cn("p-1 my-1 bg-muted/50 rounded text-inherit font-code text-sm sm:text-base", className)} {...props}>
+        <code>{String(children).replace(/\n$/, '')}</code>
         </pre>
-      ) : (
-        <code className={cn("px-1 py-0.5 bg-muted/50 rounded text-inherit font-code", className)} {...props}>
-          {children}
+    ) : (
+        <code className={cn("px-1 py-0.5 bg-muted/50 rounded text-inherit font-code text-sm sm:text-base", className)} {...props}>
+        {children}
         </code>
-      )
+    )
     },
-  };
+};
 
 
   useEffect(() => {
@@ -314,7 +313,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               {showFeedback && option.id === selectedAnswerId && option.id === question.correctAnswerId && CorrectIcon}
               {showFeedback && option.id === selectedAnswerId && option.id !== question.correctAnswerId && IncorrectIcon}
               {showFeedback && isAnswered && selectedAnswerId === null && option.id === question.correctAnswerId && TimeoutIcon}
-              <div className="prose prose-base dark:prose-invert max-w-none text-inherit min-w-0">
+              <div className="prose prose-base sm:prose-lg dark:prose-invert max-w-none text-inherit min-w-0">
                 <ReactMarkdown components={optionMarkdownComponents}>
                   {option.text}
                 </ReactMarkdown>
@@ -432,4 +431,5 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     
 
     
+
 
