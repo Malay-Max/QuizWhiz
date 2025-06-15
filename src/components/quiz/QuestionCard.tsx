@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ScrollArea } from '@/components/ui/scroll-area'; // Added ScrollArea import
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import ReactMarkdown from 'react-markdown';
 
@@ -327,7 +327,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
           <AlertDialogHeader>
             <AlertDialogTitle>Explanation</AlertDialogTitle>
           </AlertDialogHeader>
-          <AlertDialogDescription> {/* Removed asChild and specific class, will use default div wrapper */}
+          <AlertDialogDescription asChild>
             <ScrollArea className="max-h-[55vh] w-full rounded-md">
               <div className="prose prose-sm dark:prose-invert max-w-none p-4">
                   {isExplanationLoading && (
@@ -353,5 +353,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     </>
   );
 }
+
+    
 
     
