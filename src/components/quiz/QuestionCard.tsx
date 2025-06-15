@@ -52,23 +52,23 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const markdownComponents = {
-    h1: ({node, ...props}: any) => <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold my-3 text-foreground" {...props} />,
-    h2: ({node, ...props}: any) => <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold my-2.5 text-foreground" {...props} />,
-    h3: ({node, ...props}: any) => <h3 className="text-lg sm:text-xl md:text-2xl font-semibold my-2 text-foreground" {...props} />,
-    p: ({node, ...props}: any) => <p className="mb-2 leading-relaxed text-base sm:text-lg md:text-xl text-foreground" {...props} />,
-    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 sm:pl-6 mb-2 space-y-1 text-base sm:text-lg md:text-xl" {...props} />,
-    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 sm:pl-6 mb-2 space-y-1 text-base sm:text-lg md:text-xl" {...props} />,
+    h1: ({node, ...props}: any) => <h1 className="font-bold my-3 text-foreground" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="font-semibold my-2.5 text-foreground" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="font-semibold my-2 text-foreground" {...props} />,
+    p: ({node, ...props}: any) => <p className="mb-2 leading-relaxed text-foreground" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1 text-foreground" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-foreground" {...props} />,
     li: ({node, ...props}: any) => <li className="leading-relaxed text-foreground" {...props} />,
     strong: ({node, ...props}: any) => <strong className="font-bold text-foreground" {...props} />,
     em: ({node, ...props}: any) => <em className="italic text-foreground" {...props} />,
     code: ({node, inline, className, children, ...props}: any) => {
       const match = /language-(\w+)/.exec(className || '')
       return !inline && match ? (
-        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code text-sm sm:text-base md:text-lg", className)} {...props}>
+        <pre className={cn("p-2 my-2 bg-muted rounded-md overflow-x-auto font-code", className)} {...props}>
           <code>{String(children).replace(/\n$/, '')}</code>
         </pre>
       ) : (
-        <code className={cn("px-1.5 py-0.5 bg-muted rounded font-code text-sm sm:text-base md:text-lg", className)} {...props}>
+        <code className={cn("px-1.5 py-0.5 bg-muted rounded font-code", className)} {...props}>
           {children}
         </code>
       )
@@ -77,9 +77,28 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   
   const optionMarkdownComponents = { 
     ...markdownComponents, 
-    p: React.Fragment,
-    strong: ({node, ...props}: any) => <strong className="font-bold text-inherit" {...props} />,
-    em: ({node, ...props}: any) => <em className="italic text-inherit" {...props} />,
+    p: React.Fragment, // Avoids <p> tags inside buttons for cleaner rendering
+    strong: ({node, ...props}: any) => <strong className="font-bold text-inherit" {...props} />, // Ensures bold text inherits button color
+    em: ({node, ...props}: any) => <em className="italic text-inherit" {...props} />, // Ensures italic text inherits button color
+    // Explicitly remove text-foreground for options if it was inherited
+    h1: ({node, ...props}: any) => <h1 className="font-bold my-1 text-inherit" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="font-semibold my-1 text-inherit" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="font-semibold my-0.5 text-inherit" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-4 mb-1 space-y-0.5 text-inherit" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-4 mb-1 space-y-0.5 text-inherit" {...props} />,
+    li: ({node, ...props}: any) => <li className="leading-relaxed text-inherit" {...props} />,
+     code: ({node, inline, className, children, ...props}: any) => {
+      const match = /language-(\w+)/.exec(className || '')
+      return !inline && match ? (
+        <pre className={cn("p-1 my-1 bg-muted/50 rounded text-inherit font-code", className)} {...props}>
+          <code>{String(children).replace(/\n$/, '')}</code>
+        </pre>
+      ) : (
+        <code className={cn("px-1 py-0.5 bg-muted/50 rounded text-inherit font-code", className)} {...props}>
+          {children}
+        </code>
+      )
+    },
   };
 
 
@@ -134,10 +153,10 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
    useEffect(() => {
     if (!showExplanationDialog && isAnsweredRef.current) {
         const wasCorrect = selectedAnswerId === question.correctAnswerId;
-        const wasSkippedOrTimedOut = selectedAnswerId === null && isAnsweredRef.current; // isAnsweredRef.current indicates timeout/skip processed
+        // isAnsweredRef.current true for skip/timeout scenarios
+        const wasSkippedOrTimedOut = selectedAnswerId === null && isAnsweredRef.current; 
         
         if (wasCorrect || wasSkippedOrTimedOut) {
-            // Use a micro-timeout to allow any state updates from closing the dialog to settle
             const timeoutId = setTimeout(() => {
                 startAutoAdvanceSequence();
             }, 100); 
@@ -145,7 +164,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
         }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showExplanationDialog, isAnsweredRef.current, selectedAnswerId, question.correctAnswerId]); // Dependencies intentionally specific
+  }, [showExplanationDialog, isAnsweredRef.current, selectedAnswerId, question.correctAnswerId]);
 
 
   const triggerSkipOrTimeout = (currentTimeLeft: number) => {
@@ -175,10 +194,9 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     if (isCorrect) {
         startAutoAdvanceSequence();
     } else {
-      // If incorrect, ensure no auto-advance timers are running from other paths
       if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
       if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
-      setAutoAdvanceMessage(null); // Clear any pending "next question in..." message
+      setAutoAdvanceMessage(null);
     }
   };
   
@@ -191,7 +209,6 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   };
 
   const handleShowExplanation = async () => {
-    // Stop any auto-advance when opening explanation
     if (autoAdvanceTimerRef.current) {
       clearTimeout(autoAdvanceTimerRef.current);
       autoAdvanceTimerRef.current = null;
@@ -239,7 +256,6 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const getButtonClassNames = (optionId: string) => {
     if (!showFeedback) return '';
     if (optionId === question.correctAnswerId) return 'bg-accent hover:bg-accent/90 text-accent-foreground animate-pulse';
-    // Highlight the correct answer if a wrong one was chosen or if skipped/timed out
     if (isAnswered && (selectedAnswerId !== question.correctAnswerId || selectedAnswerId === null) && optionId === question.correctAnswerId) {
       return 'border-2 border-accent ring-2 ring-accent bg-accent/10';
     }
@@ -271,8 +287,8 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               />
             </div>
           </div>
-          <CardDescription asChild className="text-sm sm:text-base md:text-lg pt-1 prose prose-sm sm:prose-base dark:prose-invert max-w-none">
-             <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
+          <CardDescription asChild className="pt-1 prose prose-base sm:prose-lg dark:prose-invert max-w-none">
+             <div> {/* Outer div for CardDescription content */}
                 <ReactMarkdown components={markdownComponents}>
                     {question.text}
                 </ReactMarkdown>
@@ -285,7 +301,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               key={option.id}
               variant={getButtonVariant(option.id)}
               className={cn(
-                "w-full justify-start text-left h-auto py-2.5 sm:py-3 px-3 sm:px-4 text-xs sm:text-sm md:text-base whitespace-normal transition-all duration-200 ease-in-out transform hover:scale-[1.01]",
+                "w-full justify-start text-left h-auto py-2.5 sm:py-3 px-3 sm:px-4 text-sm sm:text-base whitespace-normal transition-all duration-200 ease-in-out transform hover:scale-[1.01]",
                 "items-start", 
                 getButtonClassNames(option.id),
                 selectedAnswerId === option.id && "ring-2 ring-offset-2",
@@ -299,9 +315,8 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
             >
               {showFeedback && option.id === selectedAnswerId && option.id === question.correctAnswerId && CorrectIcon}
               {showFeedback && option.id === selectedAnswerId && option.id !== question.correctAnswerId && IncorrectIcon}
-              {/* Show correct answer icon if skipped/timed out and this is the correct option */}
               {showFeedback && isAnswered && selectedAnswerId === null && option.id === question.correctAnswerId && TimeoutIcon}
-              <div className="prose prose-sm dark:prose-invert max-w-none text-inherit min-w-0">
+              <div className="prose prose-base dark:prose-invert max-w-none text-inherit min-w-0"> {/* Changed from prose-sm */}
                 <ReactMarkdown components={optionMarkdownComponents}>
                   {option.text}
                 </ReactMarkdown>
@@ -392,7 +407,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
           </AlertDialogHeader>
           <AlertDialogDescription asChild>
             <ScrollArea className="max-h-[50vh] sm:max-h-[60vh] w-full rounded-md">
-              <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none p-1 sm:p-2 md:p-4 text-xs sm:text-sm">
+              <div className="prose prose-base sm:prose-lg dark:prose-invert max-w-none p-1 sm:p-2 md:p-4">
                   {isExplanationLoading && (
                   <div className="flex items-center justify-center">
                       <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin text-primary" />
