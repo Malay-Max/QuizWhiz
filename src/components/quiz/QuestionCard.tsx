@@ -52,19 +52,19 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const markdownComponents = {
-    h1: ({node, ...props}: any) => <h1 className="text-xl sm:text-2xl md:text-3xl font-bold my-3 text-foreground" {...props} />,
-    h2: ({node, ...props}: any) => <h2 className="text-lg sm:text-xl md:text-2xl font-semibold my-2.5 text-foreground" {...props} />,
-    h3: ({node, ...props}: any) => <h3 className="text-base sm:text-lg md:text-xl font-semibold my-2 text-foreground" {...props} />,
-    p: ({node, ...props}: any) => <p className="mb-2 leading-relaxed text-sm sm:text-base md:text-lg text-foreground" {...props} />,
-    ul: ({node, ...props}: any) => <ul className="list-disc pl-4 sm:pl-5 mb-2 space-y-1 text-sm sm:text-base" {...props} />,
-    ol: ({node, ...props}: any) => <ol className="list-decimal pl-4 sm:pl-5 mb-2 space-y-1 text-sm sm:text-base" {...props} />,
+    h1: ({node, ...props}: any) => <h1 className="text-lg sm:text-xl md:text-2xl font-bold my-2 text-foreground" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-base sm:text-lg md:text-xl font-semibold my-1.5 text-foreground" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-sm sm:text-base md:text-lg font-semibold my-1 text-foreground" {...props} />,
+    p: ({node, ...props}: any) => <p className="mb-1.5 leading-relaxed text-sm sm:text-base md:text-lg text-foreground" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-4 sm:pl-5 mb-1.5 space-y-0.5 text-sm sm:text-base" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-4 sm:pl-5 mb-1.5 space-y-0.5 text-sm sm:text-base" {...props} />,
     li: ({node, ...props}: any) => <li className="leading-relaxed text-foreground" {...props} />,
     strong: ({node, ...props}: any) => <strong className="font-bold text-foreground" {...props} />,
     em: ({node, ...props}: any) => <em className="italic text-foreground" {...props} />,
     code: ({node, inline, className, children, ...props}: any) => {
       const match = /language-(\w+)/.exec(className || '')
       return !inline && match ? (
-        <pre className={cn("p-1.5 sm:p-2 my-1.5 sm:my-2 bg-muted rounded-md overflow-x-auto font-code text-xs sm:text-sm", className)} {...props}>
+        <pre className={cn("p-1.5 my-1.5 bg-muted rounded-md overflow-x-auto font-code text-xs sm:text-sm", className)} {...props}>
           <code>{String(children).replace(/\n$/, '')}</code>
         </pre>
       ) : (
@@ -129,10 +129,9 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
    useEffect(() => {
     if (!showExplanationDialog && isAnsweredRef.current) {
         const wasCorrect = selectedAnswerId === question.correctAnswerId;
-        // Check if it was skipped or timed out
-        const answerRecord = question.id && selectedAnswerId === null; // Simplified check based on selectedAnswerId being null for skip/timeout
+        const wasSkippedOrTimedOut = selectedAnswerId === null && isAnsweredRef.current;
         
-        if (wasCorrect || answerRecord) {
+        if (wasCorrect || wasSkippedOrTimedOut) {
             const timeoutId = setTimeout(() => {
                 startAutoAdvanceSequence();
             }, 100); 
@@ -140,18 +139,20 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
         }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showExplanationDialog, isAnsweredRef.current, selectedAnswerId, question.id, question.correctAnswerId]);
+  }, [showExplanationDialog, isAnsweredRef.current, selectedAnswerId, question.correctAnswerId]);
+
 
   const triggerSkipOrTimeout = (currentTimeLeft: number) => {
     if (isAnsweredRef.current) return;
     isAnsweredRef.current = true;
 
+    setSelectedAnswerId(null); 
     setIsAnswered(true);
     setShowFeedback(true);
 
     const timeTaken = QUESTION_DURATION - currentTimeLeft;
     onTimeout(timeTaken); 
-    startAutoAdvanceSequence(); // Start auto-advance for skip/timeout
+    startAutoAdvanceSequence(); 
   };
 
   const handleAnswerClick = (answerId: string) => {
@@ -166,7 +167,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
 
     const isCorrect = question.correctAnswerId === answerId;
     if (isCorrect) {
-        startAutoAdvanceSequence(); // Start auto-advance for correct answers
+        startAutoAdvanceSequence();
     } else {
       if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
       if (visualCountdownTimerRef.current) clearInterval(visualCountdownTimerRef.current);
@@ -247,8 +248,10 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
       <Card className="w-full max-w-3xl mx-auto shadow-xl transition-all duration-300 ease-in-out">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-1">
-            <CardTitle className="font-headline text-lg sm:text-xl md:text-2xl break-words">Question {questionNumber}/{totalQuestions}</CardTitle>
-            <div className="w-full sm:w-auto sm:max-w-xs">
+            <CardTitle className="font-headline text-lg sm:text-xl md:text-2xl break-words">
+              Question {questionNumber}/{totalQuestions}
+            </CardTitle>
+            <div className="w-full sm:flex-1">
               <Timer
                 key={`${question.id}-${questionNumber}`}
                 duration={QUESTION_DURATION}
@@ -259,7 +262,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
               />
             </div>
           </div>
-          <CardDescription asChild className="text-sm sm:text-base md:text-lg pt-1">
+          <CardDescription asChild className="text-sm sm:text-base md:text-lg pt-1 prose prose-sm sm:prose-base dark:prose-invert max-w-none">
              <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
                 <ReactMarkdown components={markdownComponents}>
                     {question.text}
@@ -391,4 +394,3 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     </>
   );
 }
-
