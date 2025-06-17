@@ -220,7 +220,7 @@ export default function ManageCategoryPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col">
           {isLoading ? (
             <div className="flex items-center justify-center py-10">
                 <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary mr-2 sm:mr-3" />
@@ -229,7 +229,7 @@ export default function ManageCategoryPage() {
           ) : (
             <>
               {directSubCategories.length > 0 && (
-                <div className="mb-6">
+                <div className="mb-6 shrink-0">
                   <h3 className="text-lg sm:text-xl font-semibold mb-3 text-foreground">Sub-categories</h3>
                   <div className="space-y-2">
                     {directSubCategories.map(subCat => (
@@ -249,15 +249,15 @@ export default function ManageCategoryPage() {
               )}
 
               {directSubCategories.length > 0 && questions.length > 0 && (
-                  <Separator className="my-4 sm:my-6" />
+                  <Separator className="my-4 sm:my-6 shrink-0" />
               )}
 
               {questions.length > 0 ? (
-                <div className="flex flex-col min-h-0">
+                <div className="flex flex-col flex-grow min-h-0">
                   <h3 className="text-lg sm:text-xl font-semibold mb-3 text-foreground shrink-0">
                     Questions in "{currentCategory?.name || 'Current Category'}" (and its sub-categories)
                   </h3>
-                  <ScrollArea className="max-h-[50vh] pr-2 sm:pr-4">
+                  <ScrollArea className="flex-grow pr-2 sm:pr-4">
                     <div className="space-y-3 sm:space-y-4">
                       {questions.map((q, index) => (
                         <Card key={q.id} className="p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow">
@@ -287,7 +287,7 @@ export default function ManageCategoryPage() {
                   </ScrollArea>
                 </div>
               ) : directSubCategories.length === 0 ? ( 
-                <div className="text-center py-10">
+                <div className="text-center py-10 shrink-0">
                   <ListChecks className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
                   <p className="text-lg sm:text-xl font-semibold text-muted-foreground">
                     No sub-categories or questions found here.
