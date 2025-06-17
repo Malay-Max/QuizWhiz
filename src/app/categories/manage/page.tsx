@@ -8,12 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlusCircle, Loader2, Database, ListTree, ArrowLeft } from 'lucide-react';
+import { PlusCircle, Loader2, ListTree, ArrowLeft } from 'lucide-react'; // Removed Database icon
 import { 
   addCategory, 
   getAllCategories,
   getFullCategoryPath,
-  seedSampleData,
   type Category as CategoryType
 } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
@@ -35,7 +34,7 @@ export default function ManageCategoriesPage() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryParentId, setNewCategoryParentId] = useState<string | null>(null);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [isSeedingData, setIsSeedingData] = useState(false);
+  // Removed isSeedingData state
 
   const refreshAllCategories = useCallback(async () => {
     const cats = await getAllCategories();
@@ -69,20 +68,7 @@ export default function ManageCategoriesPage() {
     }
   };
 
-  const handleSeedData = async () => {
-    setIsSeedingData(true);
-    const result = await seedSampleData();
-    setIsSeedingData(false);
-    toast({
-      title: result.success ? "Seeding Complete" : "Seeding Issue",
-      description: result.message,
-      variant: result.success ? "default" : "destructive",
-      className: result.success ? "bg-accent text-accent-foreground" : ""
-    });
-    if (result.success) {
-      await refreshAllCategories();
-    }
-  };
+  // Removed handleSeedData function
 
   return (
     <div className="container mx-auto py-8">
@@ -95,7 +81,7 @@ export default function ManageCategoriesPage() {
             <ListTree className="mr-3 h-7 w-7 text-primary" /> Manage Categories
           </CardTitle>
           <CardDescription className="text-sm sm:text-base">
-            Add new categories or seed sample data into your quiz application.
+            Add new categories to organize your quiz application.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
@@ -135,13 +121,7 @@ export default function ManageCategoriesPage() {
               </div>
           </div>
           
-          <div className="p-4 border rounded-lg shadow-sm">
-              <h3 className="text-lg sm:text-xl font-semibold mb-3">Sample Data</h3>
-              <Button onClick={handleSeedData} variant="outline" disabled={isSeedingData} className="w-full sm:w-auto text-sm sm:text-base">
-                  {isSeedingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Seed Sample Data
-              </Button>
-              <p className="text-xs text-muted-foreground mt-1">Adds sample categories and questions if the database is empty.</p>
-          </div>
+          {/* Removed Sample Data section */}
         </CardContent>
         <CardFooter>
           <p className="text-xs text-muted-foreground">
