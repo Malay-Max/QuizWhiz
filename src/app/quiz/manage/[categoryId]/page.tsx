@@ -89,10 +89,10 @@ export default function ManageCategoryPage() {
     const result = await updateCategoryName(currentCategory.id, categoryName.trim());
     if (result.success) {
       toast({ title: "Category Updated", description: "Category name saved successfully.", className: "bg-accent text-accent-foreground" });
-      await loadCategoryAndQuestions(); // Refresh to show updated name
+      await loadCategoryAndQuestions(); 
     } else {
       toast({ title: "Update Failed", description: result.error || "Could not update category name.", variant: "destructive" });
-      setCategoryName(currentCategory.name); // Revert to original if update failed
+      setCategoryName(currentCategory.name); 
     }
     setIsEditingCategoryName(false);
   };
@@ -109,7 +109,7 @@ export default function ManageCategoryPage() {
     setShowDeleteCategoryConfirm(false);
 
     if (result.success) {
-      toast({ title: "Category Deleted", description: `Category "${currentCategory.name}" and its contents have been removed.`, className: "bg-accent text-accent-foreground" });
+      toast({ title: "Category Deleted", description: `Category "${currentCategory.name}" and its contents (including sub-categories and their questions) have been removed.`, className: "bg-accent text-accent-foreground" });
       router.push('/'); 
     } else {
       toast({ title: "Deletion Failed", description: result.error || "Could not delete the category and its contents.", variant: "destructive" });
@@ -252,7 +252,7 @@ export default function ManageCategoryPage() {
                   <Separator className="my-4 sm:my-6 shrink-0" />
               )}
               
-              <div className="flex flex-col"> {/* Parent for heading + scroll area */}
+              <div className="flex flex-col"> 
                 {questions.length > 0 ? (
                   <>
                     <h3 className="text-lg sm:text-xl font-semibold mb-3 text-foreground shrink-0">
@@ -314,7 +314,7 @@ export default function ManageCategoryPage() {
                     </Button>
                   </div>
                 )
-              )}
+              }
               </div>
             </>
           )}
