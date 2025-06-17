@@ -11,14 +11,21 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText } from 'lucide-react';
-import { addQuestion, getCategories, getQuestionById, updateQuestion } from '@/lib/storage';
+import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText, Download } from 'lucide-react';
+import { addQuestion, getCategories, getQuestionById, updateQuestion, getQuestions } from '@/lib/storage';
 import type { Question, AnswerOption as QuestionAnswerOptionType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { generateDistractorsAction } from '@/app/actions';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const answerOptionSchema = z.object({
   id: z.string().default(() => crypto.randomUUID()),
@@ -37,13 +44,13 @@ type QuestionFormData = z.infer<typeof questionFormSchema>;
 const defaultAnswerOptions = Array(2).fill(null).map(() => ({ id: crypto.randomUUID(), text: '' }));
 
 const markdownComponents = {
-    h1: ({node, ...props}: any) => <h1 className="text-xl sm:text-2xl font-bold my-3 sm:my-4" {...props} />,
-    h2: ({node, ...props}: any) => <h2 className="text-lg sm:text-xl font-semibold my-2 sm:my-3" {...props} />,
-    h3: ({node, ...props}: any) => <h3 className="text-base sm:text-lg font-semibold my-1 sm:my-2" {...props} />,
-    p: ({node, ...props}: any) => <p className="mb-2 leading-relaxed text-sm sm:text-base" {...props} />,
-    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1 text-sm sm:text-base" {...props} />,
-    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-sm sm:text-base" {...props} />,
-    li: ({node, ...props}: any) => <li className="leading-relaxed" {...props} />,
+    h1: ({node, ...props}: any) => <h1 className="text-2xl sm:text-3xl font-bold my-3 sm:my-4" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-xl sm:text-2xl font-semibold my-2 sm:my-3" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-lg sm:text-xl font-semibold my-1 sm:my-2" {...props} />,
+    p: ({node, ...props}: any) => <p className="text-lg sm:text-xl mb-2 leading-relaxed" {...props} />,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-2 space-y-1 text-lg sm:text-xl" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-lg sm:text-xl" {...props} />,
+    li: ({node, ...props}: any) => <li className="text-lg sm:text-xl leading-relaxed" {...props} />,
     strong: ({node, ...props}: any) => <strong className="font-bold" {...props} />,
     em: ({node, ...props}: any) => <em className="italic" {...props} />,
     code: ({node, inline, className, children, ...props}: any) => {
@@ -60,7 +67,29 @@ const markdownComponents = {
     },
   };
   
-const optionMarkdownComponents = { ...markdownComponents, p: React.Fragment };
+const optionMarkdownComponents = { 
+    h1: ({node, ...props}: any) => <h1 className="text-xl sm:text-2xl font-bold my-1 text-inherit" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-lg sm:text-xl font-semibold my-1 text-inherit" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-base sm:text-lg font-semibold my-0.5 text-inherit" {...props} />,
+    p: React.Fragment,
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-4 mb-1 space-y-0.5 text-inherit text-base sm:text-lg" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-4 mb-1 space-y-0.5 text-inherit text-base sm:text-lg" {...props} />,
+    li: ({node, ...props}: any) => <li className="leading-relaxed text-inherit text-base sm:text-lg" {...props} />,
+    strong: ({node, ...props}: any) => <strong className="font-bold text-inherit" {...props} />,
+    em: ({node, ...props}: any) => <em className="italic text-inherit" {...props} />,
+    code: ({node, inline, className, children, ...props}: any) => {
+    const match = /language-(\w+)/.exec(className || '')
+    return !inline && match ? (
+        <pre className={cn("p-1 my-1 bg-muted/50 rounded text-inherit font-code text-sm sm:text-base", className)} {...props}>
+        <code>{String(children).replace(/\n$/, '')}</code>
+        </pre>
+    ) : (
+        <code className={cn("px-1 py-0.5 bg-muted/50 rounded text-inherit font-code text-sm sm:text-base", className)} {...props}>
+        {children}
+        </code>
+    )
+    },
+};
 
 
 export function QuestionForm() {
@@ -78,6 +107,9 @@ export function QuestionForm() {
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [pageTitle, setPageTitle] = useState('Add New Question');
   const [submitButtonText, setSubmitButtonText] = useState('Add Single Question');
+
+  const [selectedExportCategory, setSelectedExportCategory] = useState<string>('');
+  const [isExporting, setIsExporting] = useState(false);
 
   const form = useForm<QuestionFormData>({
     resolver: zodResolver(questionFormSchema),
@@ -456,13 +488,56 @@ export function QuestionForm() {
     }
   };
 
+  const handleExportQuestions = async () => {
+    if (!selectedExportCategory) {
+      toast({ title: "No Category Selected", description: "Please select a category to export.", variant: "destructive" });
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const allQuestionsFromDB = await getQuestions(); 
+      const questionsToExport = allQuestionsFromDB.filter(q => q.category === selectedExportCategory);
+  
+      if (questionsToExport.length === 0) {
+        toast({ title: "No Questions", description: `No questions found in category "${selectedExportCategory}" to export.`, variant: "default" });
+        setIsExporting(false);
+        return;
+      }
+  
+      const formattedQuestions = questionsToExport.map(q => {
+        const optionTexts = q.options.map(opt => opt.text).join(' - ');
+        const correctAnswerOption = q.options.find(opt => opt.id === q.correctAnswerId);
+        const correctAnswerText = correctAnswerOption ? correctAnswerOption.text : "ERROR_CORRECT_ANSWER_NOT_FOUND";
+        return `;;${q.text};; {${optionTexts}} [${correctAnswerText}]`;
+      }).join('\n');
+  
+      const blob = new Blob([formattedQuestions], { type: 'text/plain;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      const categoryFileName = selectedExportCategory.replace(/[\s/]/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+      link.download = `quiz_questions_${categoryFileName || 'export'}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+  
+      toast({ title: "Export Successful", description: `${questionsToExport.length} questions from "${selectedExportCategory}" exported.`, className: 'bg-accent text-accent-foreground' });
+  
+    } catch (error) {
+      console.error("Error exporting questions:", error);
+      toast({ title: "Export Failed", description: "An error occurred while exporting questions.", variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
         <CardTitle className="font-headline text-2xl sm:text-3xl">{pageTitle}</CardTitle>
         <CardDescription className="text-sm sm:text-base">
-            {editingQuestionId ? "Modify the details of this question." : "Fill in the details for your multiple-choice question, or use the batch add feature below."}
+            {editingQuestionId ? "Modify the details of this question." : "Fill in the details for your multiple-choice question, or use the batch add/export features below."}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -534,7 +609,7 @@ export function QuestionForm() {
                     <div key={`${option.id}-radio-item`} className="flex items-start space-x-2 p-2 border rounded-md hover:bg-secondary/50 transition-colors">
                       <RadioGroupItem value={option.id} id={`${option.id}-radio`} className="mt-1 flex-shrink-0" />
                       <Label htmlFor={`${option.id}-radio`} className="flex-grow cursor-pointer font-normal">
-                        <div className="prose prose-sm dark:prose-invert max-w-none text-inherit">
+                        <div className="prose prose-base sm:prose-lg dark:prose-invert max-w-none text-inherit">
                             <ReactMarkdown components={optionMarkdownComponents}>
                                 {option.text || `Option ${index + 1}`}
                             </ReactMarkdown>
@@ -624,7 +699,51 @@ export function QuestionForm() {
             </Button>
             </div>
         )}
+
+        <div className="mt-10 pt-6 border-t">
+          <div className="flex items-center mb-3">
+            <Download className="h-6 w-6 mr-2 text-primary" />
+            <h3 className="text-lg sm:text-xl font-semibold">Export Questions</h3>
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+            Select a category to export questions in the batch import format.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="export-category-select" className="text-base sm:text-lg">Select Category to Export</Label>
+              <Select
+                value={selectedExportCategory}
+                onValueChange={setSelectedExportCategory}
+              >
+                <SelectTrigger id="export-category-select" className="mt-1 text-sm md:text-base w-full">
+                  <SelectValue placeholder="Choose a category..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {allCategories.length > 0 ? (
+                    allCategories.map(cat => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>No categories available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={handleExportQuestions}
+              className="w-full sm:w-auto text-sm sm:text-base"
+              disabled={isExporting || !selectedExportCategory}
+            >
+              {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              Export Selected Category
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
 }
+
+    
