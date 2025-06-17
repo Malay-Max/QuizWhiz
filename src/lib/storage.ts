@@ -8,7 +8,7 @@ import {
 } from 'firebase/firestore';
 import { FirebaseError } from 'firebase/app';
 
-const QUESTIONS_COLLECTION = 'questions';
+const QUESTIONS_COLLECTION = 'allQuestions'; // Changed from 'questions'
 const CATEGORIES_COLLECTION = 'categories';
 const QUIZ_SESSIONS_COLLECTION = 'quizSessions';
 const ACTIVE_QUIZ_SESSION_ID_KEY = 'quizcraft_active_session_id';
