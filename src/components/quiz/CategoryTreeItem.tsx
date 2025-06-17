@@ -56,12 +56,10 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
           className={cn(
             "w-full justify-start text-left h-auto py-2 px-3 shadow-sm hover:bg-primary/10 hover:text-primary transition-all whitespace-normal flex items-center min-w-0",
           )}
-          // Display full path if available, otherwise just node name. Title reflects action.
           title={`${isLeafNode ? 'Manage questions in' : 'Start quiz for'} category: ${node.fullPath || node.name}`}
         >
           <Folder className="mr-2 h-4 w-4 text-primary/80 flex-shrink-0" />
-          {/* Display fullPath if available for context, otherwise just the node name */}
-          <span className="min-w-0 break-words">{node.fullPath || node.name}</span>
+          <span className="min-w-0 break-words">{node.name}</span>
         </Button>
       </div>
       {isOpen && hasChildren && (
@@ -79,3 +77,4 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
     </div>
   );
 }
+
