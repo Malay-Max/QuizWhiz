@@ -3,9 +3,8 @@
 
 import type { Category as CategoryType } from '@/types'; // Use new Category type
 import { Button } from '@/components/ui/button';
-import { Folder, ChevronRight, ChevronDown, Edit } from 'lucide-react'; // Added Edit
+import { Folder, ChevronRight, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation'; // Added useRouter
 import { cn } from '@/lib/utils';
 
 interface CategoryTreeItemProps {
@@ -16,7 +15,6 @@ interface CategoryTreeItemProps {
 
 export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItemProps) {
   const [isOpen, setIsOpen] = useState(false); 
-  const router = useRouter(); // Initialize router
 
   const hasChildren = node.children && node.children.length > 0;
   const isLeafNode = !hasChildren;
@@ -29,17 +27,14 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
   };
   
   const handleSelect = () => {
+    // If it's a leaf node (has no children), route to manage page
+    // Otherwise, start the quiz with this category and its descendants
     onSelectNode(node.id, isLeafNode);
-  };
-
-  const handleEditClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering parent selection
-    router.push(`/quiz/manage/${node.id}`);
   };
 
   return (
     <div style={{ paddingLeft: `${level * 20}px` }} className="my-1">
-      <div className="flex items-center gap-1"> {/* Added gap-1 for spacing */}
+      <div className="flex items-center">
         {hasChildren ? (
           <Button
             variant="ghost"
@@ -59,21 +54,14 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
           variant="outline"
           size="sm"
           className={cn(
-            "flex-grow justify-start text-left h-auto py-2 px-3 shadow-sm hover:bg-primary/10 hover:text-primary transition-all whitespace-normal flex items-center min-w-0",
+            "w-full justify-start text-left h-auto py-2 px-3 shadow-sm hover:bg-primary/10 hover:text-primary transition-all whitespace-normal flex items-center min-w-0",
+            // Add more padding to the right if it's a leaf node to make space for the "Manage" button/indicator
+            // isLeafNode && "pr-10" 
           )}
-          title={`${isLeafNode ? 'Manage questions in' : 'Start quiz for'} category: ${node.fullPath || node.name}`}
+          title={node.fullPath || node.name} // Use full path for tooltip if available
         >
           <Folder className="mr-2 h-4 w-4 text-primary/80 flex-shrink-0" />
           <span className="min-w-0 break-words">{node.name}</span>
-        </Button>
-        <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleEditClick}
-            className="p-1 h-auto flex-shrink-0"
-            title={`Edit category: ${node.name}`}
-        >
-            <Edit className="h-4 w-4" />
         </Button>
       </div>
       {isOpen && hasChildren && (
@@ -91,3 +79,4 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
     </div>
   );
 }
+
