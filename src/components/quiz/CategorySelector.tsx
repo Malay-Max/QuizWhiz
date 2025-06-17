@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { CategoryTreeItem } from './CategoryTreeItem';
 import { useRouter } from 'next/navigation';
-import { Zap, Loader2, ListTree, PlusCircle } from 'lucide-react'; // Added ListTree, PlusCircle
+import { Zap, Loader2, ListTree, PlusCircle } from 'lucide-react'; 
 import { Input } from '@/components/ui/input'; 
 import { Label } from '@/components/ui/label'; 
 
@@ -83,7 +83,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
             <PlusCircle className="mr-2 h-5 w-5" /> Add Questions
           </Button>
           <Button onClick={() => router.push('/categories/add')} className="w-full text-sm sm:text-base" variant="outline">
-            <ListTree className="mr-2 h-5 w-5" /> Add/Seed Categories
+            <ListTree className="mr-2 h-5 w-5" /> Add Categories
           </Button>
         </CardFooter>
       </Card>
@@ -139,11 +139,9 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
             <PlusCircle className="mr-2 h-5 w-5" /> Add New Questions
         </Button>
         <Button onClick={() => router.push('/categories/add')} className="w-full sm:flex-1 text-sm sm:text-base" variant="outline">
-            <ListTree className="mr-2 h-5 w-5" /> Add/Seed Categories
+            <ListTree className="mr-2 h-5 w-5" /> Add Categories
         </Button>
       </CardFooter>
     </Card>
   );
 }
-
-    
