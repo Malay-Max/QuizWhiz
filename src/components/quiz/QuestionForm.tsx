@@ -19,13 +19,6 @@ import { generateDistractorsAction } from '@/app/actions';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const answerOptionSchema = z.object({
   id: z.string().default(() => crypto.randomUUID()),
@@ -108,7 +101,9 @@ export function QuestionForm() {
   const [pageTitle, setPageTitle] = useState('Add New Question');
   const [submitButtonText, setSubmitButtonText] = useState('Add Single Question');
 
-  const [selectedExportCategory, setSelectedExportCategory] = useState<string>('');
+  const [exportCategorySearchTerm, setExportCategorySearchTerm] = useState<string>('');
+  const [filteredExportCategorySuggestions, setFilteredExportCategorySuggestions] = useState<string[]>([]);
+  const [categoryForExport, setCategoryForExport] = useState<string>('');
   const [isExporting, setIsExporting] = useState(false);
   const [exportedQuestionsText, setExportedQuestionsText] = useState<string>('');
 
@@ -149,6 +144,20 @@ export function QuestionForm() {
       setFilteredCategorySuggestions([]); 
     }
   }, [currentCategoryInput, allCategories]);
+  
+  useEffect(() => {
+    if (exportCategorySearchTerm && exportCategorySearchTerm.trim() !== '') {
+      const lowercasedInput = exportCategorySearchTerm.toLowerCase();
+      const suggestions = allCategories
+        .filter(cat => cat.toLowerCase().includes(lowercasedInput))
+        .slice(0, 5);
+      setFilteredExportCategorySuggestions(suggestions);
+    } else {
+      setFilteredExportCategorySuggestions([]);
+    }
+    setCategoryForExport(''); 
+    setExportedQuestionsText(''); 
+  }, [exportCategorySearchTerm, allCategories]);
 
   useEffect(() => {
     const editId = searchParams.get('editId');
@@ -216,6 +225,12 @@ export function QuestionForm() {
   const handleCategoryClick = (category: string) => {
     form.setValue('category', category, { shouldValidate: true, shouldDirty: true });
     setFilteredCategorySuggestions([]); 
+  };
+
+  const handleExportCategorySuggestionClick = (category: string) => {
+    setCategoryForExport(category);
+    setExportCategorySearchTerm(category);
+    setFilteredExportCategorySuggestions([]);
   };
 
   const handleGenerateDistractors = async () => {
@@ -490,7 +505,7 @@ export function QuestionForm() {
   };
 
   const handleExportQuestions = async () => {
-    if (!selectedExportCategory) {
+    if (!categoryForExport) {
       toast({ title: "No Category Selected", description: "Please select a category to export.", variant: "destructive" });
       return;
     }
@@ -498,10 +513,10 @@ export function QuestionForm() {
     setExportedQuestionsText(''); 
     try {
       const allQuestionsFromDB = await getQuestions(); 
-      const questionsToExport = allQuestionsFromDB.filter(q => q.category === selectedExportCategory);
+      const questionsToExport = allQuestionsFromDB.filter(q => q.category === categoryForExport);
   
       if (questionsToExport.length === 0) {
-        toast({ title: "No Questions", description: `No questions found in category "${selectedExportCategory}" to export.`, variant: "default" });
+        toast({ title: "No Questions", description: `No questions found in category "${categoryForExport}" to export.`, variant: "default" });
         setIsExporting(false);
         return;
       }
@@ -514,7 +529,7 @@ export function QuestionForm() {
       }).join('\n');
       
       setExportedQuestionsText(formattedQuestions);
-      toast({ title: "Export Ready", description: `${questionsToExport.length} questions from "${selectedExportCategory}" are displayed below for copying.`, className: 'bg-accent text-accent-foreground' });
+      toast({ title: "Export Ready", description: `${questionsToExport.length} questions from "${categoryForExport}" are displayed below for copying.`, className: 'bg-accent text-accent-foreground' });
   
     } catch (error) {
       console.error("Error preparing questions for export:", error);
@@ -534,10 +549,6 @@ export function QuestionForm() {
       console.error('Failed to copy text: ', err);
     }
   };
-
-  useEffect(() => {
-    setExportedQuestionsText('');
-  }, [selectedExportCategory]);
 
 
   return (
@@ -714,35 +725,45 @@ export function QuestionForm() {
             <h3 className="text-lg sm:text-xl font-semibold">Export Questions</h3>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-            Select a category to display its questions in the batch import format for easy copying.
+            Type to search for a category and then click "Display Questions" to see its questions in the batch import format for easy copying.
           </p>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="export-category-select" className="text-base sm:text-lg">Select Category to Export</Label>
-              <Select
-                value={selectedExportCategory}
-                onValueChange={setSelectedExportCategory}
-              >
-                <SelectTrigger id="export-category-select" className="mt-1 text-sm md:text-base w-full">
-                  <SelectValue placeholder="Choose a category..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {allCategories.length > 0 ? (
-                    allCategories.map(cat => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="--no-categories--" disabled>No categories available</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="export-category-input" className="text-base sm:text-lg">Search and Select Category to Export</Label>
+              <Input
+                id="export-category-input"
+                value={exportCategorySearchTerm}
+                onChange={(e) => setExportCategorySearchTerm(e.target.value)}
+                placeholder="Type to search category..."
+                className="mt-1 text-sm md:text-base w-full"
+                autoComplete="off"
+              />
+              {filteredExportCategorySuggestions.length > 0 && (
+                <div className="mt-2 border rounded-md bg-background shadow-md p-2">
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-1">Suggestions (click to select for export):</p>
+                  <div className="flex flex-wrap gap-1">
+                    {filteredExportCategorySuggestions.map(cat => (
+                      <Button
+                        key={`export-sugg-${cat}`}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleExportCategorySuggestionClick(cat)}
+                        className="text-xs px-2 py-1 h-auto whitespace-normal"
+                        title={`Select category for export: ${cat}`}
+                      >
+                        <Folder className="mr-1.5 h-3 w-3 shrink-0" />
+                        <span className="min-w-0 break-all">{cat}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <Button
               onClick={handleExportQuestions}
               className="w-full sm:w-auto text-sm sm:text-base"
-              disabled={isExporting || !selectedExportCategory || selectedExportCategory === "--no-categories--"}
+              disabled={isExporting || !categoryForExport}
             >
               {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
               Display Questions for Category
@@ -776,3 +797,4 @@ export function QuestionForm() {
     </Card>
   );
 }
+
