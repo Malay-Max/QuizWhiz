@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText, Download } from 'lucide-react';
+import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText, Copy } from 'lucide-react';
 import { addQuestion, getCategories, getQuestionById, updateQuestion, getQuestions } from '@/lib/storage';
 import type { Question, AnswerOption as QuestionAnswerOptionType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -110,6 +110,7 @@ export function QuestionForm() {
 
   const [selectedExportCategory, setSelectedExportCategory] = useState<string>('');
   const [isExporting, setIsExporting] = useState(false);
+  const [exportedQuestionsText, setExportedQuestionsText] = useState<string>('');
 
   const form = useForm<QuestionFormData>({
     resolver: zodResolver(questionFormSchema),
@@ -494,6 +495,7 @@ export function QuestionForm() {
       return;
     }
     setIsExporting(true);
+    setExportedQuestionsText(''); 
     try {
       const allQuestionsFromDB = await getQuestions(); 
       const questionsToExport = allQuestionsFromDB.filter(q => q.category === selectedExportCategory);
@@ -510,26 +512,32 @@ export function QuestionForm() {
         const correctAnswerText = correctAnswerOption ? correctAnswerOption.text : "ERROR_CORRECT_ANSWER_NOT_FOUND";
         return `;;${q.text};; {${optionTexts}} [${correctAnswerText}]`;
       }).join('\n');
-  
-      const blob = new Blob([formattedQuestions], { type: 'text/plain;charset=utf-8' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      const categoryFileName = selectedExportCategory.replace(/[\s/]/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-      link.download = `quiz_questions_${categoryFileName || 'export'}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
-  
-      toast({ title: "Export Successful", description: `${questionsToExport.length} questions from "${selectedExportCategory}" exported.`, className: 'bg-accent text-accent-foreground' });
+      
+      setExportedQuestionsText(formattedQuestions);
+      toast({ title: "Export Ready", description: `${questionsToExport.length} questions from "${selectedExportCategory}" are displayed below for copying.`, className: 'bg-accent text-accent-foreground' });
   
     } catch (error) {
-      console.error("Error exporting questions:", error);
-      toast({ title: "Export Failed", description: "An error occurred while exporting questions.", variant: "destructive" });
+      console.error("Error preparing questions for export:", error);
+      toast({ title: "Export Failed", description: "An error occurred while preparing questions for export.", variant: "destructive" });
     } finally {
       setIsExporting(false);
     }
   };
+
+  const handleCopyToClipboard = async () => {
+    if (!exportedQuestionsText) return;
+    try {
+      await navigator.clipboard.writeText(exportedQuestionsText);
+      toast({ title: "Copied!", description: "Questions copied to clipboard.", className: 'bg-accent text-accent-foreground' });
+    } catch (err) {
+      toast({ title: "Copy Failed", description: "Could not copy questions to clipboard.", variant: "destructive" });
+      console.error('Failed to copy text: ', err);
+    }
+  };
+
+  useEffect(() => {
+    setExportedQuestionsText('');
+  }, [selectedExportCategory]);
 
 
   return (
@@ -702,11 +710,11 @@ export function QuestionForm() {
 
         <div className="mt-10 pt-6 border-t">
           <div className="flex items-center mb-3">
-            <Download className="h-6 w-6 mr-2 text-primary" />
+            <FileText className="h-6 w-6 mr-2 text-primary" />
             <h3 className="text-lg sm:text-xl font-semibold">Export Questions</h3>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-            Select a category to export questions in the batch import format.
+            Select a category to display its questions in the batch import format for easy copying.
           </p>
           <div className="space-y-4">
             <div>
@@ -736,16 +744,35 @@ export function QuestionForm() {
               className="w-full sm:w-auto text-sm sm:text-base"
               disabled={isExporting || !selectedExportCategory || selectedExportCategory === "--no-categories--"}
             >
-              {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              Export Selected Category
+              {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+              Display Questions for Category
             </Button>
+
+            {exportedQuestionsText && (
+              <div className="mt-4 space-y-2">
+                <Label htmlFor="exported-questions-display" className="text-base sm:text-lg">Formatted Questions for Copying:</Label>
+                <Textarea
+                  id="exported-questions-display"
+                  value={exportedQuestionsText}
+                  readOnly
+                  className="min-h-[150px] text-xs sm:text-sm font-code bg-muted/50"
+                  rows={10}
+                  aria-label="Exported questions text"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyToClipboard}
+                  className="text-xs sm:text-sm"
+                >
+                  <Copy className="mr-2 h-3.5 w-3.5" /> Copy to Clipboard
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
     </Card>
   );
 }
-
-    
-
-    
