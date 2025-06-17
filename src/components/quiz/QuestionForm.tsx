@@ -11,15 +11,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText, Copy, ListTree, Database, Download } from 'lucide-react';
+import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText, Copy } from 'lucide-react';
 import { 
   addQuestion, 
   getQuestionById, 
   updateQuestion, 
   getAllCategories,
   getFullCategoryPath,
-  addCategory,
-  seedSampleData,
   Category as CategoryType,
   Question as QuestionType,
   AnswerOption as QuestionAnswerOptionType,
@@ -102,8 +100,6 @@ interface CategoryOption {
   name: string; 
 }
 
-const ROOT_CATEGORY_PLACEHOLDER_VALUE = "--root--";
-
 export function QuestionForm() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -125,11 +121,6 @@ export function QuestionForm() {
   const [categoryForExport, setCategoryForExport] = useState<CategoryOption | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportedQuestionsText, setExportedQuestionsText] = useState<string>('');
-
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [newCategoryParentId, setNewCategoryParentId] = useState<string | null>(null);
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [isSeedingData, setIsSeedingData] = useState(false);
 
   const form = useForm<QuestionFormData>({
     resolver: zodResolver(questionFormSchema),
@@ -426,7 +417,7 @@ export function QuestionForm() {
         const correctMatch = line.match(/\[(.*?)\]/);
 
         if (!questionMatch || !optionsMatch || !correctMatch) {
-          console.warn(`Skipping malformed line: ${line}`);
+          console.warn("Skipping malformed line: " + line);
           questionsFailedCount++;
           continue;
         }
@@ -436,7 +427,7 @@ export function QuestionForm() {
         const correctAnswerText = correctMatch[1].trim();
 
         if (!questionText || optionTexts.length < 2 || !correctAnswerText) {
-          console.warn(`Skipping invalid data in line: ${line}`);
+          console.warn("Skipping invalid data in line: " + line);
           questionsFailedCount++;
           continue;
         }
@@ -448,7 +439,7 @@ export function QuestionForm() {
 
         const correctOption = answerOptions.find(opt => opt.text === correctAnswerText);
         if (!correctOption) {
-          console.warn(`Correct answer text "${correctAnswerText}" not found in options for line: ${line}`);
+          console.warn("Correct answer text '" + correctAnswerText + "' not found in options for line: " + line);
           questionsFailedCount++;
           continue;
         }
@@ -465,13 +456,13 @@ export function QuestionForm() {
             questionsAddedCount++;
         } else {
             questionsFailedCount++;
-            console.error(`Failed to add question from line: ${line}. Error: ${result.error}`);
+            console.error("Failed to add question from line: " + line + ". Error: " + result.error);
             if (result.error?.toLowerCase().includes('permission denied') || result.error?.toLowerCase().includes('insufficient permissions')) {
                 permissionErrorOccurred = true;
             }
         }
       } catch (e) { 
-        console.error(`Error processing line: ${line}`, e);
+        console.error("Error processing line: " + line, e);
         questionsFailedCount++;
       }
     }
@@ -562,92 +553,15 @@ export function QuestionForm() {
     }
   };
 
-  const handleAddNewCategory = async () => {
-    if (!newCategoryName.trim()) {
-      toast({ title: "Category Name Required", description: "Please enter a name for the new category.", variant: "destructive" });
-      return;
-    }
-    setIsAddingCategory(true);
-    const result = await addCategory(newCategoryName, newCategoryParentId);
-    setIsAddingCategory(false);
-    if (result.success && result.id) {
-      toast({ title: "Category Added", description: `Category "${newCategoryName}" created.`, className: "bg-accent text-accent-foreground" });
-      setNewCategoryName('');
-      setNewCategoryParentId(null);
-      await refreshAllCategories(); 
-      form.setValue('categoryId', result.id); 
-    } else {
-      toast({ title: "Failed to Add Category", description: result.error || "Could not create category.", variant: "destructive" });
-    }
-  };
-
-  const handleSeedData = async () => {
-    setIsSeedingData(true);
-    const result = await seedSampleData();
-    setIsSeedingData(false);
-    toast({
-      title: result.success ? "Seeding Complete" : "Seeding Issue",
-      description: result.message,
-      variant: result.success ? "default" : "destructive",
-      className: result.success ? "bg-accent text-accent-foreground" : ""
-    });
-    if (result.success) {
-      await refreshAllCategories();
-    }
-  };
-
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
         <CardTitle className="font-headline text-2xl sm:text-3xl">{pageTitle}</CardTitle>
         <CardDescription className="text-sm sm:text-base">
-            {editingQuestionId ? "Modify the details of this question." : "Fill in the details, or use batch/export features."}
+            {editingQuestionId ? "Modify the details of this question." : "Fill in the details for a new question, or use batch/export features below."}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        
-        <div className="mb-8 p-4 border rounded-lg shadow-sm">
-            <h3 className="text-lg sm:text-xl font-semibold mb-3 flex items-center"><ListTree className="mr-2 h-5 w-5 text-primary" />Manage Categories</h3>
-            <div className="space-y-3">
-                <div>
-                    <Label htmlFor="new-category-name">New Category Name</Label>
-                    <Input 
-                        id="new-category-name"
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        placeholder="e.g., Modern Poetry"
-                        className="mt-1 text-sm md:text-base"
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="new-category-parent">Parent Category (Optional)</Label>
-                    <Select 
-                        value={newCategoryParentId === null ? ROOT_CATEGORY_PLACEHOLDER_VALUE : newCategoryParentId} 
-                        onValueChange={(value) => setNewCategoryParentId(value === ROOT_CATEGORY_PLACEHOLDER_VALUE ? null : value)}
-                    >
-                        <SelectTrigger className="w-full mt-1 text-sm md:text-base">
-                            <SelectValue placeholder="Select parent (optional, for root leave empty)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ROOT_CATEGORY_PLACEHOLDER_VALUE}>-- No Parent (Root Category) --</SelectItem>
-                            {categoryOptionsForSelect.map(catOpt => (
-                                <SelectItem key={catOpt.id} value={catOpt.id}>{catOpt.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <Button onClick={handleAddNewCategory} disabled={isAddingCategory || !newCategoryName.trim()} className="w-full sm:w-auto text-sm sm:text-base">
-                    {isAddingCategory ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />} Add Category
-                </Button>
-            </div>
-            <div className="mt-6 pt-4 border-t">
-                <Button onClick={handleSeedData} variant="outline" disabled={isSeedingData} className="w-full sm:w-auto text-sm sm:text-base">
-                    {isSeedingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Seed Sample Data
-                </Button>
-                <p className="text-xs text-muted-foreground mt-1">Adds sample categories and questions if none exist.</p>
-            </div>
-        </div>
-
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div>
             <Label htmlFor="text" className="text-base sm:text-lg">Question Text</Label>

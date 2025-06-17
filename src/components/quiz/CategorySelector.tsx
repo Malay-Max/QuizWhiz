@@ -8,19 +8,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { CategoryTreeItem } from './CategoryTreeItem';
 import { useRouter } from 'next/navigation';
-import { Zap, Loader2 } from 'lucide-react';
+import { Zap, Loader2, ListTree, PlusCircle } from 'lucide-react'; // Added ListTree, PlusCircle
 import { Input } from '@/components/ui/input'; 
 import { Label } from '@/components/ui/label'; 
 
 interface CategorySelectorProps {
-  onCategoryAction: (categoryId: string, isLeafNode: boolean) => void; // Changed to categoryId
+  onCategoryAction: (categoryId: string, isLeafNode: boolean) => void;
   onStartRandomQuiz: (count?: number) => void; 
 }
 
-export const ALL_QUESTIONS_RANDOM_KEY = "__ALL_QUESTIONS_RANDOM__"; // This can remain for random quiz logic
+export const ALL_QUESTIONS_RANDOM_KEY = "__ALL_QUESTIONS_RANDOM__"; 
 
 export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: CategorySelectorProps) {
-  const [categoryTree, setCategoryTree] = useState<CategoryType[]>([]); // Use CategoryType[]
+  const [categoryTree, setCategoryTree] = useState<CategoryType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [randomQuizCountInput, setRandomQuizCountInput] = useState<string>(''); 
   const router = useRouter();
@@ -29,7 +29,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
     setIsLoading(true);
     try {
       const allCats = await getAllCategories();
-      const tree = buildCategoryTree(allCats); // buildCategoryTree now takes Category[]
+      const tree = buildCategoryTree(allCats);
       setCategoryTree(tree);
     } catch (error) {
       console.error("Failed to load or build category tree:", error);
@@ -77,10 +77,15 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
           <p className="text-muted-foreground text-sm sm:text-base">
             It looks like there are no questions or categories added yet. Please add some first.
           </p>
-          <Button onClick={() => router.push('/add-question')} className="mt-4 w-full text-sm sm:text-base">
-            Add Questions/Categories
-          </Button>
         </CardContent>
+        <CardFooter className="flex flex-col gap-2">
+          <Button onClick={() => router.push('/add-question')} className="w-full text-sm sm:text-base">
+            <PlusCircle className="mr-2 h-5 w-5" /> Add Questions
+          </Button>
+          <Button onClick={() => router.push('/categories/manage')} className="w-full text-sm sm:text-base" variant="outline">
+            <ListTree className="mr-2 h-5 w-5" /> Manage Categories
+          </Button>
+        </CardFooter>
       </Card>
     );
   }
@@ -110,7 +115,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
               onClick={handleRandomQuizButtonClick}
               variant="default"
               size="lg"
-              className="w-full sm:flex-1 shadow-md hover:scale-105 transition-transform text-sm sm:text-base"
+              className="w-full sm:flex-1 shadow-md hover:scale-105 transition-transform text-sm sm:text-base h-11"
             >
               <Zap className="mr-2 h-5 w-5" />
               Start Random Quiz
@@ -121,17 +126,20 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
         <div className="pt-3 space-y-1">
           {categoryTree.map((node) => (
             <CategoryTreeItem
-              key={node.id} // Use node.id as key
+              key={node.id}
               node={node}
-              onSelectNode={onCategoryAction} // Prop name is fine, implementation changes
+              onSelectNode={onCategoryAction}
               level={0}
             />
           ))}
         </div>
       </CardContent>
-      <CardFooter>
-        <Button onClick={() => router.push('/add-question')} className="w-full text-sm sm:text-base" variant="outline">
-            Add New Questions/Categories
+      <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4">
+        <Button onClick={() => router.push('/add-question')} className="w-full sm:flex-1 text-sm sm:text-base" variant="outline">
+            <PlusCircle className="mr-2 h-5 w-5" /> Add New Questions
+        </Button>
+        <Button onClick={() => router.push('/categories/manage')} className="w-full sm:flex-1 text-sm sm:text-base" variant="outline">
+            <ListTree className="mr-2 h-5 w-5" /> Manage Categories
         </Button>
       </CardFooter>
     </Card>
