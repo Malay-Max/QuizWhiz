@@ -82,8 +82,8 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
           <Button onClick={() => router.push('/add-question')} className="w-full text-sm sm:text-base">
             <PlusCircle className="mr-2 h-5 w-5" /> Add Questions
           </Button>
-          <Button onClick={() => router.push('/categories/manage')} className="w-full text-sm sm:text-base" variant="outline">
-            <ListTree className="mr-2 h-5 w-5" /> Manage Categories
+          <Button onClick={() => router.push('/categories/add')} className="w-full text-sm sm:text-base" variant="outline">
+            <ListTree className="mr-2 h-5 w-5" /> Add/Seed Categories
           </Button>
         </CardFooter>
       </Card>
@@ -138,10 +138,12 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
         <Button onClick={() => router.push('/add-question')} className="w-full sm:flex-1 text-sm sm:text-base" variant="outline">
             <PlusCircle className="mr-2 h-5 w-5" /> Add New Questions
         </Button>
-        <Button onClick={() => router.push('/categories/manage')} className="w-full sm:flex-1 text-sm sm:text-base" variant="outline">
-            <ListTree className="mr-2 h-5 w-5" /> Manage Categories
+        <Button onClick={() => router.push('/categories/add')} className="w-full sm:flex-1 text-sm sm:text-base" variant="outline">
+            <ListTree className="mr-2 h-5 w-5" /> Add/Seed Categories
         </Button>
       </CardFooter>
     </Card>
   );
 }
+
+    
