@@ -253,11 +253,11 @@ export default function ManageCategoryPage() {
               )}
 
               {questions.length > 0 ? (
-                <div className="flex flex-col flex-grow min-h-0">
+                <div className="flex flex-col">
                   <h3 className="text-lg sm:text-xl font-semibold mb-3 text-foreground shrink-0">
                     Questions in "{currentCategory?.name || 'Current Category'}" (and its sub-categories)
                   </h3>
-                  <ScrollArea className="flex-grow pr-2 sm:pr-4">
+                  <ScrollArea className="h-[50vh] pr-2 sm:pr-4">
                     <div className="space-y-3 sm:space-y-4">
                       {questions.map((q, index) => (
                         <Card key={q.id} className="p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow">
