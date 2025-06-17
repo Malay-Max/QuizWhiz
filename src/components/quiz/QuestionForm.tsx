@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText, Copy, ListTree, Database } from 'lucide-react';
+import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText, Copy, ListTree, Database, Download } from 'lucide-react';
 import { 
   addQuestion, 
   getQuestionById, 
@@ -20,9 +20,10 @@ import {
   getFullCategoryPath,
   addCategory,
   seedSampleData,
-  Category as CategoryType, // Renamed to avoid conflict
-  Question as QuestionType, // Renamed
-  AnswerOption as QuestionAnswerOptionType 
+  Category as CategoryType,
+  Question as QuestionType,
+  AnswerOption as QuestionAnswerOptionType,
+  getQuestionsByCategoryIdAndDescendants // Added for export
 } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateDistractorsAction } from '@/app/actions';
@@ -41,7 +42,7 @@ const questionFormSchema = z.object({
   text: z.string().min(5, 'Question text must be at least 5 characters'),
   options: z.array(answerOptionSchema).min(2, 'At least 2 answer options are required').max(6, 'Maximum 6 answer options allowed'),
   correctAnswerId: z.string().min(1,'Please select a correct answer'),
-  categoryId: z.string().min(1, 'Category is required.'), // Changed from category path to categoryId
+  categoryId: z.string().min(1, 'Category is required.'),
 });
 
 type QuestionFormData = z.infer<typeof questionFormSchema>;
@@ -98,8 +99,10 @@ const optionMarkdownComponents = {
 
 interface CategoryOption {
   id: string;
-  name: string; // Full resolved path for display
+  name: string; 
 }
+
+const ROOT_CATEGORY_PLACEHOLDER_VALUE = "--root--";
 
 export function QuestionForm() {
   const { toast } = useToast();
@@ -148,7 +151,7 @@ export function QuestionForm() {
     setAllCategories(cats);
     const options = cats.map(cat => ({
       id: cat.id,
-      name: getFullCategoryPath(cat.id, cats) || cat.name, // Fallback to name if path is empty
+      name: getFullCategoryPath(cat.id, cats) || cat.name, 
     })).sort((a,b) => a.name.localeCompare(b.name));
     setCategoryOptionsForSelect(options);
   }, []);
@@ -167,9 +170,11 @@ export function QuestionForm() {
     } else {
       setFilteredExportCategorySuggestions([]);
     }
-    setCategoryForExport(null); 
+    if (categoryForExport && categoryForExport.name !== exportCategorySearchTerm) {
+        setCategoryForExport(null); 
+    }
     setExportedQuestionsText(''); 
-  }, [exportCategorySearchTerm, categoryOptionsForSelect]);
+  }, [exportCategorySearchTerm, categoryOptionsForSelect, categoryForExport]);
 
   useEffect(() => {
     const editId = searchParams.get('editId');
@@ -195,7 +200,7 @@ export function QuestionForm() {
     if (editId) {
         loadQuestionForEditing(editId);
     } else {
-        if (editingQuestionId) { // Clear form if was editing and now adding new
+        if (editingQuestionId) { 
              form.reset({
                 text: '',
                 options: defaultAnswerOptions.map(opt => ({...opt})),
@@ -240,7 +245,7 @@ export function QuestionForm() {
 
   const handleExportCategorySuggestionClick = (categoryOpt: CategoryOption) => {
     setCategoryForExport(categoryOpt);
-    setExportCategorySearchTerm(categoryOpt.name); // Display full path in search
+    setExportCategorySearchTerm(categoryOpt.name); 
     setFilteredExportCategorySuggestions([]);
   };
 
@@ -331,7 +336,7 @@ export function QuestionForm() {
   const onSubmit = async (data: QuestionFormData) => {
     let result;
     if (editingQuestionId) {
-        const updatedQuestionData: QuestionType = { // Use renamed QuestionType
+        const updatedQuestionData: QuestionType = { 
             id: editingQuestionId,
             text: data.text,
             options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
@@ -356,7 +361,7 @@ export function QuestionForm() {
             });
         }
     } else {
-        const newQuestionData: Omit<QuestionType, 'id'> = { // Use renamed QuestionType
+        const newQuestionData: Omit<QuestionType, 'id'> = { 
             text: data.text,
             options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
             correctAnswerId: data.correctAnswerId,
@@ -374,7 +379,7 @@ export function QuestionForm() {
                 text: '',
                 options: defaultAnswerOptions.map(opt => ({...opt})),
                 correctAnswerId: '',
-                categoryId: data.categoryId // Keep category for next question
+                categoryId: data.categoryId 
             });
         } else {
             toast({
@@ -421,7 +426,7 @@ export function QuestionForm() {
         const correctMatch = line.match(/\[(.*?)\]/);
 
         if (!questionMatch || !optionsMatch || !correctMatch) {
-          console.warn(`Skipping malformed line: ${line}`);
+          console.warn(\`Skipping malformed line: \${line}\`);
           questionsFailedCount++;
           continue;
         }
@@ -431,7 +436,7 @@ export function QuestionForm() {
         const correctAnswerText = correctMatch[1].trim();
 
         if (!questionText || optionTexts.length < 2 || !correctAnswerText) {
-          console.warn(`Skipping invalid data in line: ${line}`);
+          console.warn(\`Skipping invalid data in line: \${line}\`);
           questionsFailedCount++;
           continue;
         }
@@ -443,7 +448,7 @@ export function QuestionForm() {
 
         const correctOption = answerOptions.find(opt => opt.text === correctAnswerText);
         if (!correctOption) {
-          console.warn(`Correct answer text "${correctAnswerText}" not found in options for line: ${line}`);
+          console.warn(\`Correct answer text "\${correctAnswerText}" not found in options for line: \${line}\`);
           questionsFailedCount++;
           continue;
         }
@@ -452,7 +457,7 @@ export function QuestionForm() {
           text: questionText,
           options: answerOptions,
           correctAnswerId: correctOption.id,
-          categoryId: currentCategoryId, // Use selected categoryId
+          categoryId: currentCategoryId, 
         };
 
         const result = await addQuestion(newQuestionData);
@@ -460,13 +465,13 @@ export function QuestionForm() {
             questionsAddedCount++;
         } else {
             questionsFailedCount++;
-            console.error(`Failed to add question from line: ${line}. Error: ${result.error}`);
+            console.error(\`Failed to add question from line: \${line}. Error: \${result.error}\`);
             if (result.error?.toLowerCase().includes('permission denied') || result.error?.toLowerCase().includes('insufficient permissions')) {
                 permissionErrorOccurred = true;
             }
         }
       } catch (e) { 
-        console.error(`Error processing line: ${line}`, e);
+        console.error(\`Error processing line: \${line}\`, e);
         questionsFailedCount++;
       }
     }
@@ -475,9 +480,9 @@ export function QuestionForm() {
     let finalToastTitle = 'Batch Processing Complete';
     let finalToastVariant: "default" | "destructive" = 'default';
     let finalToastClassName = 'bg-accent text-accent-foreground';
-    let finalToastDescription = `${questionsAddedCount} questions added.`;
+    let finalToastDescription = \`\${questionsAddedCount} questions added.\`;
     if (questionsFailedCount > 0) {
-        finalToastDescription += ` ${questionsFailedCount} failed.`;
+        finalToastDescription += \` \${questionsFailedCount} failed.\`;
         finalToastVariant = 'destructive';
         finalToastClassName = ''; 
     }
@@ -514,17 +519,17 @@ export function QuestionForm() {
 
   const handleExportQuestions = async () => {
     if (!categoryForExport) {
-      toast({ title: "No Category Selected", description: "Please select a category to export.", variant: "destructive" });
+      toast({ title: "No Category Selected", description: "Please select a category using the search box above to display its questions.", variant: "destructive" });
       return;
     }
     setIsExporting(true);
     setExportedQuestionsText(''); 
     try {
-      const allQuestionsFromDB = await getAllCategories().then(cats => getQuestionById(categoryForExport.id).then(() => getQuestions())); // A bit verbose, ensure correct function
-      const questionsToExport = allQuestionsFromDB.filter(q => q.categoryId === categoryForExport.id);
+      // Use getQuestionsByCategoryIdAndDescendants to fetch questions for the selected category and its children
+      const questionsToExport = await getQuestionsByCategoryIdAndDescendants(categoryForExport.id, allCategories);
   
       if (questionsToExport.length === 0) {
-        toast({ title: "No Questions", description: `No questions found in category "${categoryForExport.name}" to export.`, variant: "default" });
+        toast({ title: "No Questions", description: \`No questions found in category "\${categoryForExport.name}" or its sub-categories to display.\`, variant: "default" });
         setIsExporting(false);
         return;
       }
@@ -533,15 +538,15 @@ export function QuestionForm() {
         const optionTexts = q.options.map(opt => opt.text).join(' - ');
         const correctAnswerOption = q.options.find(opt => opt.id === q.correctAnswerId);
         const correctAnswerText = correctAnswerOption ? correctAnswerOption.text : "ERROR_CORRECT_ANSWER_NOT_FOUND";
-        return `;;${q.text};; {${optionTexts}} [${correctAnswerText}]`;
+        return \`;;\${q.text};; {\${optionTexts}} [\${correctAnswerText}]\`;
       }).join('\n');
       
       setExportedQuestionsText(formattedQuestions);
-      toast({ title: "Export Ready", description: `${questionsToExport.length} questions from "${categoryForExport.name}" are displayed below for copying.`, className: 'bg-accent text-accent-foreground' });
+      toast({ title: "Display Ready", description: \`\${questionsToExport.length} questions from "\${categoryForExport.name}" and its sub-categories are displayed below for copying.\`, className: 'bg-accent text-accent-foreground' });
   
     } catch (error) {
-      console.error("Error preparing questions for export:", error);
-      toast({ title: "Export Failed", description: "An error occurred while preparing questions for export.", variant: "destructive" });
+      console.error("Error preparing questions for display:", error);
+      toast({ title: "Display Failed", description: "An error occurred while preparing questions for display.", variant: "destructive" });
     } finally {
       setIsExporting(false);
     }
@@ -567,11 +572,11 @@ export function QuestionForm() {
     const result = await addCategory(newCategoryName, newCategoryParentId);
     setIsAddingCategory(false);
     if (result.success && result.id) {
-      toast({ title: "Category Added", description: `Category "${newCategoryName}" created.`, className: "bg-accent text-accent-foreground" });
+      toast({ title: "Category Added", description: \`Category "\${newCategoryName}" created.\`, className: "bg-accent text-accent-foreground" });
       setNewCategoryName('');
       setNewCategoryParentId(null);
-      await refreshAllCategories(); // Refresh categories to include the new one in dropdowns
-      form.setValue('categoryId', result.id); // Optionally auto-select the new category
+      await refreshAllCategories(); 
+      form.setValue('categoryId', result.id); 
     } else {
       toast({ title: "Failed to Add Category", description: result.error || "Could not create category.", variant: "destructive" });
     }
@@ -601,7 +606,7 @@ export function QuestionForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {/* Section to add new category */}
+        
         <div className="mb-8 p-4 border rounded-lg shadow-sm">
             <h3 className="text-lg sm:text-xl font-semibold mb-3 flex items-center"><ListTree className="mr-2 h-5 w-5 text-primary" />Manage Categories</h3>
             <div className="space-y-3">
@@ -618,14 +623,14 @@ export function QuestionForm() {
                 <div>
                     <Label htmlFor="new-category-parent">Parent Category (Optional)</Label>
                     <Select 
-                        value={newCategoryParentId || ""} 
-                        onValueChange={(value) => setNewCategoryParentId(value || null)}
+                        value={newCategoryParentId === null ? ROOT_CATEGORY_PLACEHOLDER_VALUE : newCategoryParentId} 
+                        onValueChange={(value) => setNewCategoryParentId(value === ROOT_CATEGORY_PLACEHOLDER_VALUE ? null : value)}
                     >
                         <SelectTrigger className="w-full mt-1 text-sm md:text-base">
                             <SelectValue placeholder="Select parent (optional, for root leave empty)" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">-- No Parent (Root Category) --</SelectItem>
+                            <SelectItem value={ROOT_CATEGORY_PLACEHOLDER_VALUE}>-- No Parent (Root Category) --</SelectItem>
                             {categoryOptionsForSelect.map(catOpt => (
                                 <SelectItem key={catOpt.id} value={catOpt.id}>{catOpt.name}</SelectItem>
                             ))}
@@ -661,14 +666,14 @@ export function QuestionForm() {
             {fields.map((field, index) => (
               <div key={field.id} className="flex items-center gap-2">
                 <Input
-                  {...form.register(`options.${index}.text`)}
-                  placeholder={`Option ${index + 1}`}
+                  {...form.register(\`options.\${index}.text\`)}
+                  placeholder={\`Option \${index + 1}\`}
                   className="flex-grow text-sm md:text-base"
-                  aria-label={`Answer option ${index + 1}`}
+                  aria-label={\`Answer option \${index + 1}\`}
                   aria-invalid={form.formState.errors.options?.[index]?.text ? "true" : "false"}
                 />
                 {fields.length > 2 && (
-                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveOption(index)} aria-label={`Remove option ${index + 1}`}>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveOption(index)} aria-label={\`Remove option \${index + 1}\`}>
                     <Trash2 className="h-5 w-5 text-destructive" />
                   </Button>
                 )}
@@ -709,12 +714,12 @@ export function QuestionForm() {
                 >
                   {form.getValues('options').map((option, index) => (
                     option.text.trim() && ( 
-                    <div key={`${option.id}-radio-item`} className="flex items-start space-x-2 p-2 border rounded-md hover:bg-secondary/50 transition-colors">
-                      <RadioGroupItem value={option.id} id={`${option.id}-radio`} className="mt-1 flex-shrink-0" />
-                      <Label htmlFor={`${option.id}-radio`} className="flex-grow cursor-pointer font-normal">
+                    <div key={\`\${option.id}-radio-item\`} className="flex items-start space-x-2 p-2 border rounded-md hover:bg-secondary/50 transition-colors">
+                      <RadioGroupItem value={option.id} id={\`\${option.id}-radio\`} className="mt-1 flex-shrink-0" />
+                      <Label htmlFor={\`\${option.id}-radio\`} className="flex-grow cursor-pointer font-normal">
                         <div className="prose prose-base sm:prose-lg dark:prose-invert max-w-none text-inherit">
                             <ReactMarkdown components={optionMarkdownComponents}>
-                                {option.text || `Option ${index + 1}`}
+                                {option.text || \`Option \${index + 1}\`}
                             </ReactMarkdown>
                         </div>
                       </Label>
@@ -742,7 +747,7 @@ export function QuestionForm() {
                             <SelectValue placeholder={categoryOptionsForSelect.length === 0 ? "No categories available - Add one first" : "Select a category"} />
                         </SelectTrigger>
                         <SelectContent>
-                            {categoryOptionsForSelect.length === 0 ? (
+                            {categoryOptionsForSelect.length === 0 && !editingQuestionId ? ( // Also consider editing case here
                                  <SelectItem value="--no-categories--" disabled>No categories available</SelectItem>
                             ) : (
                                 categoryOptionsForSelect.map(catOpt => (
@@ -800,15 +805,15 @@ export function QuestionForm() {
 
         <div className="mt-10 pt-6 border-t">
           <div className="flex items-center mb-3">
-            <FileText className="h-6 w-6 mr-2 text-primary" />
-            <h3 className="text-lg sm:text-xl font-semibold">Export Questions</h3>
+            <Folder className="h-6 w-6 mr-2 text-primary" />
+            <h3 className="text-lg sm:text-xl font-semibold">Display Questions for Category</h3>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-            Type to search for a category and then click "Display Questions" to see its questions in the batch import format for easy copying.
+            Type to search for a category, select it, then click "Display Questions" to see its questions (and sub-category questions) in the batch import format for easy copying.
           </p>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="export-category-input" className="text-base sm:text-lg">Search and Select Category to Export</Label>
+              <Label htmlFor="export-category-input" className="text-base sm:text-lg">Search and Select Category</Label>
               <Input
                 id="export-category-input"
                 value={exportCategorySearchTerm}
@@ -819,17 +824,17 @@ export function QuestionForm() {
               />
               {filteredExportCategorySuggestions.length > 0 && (
                 <div className="mt-2 border rounded-md bg-background shadow-md p-2">
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-1">Suggestions (click to select for export):</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-1">Suggestions (click to select):</p>
                   <div className="flex flex-wrap gap-1">
                     {filteredExportCategorySuggestions.map(catOpt => (
                       <Button
-                        key={`export-sugg-${catOpt.id}`}
+                        key={\`export-sugg-\${catOpt.id}\`}
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={() => handleExportCategorySuggestionClick(catOpt)}
                         className="text-xs px-2 py-1 h-auto whitespace-normal"
-                        title={`Select category for export: ${catOpt.name}`}
+                        title={\`Select category: \${catOpt.name}\`}
                       >
                         <Folder className="mr-1.5 h-3 w-3 shrink-0" />
                         <span className="min-w-0 break-all">{catOpt.name}</span>
@@ -845,7 +850,7 @@ export function QuestionForm() {
               disabled={isExporting || !categoryForExport}
             >
               {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-              Display Questions for Category
+              Display Questions
             </Button>
 
             {exportedQuestionsText && (
@@ -876,3 +881,4 @@ export function QuestionForm() {
     </Card>
   );
 }
+
