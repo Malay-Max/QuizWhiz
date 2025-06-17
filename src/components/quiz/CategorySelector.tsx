@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from '@/hooks/use-toast';
 
 interface CategorySelectorProps {
-  onCategoryAction: (categoryId: string, isLeafNode: boolean) => void;
+  onCategoryAction: (categoryId: string) => void;
   onStartRandomQuiz: (count?: number) => void;
 }
 
@@ -40,11 +40,10 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
     setIsLoading(true);
     try {
       const allCats = await getAllCategories();
-      setAllStoredCategories(allCats); // Store flat list for parent selector
+      setAllStoredCategories(allCats); 
       const tree = buildCategoryTree(allCats);
       setCategoryTree(tree);
 
-      // Prepare options for the parent category select dropdown
       const options = allCats.map(cat => ({
         id: cat.id,
         name: getFullCategoryPath(cat.id, allCats) || cat.name,
@@ -114,7 +113,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
       <CardHeader>
         <CardTitle className="font-headline text-2xl sm:text-3xl">Select a Quiz or Manage Category</CardTitle>
         <CardDescription className="text-sm sm:text-base">
-          Choose a category to start a quiz, manage its questions, or add new categories below.
+          Choose a category to manage its questions, or add new categories below.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -154,7 +153,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
               <CategoryTreeItem
                 key={node.id}
                 node={node}
-                onSelectNode={onCategoryAction}
+                onSelectNode={onCategoryAction} 
                 level={0}
               />
             ))}
@@ -198,7 +197,6 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
             </Button>
           </div>
         )}
-
 
         {(noCategoriesExist && !showAddCategoryForm) && (
            <Card className="w-full max-w-md mx-auto shadow-lg my-6">

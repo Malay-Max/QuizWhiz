@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 
 interface CategoryTreeItemProps {
   node: CategoryType; 
-  onSelectNode: (categoryId: string, isLeaf: boolean) => void; 
+  onSelectNode: (categoryId: string) => void; 
   level: number;
 }
 
@@ -17,7 +17,6 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
   const [isOpen, setIsOpen] = useState(false); 
 
   const hasChildren = node.children && node.children.length > 0;
-  const isLeafNode = !hasChildren;
 
   const handleToggleOpen = (e: React.MouseEvent) => {
     e.stopPropagation(); 
@@ -27,9 +26,7 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
   };
   
   const handleSelect = () => {
-    // If it's a leaf node (has no children), route to manage page
-    // Otherwise, start the quiz with this category and its descendants
-    onSelectNode(node.id, isLeafNode);
+    onSelectNode(node.id);
   };
 
   return (
@@ -55,10 +52,8 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
           size="sm"
           className={cn(
             "w-full justify-start text-left h-auto py-2 px-3 shadow-sm hover:bg-primary/10 hover:text-primary transition-all whitespace-normal flex items-center min-w-0",
-            // Add more padding to the right if it's a leaf node to make space for the "Manage" button/indicator
-            // isLeafNode && "pr-10" 
           )}
-          title={node.fullPath || node.name} // Use full path for tooltip if available
+          title={node.fullPath || node.name} 
         >
           <Folder className="mr-2 h-4 w-4 text-primary/80 flex-shrink-0" />
           <span className="min-w-0 break-words">{node.name}</span>
@@ -79,4 +74,3 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
     </div>
   );
 }
-

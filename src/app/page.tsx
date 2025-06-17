@@ -3,15 +3,15 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { Question, QuizSession, Category as CategoryType } from '@/types'; // Import new Category type
+import type { Question, QuizSession, Category as CategoryType } from '@/types'; 
 import { 
-  getQuestionsByCategoryIdAndDescendants, // New function
+  getQuestionsByCategoryIdAndDescendants, 
   saveQuizSession, 
   getQuizSession, 
   clearQuizSession, 
   deleteQuestionById, 
-  deleteQuestionsByCategoryId, // New function name
-  getAllCategories, // To resolve category names
+  deleteQuestionsByCategoryId, 
+  getAllCategories, 
   getFullCategoryPath
 } from '@/lib/storage';
 import { CategorySelector, ALL_QUESTIONS_RANDOM_KEY } from '@/components/quiz/CategorySelector';
@@ -53,14 +53,10 @@ function QuizPageContent() {
   const startQuiz = useCallback(async (selectedIdOrKey: string, limit?: number) => {
     setIsLoading(true);
     let questionsForSession: Question[] = [];
-    let finalQuizCategoryName = "Quiz"; // Default
+    let finalQuizCategoryName = "Quiz"; 
     let finalQuizCategoryId = selectedIdOrKey;
 
     if (selectedIdOrKey === ALL_QUESTIONS_RANDOM_KEY) {
-      // This branch logic for random quiz from all questions might need adjustment
-      // if getQuestions() is no longer the primary way to get *all* questions for random selection.
-      // For now, let's assume a similar pattern or that you'd fetch all questions by iterating categories.
-      // Simplified: Get all questions. A more performant way would be needed for very large datasets.
       const allQuestionsFromAllCats: Question[] = [];
       const topLevelCats = allCategories.filter(c => !c.parentId);
       for (const cat of topLevelCats) {
@@ -68,7 +64,7 @@ function QuizPageContent() {
           allQuestionsFromAllCats.push(...qs);
       }
       questionsForSession = allQuestionsFromAllCats;
-      finalQuizCategoryId = ALL_QUESTIONS_RANDOM_KEY; // Keep the key for identification
+      finalQuizCategoryId = ALL_QUESTIONS_RANDOM_KEY; 
       
       if (questionsForSession.length > 0) {
         if (limit && limit > 0 && limit < questionsForSession.length) {
@@ -81,7 +77,7 @@ function QuizPageContent() {
           finalQuizCategoryName = "Random Quiz (No Questions Available)";
       }
 
-    } else { // Specific category ID selected
+    } else { 
       questionsForSession = await getQuestionsByCategoryIdAndDescendants(selectedIdOrKey, allCategories);
       const selectedCategory = allCategories.find(c => c.id === selectedIdOrKey);
       finalQuizCategoryName = selectedCategory ? getFullCategoryPath(selectedCategory.id, allCategories) : "Selected Category";
@@ -98,7 +94,7 @@ function QuizPageContent() {
       return;
     }
 
-    const shuffleArray = (array: any[]) => { /* ... (shuffle logic remains same) ... */ 
+    const shuffleArray = (array: any[]) => { 
       const newArray = [...array];
       for (let i = newArray.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -119,8 +115,8 @@ function QuizPageContent() {
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
-      categoryId: finalQuizCategoryId, // Store categoryId
-      categoryName: finalQuizCategoryName, // Store resolved name
+      categoryId: finalQuizCategoryId, 
+      categoryName: finalQuizCategoryName, 
       questions: questionsWithShuffledOptions,
       currentQuestionIndex: 0,
       answers: [],
@@ -143,7 +139,7 @@ function QuizPageContent() {
   }, [allCategories, toast]); 
 
   const loadActiveSessionOrFromParams = useCallback(async () => {
-    const categoryIdFromParams = searchParams.get('categoryId'); // Changed from 'category'
+    const categoryIdFromParams = searchParams.get('categoryId'); 
     const limitFromParams = searchParams.get('limit');
 
     if (categoryIdFromParams) {
@@ -164,10 +160,10 @@ function QuizPageContent() {
     }
     setIsLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, router, startQuiz, allCategories]); // Added allCategories
+  }, [searchParams, router, startQuiz, allCategories]); 
 
   useEffect(() => {
-    if (allCategories.length > 0) { // Ensure categories are loaded before trying to load session or start quiz
+    if (allCategories.length > 0) { 
         loadActiveSessionOrFromParams();
     }
   }, [allCategories, loadActiveSessionOrFromParams]);
@@ -178,15 +174,8 @@ function QuizPageContent() {
     }
   }, [quizSession, router]);
 
-
-  const handleCategoryAction = async (categoryId: string, isLeafNode: boolean) => {
-    if (isLeafNode) {
-      // Route to manage page using categoryId
-      router.push(`/quiz/manage/${categoryId}`); 
-    } else {
-      // Start quiz for this category and its descendants
-      await startQuiz(categoryId);
-    }
+  const handleCategoryAction = (categoryId: string) => {
+    router.push(`/quiz/manage/${categoryId}`);
   };
 
   const handleStartRandomQuiz = async (limit?: number) => {
@@ -282,7 +271,7 @@ function QuizPageContent() {
     setQuizSession(null);
     setIsLoading(true); 
     setTimeout(() => {
-        if (allCategories.length > 0) loadActiveSessionOrFromParams(); // Ensure categories are loaded
+        if (allCategories.length > 0) loadActiveSessionOrFromParams(); 
     }, 50);
   };
 
@@ -369,7 +358,7 @@ function QuizPageContent() {
     }
 
     const categoryIdToDelete = quizSession.categoryId;
-    const deleteResult = await deleteQuestionsByCategoryId(categoryIdToDelete, allCategories); // Use new function
+    const deleteResult = await deleteQuestionsByCategoryId(categoryIdToDelete, allCategories); 
     setShowDeleteCategoryConfirmDialog(false);
 
     if (!deleteResult.success) {
@@ -395,7 +384,7 @@ function QuizPageContent() {
     }, 50);
   };
 
-  if (isLoading || allCategories.length === 0 && !quizSession) { // Adjust loading condition
+  if (isLoading || allCategories.length === 0 && !quizSession) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

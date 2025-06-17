@@ -179,12 +179,8 @@ function QuizPlayPageContent() {
   }, [quizSession, router]);
 
 
-  const handleCategoryAction = async (categoryId: string, isLeafNode: boolean) => {
-    if (isLeafNode) {
-      router.push(`/quiz/manage/${categoryId}`);
-    } else {
-      await startQuiz(categoryId);
-    }
+  const handleCategoryAction = (categoryId: string) => {
+    router.push(`/quiz/manage/${categoryId}`);
   };
 
   const handleStartRandomQuiz = async (limit?: number) => {
