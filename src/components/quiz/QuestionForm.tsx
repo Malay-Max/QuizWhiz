@@ -23,7 +23,7 @@ import {
   Category as CategoryType,
   Question as QuestionType,
   AnswerOption as QuestionAnswerOptionType,
-  getQuestionsByCategoryIdAndDescendants // Added for export
+  getQuestionsByCategoryIdAndDescendants
 } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateDistractorsAction } from '@/app/actions';
@@ -426,7 +426,7 @@ export function QuestionForm() {
         const correctMatch = line.match(/\[(.*?)\]/);
 
         if (!questionMatch || !optionsMatch || !correctMatch) {
-          console.warn(\`Skipping malformed line: \${line}\`);
+          console.warn(`Skipping malformed line: ${line}`);
           questionsFailedCount++;
           continue;
         }
@@ -436,7 +436,7 @@ export function QuestionForm() {
         const correctAnswerText = correctMatch[1].trim();
 
         if (!questionText || optionTexts.length < 2 || !correctAnswerText) {
-          console.warn(\`Skipping invalid data in line: \${line}\`);
+          console.warn(`Skipping invalid data in line: ${line}`);
           questionsFailedCount++;
           continue;
         }
@@ -448,7 +448,7 @@ export function QuestionForm() {
 
         const correctOption = answerOptions.find(opt => opt.text === correctAnswerText);
         if (!correctOption) {
-          console.warn(\`Correct answer text "\${correctAnswerText}" not found in options for line: \${line}\`);
+          console.warn(`Correct answer text "${correctAnswerText}" not found in options for line: ${line}`);
           questionsFailedCount++;
           continue;
         }
@@ -465,13 +465,13 @@ export function QuestionForm() {
             questionsAddedCount++;
         } else {
             questionsFailedCount++;
-            console.error(\`Failed to add question from line: \${line}. Error: \${result.error}\`);
+            console.error(`Failed to add question from line: ${line}. Error: ${result.error}`);
             if (result.error?.toLowerCase().includes('permission denied') || result.error?.toLowerCase().includes('insufficient permissions')) {
                 permissionErrorOccurred = true;
             }
         }
       } catch (e) { 
-        console.error(\`Error processing line: \${line}\`, e);
+        console.error(`Error processing line: ${line}`, e);
         questionsFailedCount++;
       }
     }
@@ -480,9 +480,9 @@ export function QuestionForm() {
     let finalToastTitle = 'Batch Processing Complete';
     let finalToastVariant: "default" | "destructive" = 'default';
     let finalToastClassName = 'bg-accent text-accent-foreground';
-    let finalToastDescription = \`\${questionsAddedCount} questions added.\`;
+    let finalToastDescription = `${questionsAddedCount} questions added.`;
     if (questionsFailedCount > 0) {
-        finalToastDescription += \` \${questionsFailedCount} failed.\`;
+        finalToastDescription += ` ${questionsFailedCount} failed.`;
         finalToastVariant = 'destructive';
         finalToastClassName = ''; 
     }
@@ -525,11 +525,10 @@ export function QuestionForm() {
     setIsExporting(true);
     setExportedQuestionsText(''); 
     try {
-      // Use getQuestionsByCategoryIdAndDescendants to fetch questions for the selected category and its children
       const questionsToExport = await getQuestionsByCategoryIdAndDescendants(categoryForExport.id, allCategories);
   
       if (questionsToExport.length === 0) {
-        toast({ title: "No Questions", description: \`No questions found in category "\${categoryForExport.name}" or its sub-categories to display.\`, variant: "default" });
+        toast({ title: "No Questions", description: `No questions found in category "${categoryForExport.name}" or its sub-categories to display.`, variant: "default" });
         setIsExporting(false);
         return;
       }
@@ -538,11 +537,11 @@ export function QuestionForm() {
         const optionTexts = q.options.map(opt => opt.text).join(' - ');
         const correctAnswerOption = q.options.find(opt => opt.id === q.correctAnswerId);
         const correctAnswerText = correctAnswerOption ? correctAnswerOption.text : "ERROR_CORRECT_ANSWER_NOT_FOUND";
-        return \`;;\${q.text};; {\${optionTexts}} [\${correctAnswerText}]\`;
+        return `;;${q.text};; {${optionTexts}} [${correctAnswerText}]`;
       }).join('\n');
       
       setExportedQuestionsText(formattedQuestions);
-      toast({ title: "Display Ready", description: \`\${questionsToExport.length} questions from "\${categoryForExport.name}" and its sub-categories are displayed below for copying.\`, className: 'bg-accent text-accent-foreground' });
+      toast({ title: "Display Ready", description: `${questionsToExport.length} questions from "${categoryForExport.name}" and its sub-categories are displayed below for copying.`, className: 'bg-accent text-accent-foreground' });
   
     } catch (error) {
       console.error("Error preparing questions for display:", error);
@@ -572,7 +571,7 @@ export function QuestionForm() {
     const result = await addCategory(newCategoryName, newCategoryParentId);
     setIsAddingCategory(false);
     if (result.success && result.id) {
-      toast({ title: "Category Added", description: \`Category "\${newCategoryName}" created.\`, className: "bg-accent text-accent-foreground" });
+      toast({ title: "Category Added", description: `Category "${newCategoryName}" created.`, className: "bg-accent text-accent-foreground" });
       setNewCategoryName('');
       setNewCategoryParentId(null);
       await refreshAllCategories(); 
@@ -666,14 +665,14 @@ export function QuestionForm() {
             {fields.map((field, index) => (
               <div key={field.id} className="flex items-center gap-2">
                 <Input
-                  {...form.register(\`options.\${index}.text\`)}
-                  placeholder={\`Option \${index + 1}\`}
+                  {...form.register(`options.${index}.text`)}
+                  placeholder={`Option ${index + 1}`}
                   className="flex-grow text-sm md:text-base"
-                  aria-label={\`Answer option \${index + 1}\`}
+                  aria-label={`Answer option ${index + 1}`}
                   aria-invalid={form.formState.errors.options?.[index]?.text ? "true" : "false"}
                 />
                 {fields.length > 2 && (
-                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveOption(index)} aria-label={\`Remove option \${index + 1}\`}>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveOption(index)} aria-label={`Remove option ${index + 1}`}>
                     <Trash2 className="h-5 w-5 text-destructive" />
                   </Button>
                 )}
@@ -714,12 +713,12 @@ export function QuestionForm() {
                 >
                   {form.getValues('options').map((option, index) => (
                     option.text.trim() && ( 
-                    <div key={\`\${option.id}-radio-item\`} className="flex items-start space-x-2 p-2 border rounded-md hover:bg-secondary/50 transition-colors">
-                      <RadioGroupItem value={option.id} id={\`\${option.id}-radio\`} className="mt-1 flex-shrink-0" />
-                      <Label htmlFor={\`\${option.id}-radio\`} className="flex-grow cursor-pointer font-normal">
+                    <div key={`${option.id}-radio-item`} className="flex items-start space-x-2 p-2 border rounded-md hover:bg-secondary/50 transition-colors">
+                      <RadioGroupItem value={option.id} id={`${option.id}-radio`} className="mt-1 flex-shrink-0" />
+                      <Label htmlFor={`${option.id}-radio`} className="flex-grow cursor-pointer font-normal">
                         <div className="prose prose-base sm:prose-lg dark:prose-invert max-w-none text-inherit">
                             <ReactMarkdown components={optionMarkdownComponents}>
-                                {option.text || \`Option \${index + 1}\`}
+                                {option.text || `Option ${index + 1}`}
                             </ReactMarkdown>
                         </div>
                       </Label>
@@ -747,7 +746,7 @@ export function QuestionForm() {
                             <SelectValue placeholder={categoryOptionsForSelect.length === 0 ? "No categories available - Add one first" : "Select a category"} />
                         </SelectTrigger>
                         <SelectContent>
-                            {categoryOptionsForSelect.length === 0 && !editingQuestionId ? ( // Also consider editing case here
+                            {categoryOptionsForSelect.length === 0 && !editingQuestionId ? (
                                  <SelectItem value="--no-categories--" disabled>No categories available</SelectItem>
                             ) : (
                                 categoryOptionsForSelect.map(catOpt => (
@@ -828,13 +827,13 @@ export function QuestionForm() {
                   <div className="flex flex-wrap gap-1">
                     {filteredExportCategorySuggestions.map(catOpt => (
                       <Button
-                        key={\`export-sugg-\${catOpt.id}\`}
+                        key={`export-sugg-${catOpt.id}`}
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={() => handleExportCategorySuggestionClick(catOpt)}
                         className="text-xs px-2 py-1 h-auto whitespace-normal"
-                        title={\`Select category: \${catOpt.name}\`}
+                        title={`Select category: ${catOpt.name}`}
                       >
                         <Folder className="mr-1.5 h-3 w-3 shrink-0" />
                         <span className="min-w-0 break-all">{catOpt.name}</span>
@@ -881,4 +880,3 @@ export function QuestionForm() {
     </Card>
   );
 }
-
