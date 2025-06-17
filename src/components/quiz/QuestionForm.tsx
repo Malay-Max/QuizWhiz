@@ -726,7 +726,7 @@ export function QuestionForm() {
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="" disabled>No categories available</SelectItem>
+                    <SelectItem value="--no-categories--" disabled>No categories available</SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -734,7 +734,7 @@ export function QuestionForm() {
             <Button
               onClick={handleExportQuestions}
               className="w-full sm:w-auto text-sm sm:text-base"
-              disabled={isExporting || !selectedExportCategory}
+              disabled={isExporting || !selectedExportCategory || selectedExportCategory === "--no-categories--"}
             >
               {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Export Selected Category
@@ -745,5 +745,7 @@ export function QuestionForm() {
     </Card>
   );
 }
+
+    
 
     
