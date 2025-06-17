@@ -89,10 +89,10 @@ export default function ManageCategoryPage() {
     const result = await updateCategoryName(currentCategory.id, categoryName.trim());
     if (result.success) {
       toast({ title: "Category Updated", description: "Category name saved successfully.", className: "bg-accent text-accent-foreground" });
-      await loadCategoryAndQuestions();
+      await loadCategoryAndQuestions(); // Refresh to show updated name
     } else {
       toast({ title: "Update Failed", description: result.error || "Could not update category name.", variant: "destructive" });
-      setCategoryName(currentCategory.name); 
+      setCategoryName(currentCategory.name); // Revert to original if update failed
     }
     setIsEditingCategoryName(false);
   };
@@ -109,10 +109,10 @@ export default function ManageCategoryPage() {
     setShowDeleteCategoryConfirm(false);
 
     if (result.success) {
-      toast({ title: "Category Deleted", description: `Category "${currentCategory.name}" has been removed.`, className: "bg-accent text-accent-foreground" });
+      toast({ title: "Category Deleted", description: `Category "${currentCategory.name}" and its contents have been removed.`, className: "bg-accent text-accent-foreground" });
       router.push('/'); 
     } else {
-      toast({ title: "Deletion Failed", description: result.error || "Could not delete the category. It might have sub-categories or questions.", variant: "destructive" });
+      toast({ title: "Deletion Failed", description: result.error || "Could not delete the category and its contents.", variant: "destructive" });
     }
   };
 
@@ -213,7 +213,7 @@ export default function ManageCategoryPage() {
                     disabled={isLoading || !currentCategory}
                     size="sm"
                     className="w-full sm:w-auto text-sm sm:text-base"
-                    title="Delete this category (if empty and no sub-categories)"
+                    title="Delete this category and its contents"
                 >
                    <Trash2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Delete Category
                 </Button>
@@ -251,55 +251,71 @@ export default function ManageCategoryPage() {
               {directSubCategories.length > 0 && questions.length > 0 && (
                   <Separator className="my-4 sm:my-6 shrink-0" />
               )}
-
-              {questions.length > 0 ? (
-                <div className="flex flex-col">
-                  <h3 className="text-lg sm:text-xl font-semibold mb-3 text-foreground shrink-0">
-                    Questions in "{currentCategory?.name || 'Current Category'}" (and its sub-categories)
-                  </h3>
-                  <ScrollArea className="h-[50vh] pr-2 sm:pr-4">
-                    <div className="space-y-3 sm:space-y-4">
-                      {questions.map((q, index) => (
-                        <Card key={q.id} className="p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow">
-                          <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
-                            <div className="flex-grow min-w-0">
-                              <p className="font-semibold text-sm sm:text-base md:text-lg text-primary break-words">Q{index + 1}: {q.text}</p>
-                              <ul className="list-disc list-inside pl-2 sm:pl-4 mt-1 sm:mt-2 text-xs sm:text-sm text-muted-foreground">
-                                {q.options.map(opt => (
-                                  <li key={opt.id} className={`break-words ${opt.id === q.correctAnswerId ? 'font-bold text-accent' : ''}`}>
-                                    {opt.text} {opt.id === q.correctAnswerId && "(Correct)"}
-                                  </li>
-                                ))}
-                              </ul>
+              
+              <div className="flex flex-col"> {/* Parent for heading + scroll area */}
+                {questions.length > 0 ? (
+                  <>
+                    <h3 className="text-lg sm:text-xl font-semibold mb-3 text-foreground shrink-0">
+                      Questions in "{currentCategory?.name || 'Current Category'}" (and its sub-categories)
+                    </h3>
+                    <ScrollArea className="h-[50vh] pr-2 sm:pr-4">
+                      <div className="space-y-3 sm:space-y-4">
+                        {questions.map((q, index) => (
+                          <Card key={q.id} className="p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow">
+                            <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                              <div className="flex-grow min-w-0">
+                                <p className="font-semibold text-sm sm:text-base md:text-lg text-primary break-words">Q{index + 1}: {q.text}</p>
+                                <ul className="list-disc list-inside pl-2 sm:pl-4 mt-1 sm:mt-2 text-xs sm:text-sm text-muted-foreground">
+                                  {q.options.map(opt => (
+                                    <li key={opt.id} className={`break-words ${opt.id === q.correctAnswerId ? 'font-bold text-accent' : ''}`}>
+                                      {opt.text} {opt.id === q.correctAnswerId && "(Correct)"}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                              <div className="flex gap-2 ml-0 sm:ml-4 shrink-0 self-start sm:self-auto w-full sm:w-auto justify-end">
+                                <Button variant="outline" size="sm" onClick={() => handleEditQuestionClick(q)} title="Edit Question" className="flex-1 sm:flex-initial">
+                                  <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" /> <span className="hidden sm:inline">Edit</span>
+                                </Button>
+                                <Button variant="destructive" size="sm" onClick={() => handleDeleteQuestionClick(q)} title="Delete Question" className="flex-1 sm:flex-initial">
+                                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" /> <span className="hidden sm:inline">Delete</span>
+                                </Button>
+                              </div>
                             </div>
-                            <div className="flex gap-2 ml-0 sm:ml-4 shrink-0 self-start sm:self-auto w-full sm:w-auto justify-end">
-                              <Button variant="outline" size="sm" onClick={() => handleEditQuestionClick(q)} title="Edit Question" className="flex-1 sm:flex-initial">
-                                <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" /> <span className="hidden sm:inline">Edit</span>
-                              </Button>
-                              <Button variant="destructive" size="sm" onClick={() => handleDeleteQuestionClick(q)} title="Delete Question" className="flex-1 sm:flex-initial">
-                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" /> <span className="hidden sm:inline">Delete</span>
-                              </Button>
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </div>
-              ) : directSubCategories.length === 0 ? ( 
-                <div className="text-center py-10 shrink-0">
-                  <ListChecks className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
-                  <p className="text-lg sm:text-xl font-semibold text-muted-foreground">
-                    No sub-categories or questions found here.
-                  </p>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                    Add sub-categories via the "Add New Category" page, or add questions to "{currentCategory?.name || 'this category'}".
-                  </p>
-                  <Button onClick={() => router.push('/add-question')} className="mt-4 sm:mt-6 text-sm sm:text-base">
-                    Add Questions to this Category
-                  </Button>
-                </div>
-              ) : null}
+                          </Card>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </>
+                ) : directSubCategories.length === 0 ? ( 
+                  <div className="text-center py-10 shrink-0">
+                    <ListChecks className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
+                    <p className="text-lg sm:text-xl font-semibold text-muted-foreground">
+                      No sub-categories or questions found here.
+                    </p>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                      Add sub-categories via the "Add New Category" page, or add questions to "{currentCategory?.name || 'this category'}".
+                    </p>
+                    <Button onClick={() => router.push('/add-question')} className="mt-4 sm:mt-6 text-sm sm:text-base">
+                      Add Questions to this Category
+                    </Button>
+                  </div>
+                ) : (
+                   <div className="text-center py-10 shrink-0">
+                    <ListChecks className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
+                    <p className="text-lg sm:text-xl font-semibold text-muted-foreground">
+                      No questions found in "{currentCategory?.name || 'this category'}" or its direct sub-categories.
+                    </p>
+                     <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                      You can add questions directly to this category or manage questions within its sub-categories.
+                    </p>
+                     <Button onClick={() => router.push('/add-question')} className="mt-4 sm:mt-6 text-sm sm:text-base">
+                      Add Questions to this Category
+                    </Button>
+                  </div>
+                )
+              )}
+              </div>
             </>
           )}
         </CardContent>
@@ -341,13 +357,13 @@ export default function ManageCategoryPage() {
               <strong className="text-primary mt-2 block break-words">
                   {currentCategory?.name}
               </strong>?
-              <br />This action cannot be undone. This will only succeed if the category has no sub-categories and no questions directly linked to it.
+              <br />This action cannot be undone. This will delete the category, all its sub-categories, and all questions within them.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setShowDeleteCategoryConfirm(false)} className="text-sm sm:text-base">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDeleteCategory} className="bg-destructive hover:bg-destructive/90 text-sm sm:text-base">
-              Delete Category
+              Delete Category & Contents
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

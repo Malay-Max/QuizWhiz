@@ -8,7 +8,7 @@ import {
 } from 'firebase/firestore';
 import { FirebaseError } from 'firebase/app';
 
-const QUESTIONS_COLLECTION = 'allQuestions'; // Changed from 'questions'
+const QUESTIONS_COLLECTION = 'allQuestions';
 const CATEGORIES_COLLECTION = 'categories';
 const QUIZ_SESSIONS_COLLECTION = 'quizSessions';
 const ACTIVE_QUIZ_SESSION_ID_KEY = 'quizcraft_active_session_id';
@@ -48,7 +48,7 @@ export async function getCategoryById(id: string): Promise<Category | undefined>
     const docRef = doc(db, CATEGORIES_COLLECTION, id);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      return docSnap.data() as Category; // ID is already part of the document data
+      return docSnap.data() as Category;
     }
     return undefined;
   } catch (error) {
@@ -87,28 +87,60 @@ export async function updateCategoryName(id: string, newName: string): Promise<{
 
 export async function deleteCategory(id: string): Promise<{ success: boolean; error?: string }> {
   if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
-  // Note: This is a simple delete. It doesn't handle orphaned children or questions.
-  // Consider implementing cascading deletes or checks if needed.
+  
   try {
-    // First, check if this category is a parent to any other categories
-    const childrenQuery = query(collection(db, CATEGORIES_COLLECTION), where("parentId", "==", id), firestoreLimit(1));
-    const childrenSnapshot = await getDocs(childrenQuery);
-    if (!childrenSnapshot.empty) {
-      return { success: false, error: "Cannot delete category: It has sub-categories. Delete sub-categories first." };
+    const allCats = await getAllCategories();
+    const targetCategory = allCats.find(c => c.id === id);
+    if (!targetCategory) {
+      return { success: false, error: "Category not found." };
     }
 
-    // Second, check if any questions are linked to this category
-    const questionsQuery = query(collection(db, QUESTIONS_COLLECTION), where("categoryId", "==", id), firestoreLimit(1));
-    const questionsSnapshot = await getDocs(questionsQuery);
-    if (!questionsSnapshot.empty) {
-      return { success: false, error: "Cannot delete category: It has questions linked to it. Delete or reassign questions first." };
+    const descendantCategoryIds = getDescendantCategoryIds(id, allCats);
+    const allCategoryIdsToDelete = [id, ...descendantCategoryIds];
+
+    const batch = writeBatch(db);
+    let operationsCount = 0;
+
+    // Delete questions associated with these categories
+    const CHUNK_SIZE = 30; // Firestore 'in' query limit for array-contains-any or 'in'
+    for (let i = 0; i < allCategoryIdsToDelete.length; i += CHUNK_SIZE) {
+      const chunk = allCategoryIdsToDelete.slice(i, i + CHUNK_SIZE);
+      const questionsQuery = query(collection(db, QUESTIONS_COLLECTION), where("categoryId", "in", chunk));
+      const questionsSnapshot = await getDocs(questionsQuery);
+      
+      questionsSnapshot.forEach((docSnap) => {
+        batch.delete(docSnap.ref);
+        operationsCount++;
+        // Note: If operationsCount exceeds ~490, a more complex solution to commit in multiple batches would be needed.
+        // For simplicity, this implementation assumes the total operations will be within Firestore's single batch limit (500).
+      });
+    }
+
+    // Delete the categories themselves
+    allCategoryIdsToDelete.forEach(catId => {
+      const categoryRef = doc(db, CATEGORIES_COLLECTION, catId);
+      batch.delete(categoryRef);
+      operationsCount++;
+    });
+
+    if (operationsCount > 0) {
+        await batch.commit();
+    } else {
+        // If no operations (e.g., deleting an already empty and non-existent category path),
+        // still commit to ensure the target category itself is attempted to be deleted if it exists.
+        // This case is mostly handled by `targetCategory` check, but good to be robust.
+        const categoryRef = doc(db, CATEGORIES_COLLECTION, id);
+        const categoryDoc = await getDoc(categoryRef);
+        if (categoryDoc.exists()) {
+           batch.delete(categoryRef);
+           await batch.commit();
+        }
     }
     
-    await deleteDoc(doc(db, CATEGORIES_COLLECTION, id));
     return { success: true };
   } catch (error) {
-    console.error("Error deleting category:", error);
-    return { success: false, error: handleFirestoreError(error, "Could not delete category.") };
+    console.error("Error deleting category and its sub-content:", error);
+    return { success: false, error: handleFirestoreError(error, "Could not delete category and its contents.") };
   }
 }
 
@@ -142,12 +174,25 @@ export function getDescendantCategoryIds(categoryId: string, allCategories: Cate
     }
     directChildrenMap.get(cat.parentId)!.push(cat.id);
   });
+  
+  // We only want descendants, not the categoryId itself in the list of descendants.
+  // So, initialize queue with children of categoryId if we want to be strict about "descendants"
+  // Or, more simply, filter categoryId out after processing if it was added.
+  // The current logic of adding to queue then processing children is okay,
+  // but the result `descendants` should not include the initial `categoryId`.
+  // The current use in deleteCategory expects `categoryId` to be added back to the list, so it's fine.
+
+  const processedForQueue: string[] = []; // To avoid re-processing if there were cycles
 
   while (queue.length > 0) {
     const currentParentId = queue.shift()!;
+    if(processedForQueue.includes(currentParentId) && currentParentId !== categoryId) continue; // Avoid reprocessing for cycles
+    if(currentParentId !== categoryId) processedForQueue.push(currentParentId);
+
+
     const children = directChildrenMap.get(currentParentId) || [];
     for (const childId of children) {
-      if (!descendants.includes(childId)) { // Avoid circular dependencies if data is bad
+      if (!descendants.includes(childId)) { 
         descendants.push(childId);
         queue.push(childId);
       }
@@ -160,24 +205,20 @@ export function buildCategoryTree(allCategories: Category[]): Category[] {
   const categoriesMap = new Map<string, Category>();
   const rootCategories: Category[] = [];
 
-  // Clone categories and initialize children arrays
   allCategories.forEach(cat => {
     categoriesMap.set(cat.id, { ...cat, children: [], fullPath: '' });
   });
   
-  // Populate full paths first
   categoriesMap.forEach(cat => {
     cat.fullPath = getFullCategoryPath(cat.id, allCategories);
   });
 
-  // Build the tree structure
   categoriesMap.forEach(cat => {
     if (cat.parentId) {
       const parent = categoriesMap.get(cat.parentId);
       if (parent) {
         parent.children!.push(cat);
       } else {
-        // Orphaned category, treat as root for now, or log an error
         rootCategories.push(cat);
       }
     } else {
@@ -185,7 +226,6 @@ export function buildCategoryTree(allCategories: Category[]): Category[] {
     }
   });
   
-  // Sort children by name
   const sortChildrenByName = (node: Category) => {
     if (node.children && node.children.length > 0) {
       node.children.sort((a, b) => a.name.localeCompare(b.name));
@@ -206,7 +246,7 @@ export async function getQuestions(): Promise<Question[]> {
     const querySnapshot = await getDocs(collection(db, QUESTIONS_COLLECTION));
     const questions: Question[] = [];
     querySnapshot.forEach((doc) => {
-      questions.push(doc.data() as Question); // ID is part of document data
+      questions.push(doc.data() as Question);
     });
     return questions;
   } catch (error) {
@@ -215,7 +255,6 @@ export async function getQuestions(): Promise<Question[]> {
   }
 }
 
-// Modified addQuestion to accept categoryId
 export async function addQuestion(question: Omit<Question, 'id'> & { id?: string }): Promise<{ success: boolean; id?: string; error?: string }> {
   if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
@@ -225,7 +264,7 @@ export async function addQuestion(question: Omit<Question, 'id'> & { id?: string
       text: question.text,
       options: question.options,
       correctAnswerId: question.correctAnswerId,
-      categoryId: question.categoryId, // Use categoryId
+      categoryId: question.categoryId,
     };
     await setDoc(newQuestionRef, questionData);
     return { success: true, id: newQuestionRef.id };
@@ -241,7 +280,7 @@ export async function getQuestionById(id: string): Promise<Question | undefined>
     const docRef = doc(db, QUESTIONS_COLLECTION, id);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      return docSnap.data() as Question; // ID is part of document data
+      return docSnap.data() as Question;
     }
     return undefined;
   } catch (error) {
@@ -273,7 +312,6 @@ export async function deleteQuestionById(questionId: string): Promise<{ success:
   }
 }
 
-// Modified to use categoryId and its descendants
 export async function deleteQuestionsByCategoryId(categoryId: string, allCategories: Category[]): Promise<{ success: boolean; count?: number; error?: string }> {
   if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
@@ -283,7 +321,6 @@ export async function deleteQuestionsByCategoryId(categoryId: string, allCategor
       return { success: true, count: 0 };
     }
     
-    // Firestore 'in' query supports up to 30 elements. If more, split into chunks.
     const CHUNK_SIZE = 30;
     let deletedCount = 0;
     const batch = writeBatch(db);
@@ -298,13 +335,7 @@ export async function deleteQuestionsByCategoryId(categoryId: string, allCategor
             batch.delete(docSnap.ref);
             deletedCount++;
             currentBatchOperations++;
-            if (currentBatchOperations >= 499) { // Firestore batch limit is 500 operations
-                console.warn("Approaching batch limit, committing intermediate batch for question deletion.");
-                // await batch.commit(); // Cannot await inside forEach, handle outside or refactor
-                // batch = writeBatch(db);
-                // currentBatchOperations = 0;
-                // This part needs careful handling if many questions are expected. For now, assume less than 500 total.
-            }
+            // Batch commit logic would be needed here if >500 operations are expected.
         });
     }
     
@@ -326,7 +357,6 @@ export async function getQuestionsByCategoryIdAndDescendants(categoryId: string,
     if (relevantCategoryIds.length === 0) return [];
 
     const questions: Question[] = [];
-    // Firestore 'in' query supports up to 30 elements. If more, split into chunks.
     const CHUNK_SIZE = 30;
     for (let i = 0; i < relevantCategoryIds.length; i += CHUNK_SIZE) {
         const chunk = relevantCategoryIds.slice(i, i + CHUNK_SIZE);
@@ -345,7 +375,6 @@ export async function getQuestionsByCategoryIdAndDescendants(categoryId: string,
 
 
 // --- Quiz Session Functions ---
-// Modified saveQuizSession to use categoryId
 export async function saveQuizSession(session: QuizSession): Promise<{ success: boolean; error?: string }> {
   if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
@@ -354,7 +383,7 @@ export async function saveQuizSession(session: QuizSession): Promise<{ success: 
 
     const dataToStore: StorableQuizSession = {
       id: session.id,
-      categoryId: session.categoryId, // Use categoryId
+      categoryId: session.categoryId,
       categoryName: session.categoryName,
       questions: session.questions,
       currentQuestionIndex: session.currentQuestionIndex,
@@ -374,7 +403,6 @@ export async function saveQuizSession(session: QuizSession): Promise<{ success: 
   }
 }
 
-// Modified getQuizSession to handle categoryId
 export async function getQuizSession(): Promise<QuizSession | null> {
   if (typeof window === 'undefined') return null;
   const activeSessionId = localStorage.getItem(ACTIVE_QUIZ_SESSION_ID_KEY);
@@ -387,7 +415,7 @@ export async function getQuizSession(): Promise<QuizSession | null> {
       const data = docSnap.data() as StorableQuizSession; 
       const quizSession: QuizSession = {
         id: data.id,
-        categoryId: data.categoryId, // Use categoryId
+        categoryId: data.categoryId,
         categoryName: data.categoryName,
         questions: data.questions,
         currentQuestionIndex: data.currentQuestionIndex,
@@ -412,5 +440,3 @@ export function clearQuizSession(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(ACTIVE_QUIZ_SESSION_ID_KEY);
 }
-
-// --- Seed Data Function removed ---
