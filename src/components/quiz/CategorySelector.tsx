@@ -1,9 +1,9 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
-import { getCategories, buildCategoryTree } from '@/lib/storage';
-import type { CategoryTreeNode } from '@/types';
+import { useState, useEffect, useCallback } from 'react';
+import { getAllCategories, buildCategoryTree } from '@/lib/storage';
+import type { Category as CategoryType } from '@/types'; // Use new Category type
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { CategoryTreeItem } from './CategoryTreeItem';
@@ -13,34 +13,35 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label'; 
 
 interface CategorySelectorProps {
-  onCategoryAction: (categoryPath: string, isLeafNode: boolean) => void;
+  onCategoryAction: (categoryId: string, isLeafNode: boolean) => void; // Changed to categoryId
   onStartRandomQuiz: (count?: number) => void; 
 }
 
-export const ALL_QUESTIONS_RANDOM_KEY = "__ALL_QUESTIONS_RANDOM__";
+export const ALL_QUESTIONS_RANDOM_KEY = "__ALL_QUESTIONS_RANDOM__"; // This can remain for random quiz logic
 
 export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: CategorySelectorProps) {
-  const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
+  const [categoryTree, setCategoryTree] = useState<CategoryType[]>([]); // Use CategoryType[]
   const [isLoading, setIsLoading] = useState(true);
   const [randomQuizCountInput, setRandomQuizCountInput] = useState<string>(''); 
   const router = useRouter();
 
-  useEffect(() => {
-    const loadCategoriesData = async () => {
-      setIsLoading(true);
-      try {
-        const flatCategories = await getCategories();
-        const tree = buildCategoryTree(flatCategories);
-        setCategoryTree(tree);
-      } catch (error) {
-        console.error("Failed to load or build category tree:", error);
-        setCategoryTree([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadCategoriesData();
+  const loadCategoriesData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const allCats = await getAllCategories();
+      const tree = buildCategoryTree(allCats); // buildCategoryTree now takes Category[]
+      setCategoryTree(tree);
+    } catch (error) {
+      console.error("Failed to load or build category tree:", error);
+      setCategoryTree([]);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadCategoriesData();
+  }, [loadCategoriesData]);
 
   const handleRandomQuizButtonClick = () => {
     const count = parseInt(randomQuizCountInput, 10);
@@ -74,10 +75,10 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-sm sm:text-base">
-            It looks like there are no questions added yet. Please add some questions first.
+            It looks like there are no questions or categories added yet. Please add some first.
           </p>
           <Button onClick={() => router.push('/add-question')} className="mt-4 w-full text-sm sm:text-base">
-            Add Questions
+            Add Questions/Categories
           </Button>
         </CardContent>
       </Card>
@@ -89,7 +90,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
       <CardHeader>
         <CardTitle className="font-headline text-2xl sm:text-3xl">Select a Quiz or Manage Category</CardTitle>
         <CardDescription className="text-sm sm:text-base">
-          Choose a category branch to start a quiz, a specific sub-category to manage its questions, or try a random mix.
+          Choose a category to start a quiz with its questions (including sub-categories), or a specific category to manage its questions.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -120,9 +121,9 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
         <div className="pt-3 space-y-1">
           {categoryTree.map((node) => (
             <CategoryTreeItem
-              key={node.path}
+              key={node.id} // Use node.id as key
               node={node}
-              onSelectNode={onCategoryAction}
+              onSelectNode={onCategoryAction} // Prop name is fine, implementation changes
               level={0}
             />
           ))}
@@ -130,7 +131,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
       </CardContent>
       <CardFooter>
         <Button onClick={() => router.push('/add-question')} className="w-full text-sm sm:text-base" variant="outline">
-            Add New Questions
+            Add New Questions/Categories
         </Button>
       </CardFooter>
     </Card>

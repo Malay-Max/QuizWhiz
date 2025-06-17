@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -11,14 +11,26 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText, Copy } from 'lucide-react';
-import { addQuestion, getCategories, getQuestionById, updateQuestion, getQuestions } from '@/lib/storage';
-import type { Question, AnswerOption as QuestionAnswerOptionType } from '@/types';
+import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText, Copy, ListTree, Database } from 'lucide-react';
+import { 
+  addQuestion, 
+  getQuestionById, 
+  updateQuestion, 
+  getAllCategories,
+  getFullCategoryPath,
+  addCategory,
+  seedSampleData,
+  Category as CategoryType, // Renamed to avoid conflict
+  Question as QuestionType, // Renamed
+  AnswerOption as QuestionAnswerOptionType 
+} from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateDistractorsAction } from '@/app/actions';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 const answerOptionSchema = z.object({
   id: z.string().default(() => crypto.randomUUID()),
@@ -29,7 +41,7 @@ const questionFormSchema = z.object({
   text: z.string().min(5, 'Question text must be at least 5 characters'),
   options: z.array(answerOptionSchema).min(2, 'At least 2 answer options are required').max(6, 'Maximum 6 answer options allowed'),
   correctAnswerId: z.string().min(1,'Please select a correct answer'),
-  category: z.string().min(1, 'Category is required. Use / to create subcategories (e.g., Science/Physics).'),
+  categoryId: z.string().min(1, 'Category is required.'), // Changed from category path to categoryId
 });
 
 type QuestionFormData = z.infer<typeof questionFormSchema>;
@@ -84,6 +96,10 @@ const optionMarkdownComponents = {
     },
 };
 
+interface CategoryOption {
+  id: string;
+  name: string; // Full resolved path for display
+}
 
 export function QuestionForm() {
   const { toast } = useToast();
@@ -91,8 +107,8 @@ export function QuestionForm() {
   const router = useRouter();
 
   const [isGeneratingDistractors, setIsGeneratingDistractors] = useState(false);
-  const [allCategories, setAllCategories] = useState<string[]>([]);
-  const [filteredCategorySuggestions, setFilteredCategorySuggestions] = useState<string[]>([]);
+  const [allCategories, setAllCategories] = useState<CategoryType[]>([]);
+  const [categoryOptionsForSelect, setCategoryOptionsForSelect] = useState<CategoryOption[]>([]);
   
   const [batchInput, setBatchInput] = useState('');
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
@@ -102,10 +118,15 @@ export function QuestionForm() {
   const [submitButtonText, setSubmitButtonText] = useState('Add Single Question');
 
   const [exportCategorySearchTerm, setExportCategorySearchTerm] = useState<string>('');
-  const [filteredExportCategorySuggestions, setFilteredExportCategorySuggestions] = useState<string[]>([]);
-  const [categoryForExport, setCategoryForExport] = useState<string>('');
+  const [filteredExportCategorySuggestions, setFilteredExportCategorySuggestions] = useState<CategoryOption[]>([]);
+  const [categoryForExport, setCategoryForExport] = useState<CategoryOption | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportedQuestionsText, setExportedQuestionsText] = useState<string>('');
+
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryParentId, setNewCategoryParentId] = useState<string | null>(null);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [isSeedingData, setIsSeedingData] = useState(false);
 
   const form = useForm<QuestionFormData>({
     resolver: zodResolver(questionFormSchema),
@@ -113,7 +134,7 @@ export function QuestionForm() {
       text: '',
       options: defaultAnswerOptions.map(opt => ({...opt})),
       correctAnswerId: '',
-      category: '',
+      categoryId: '',
     },
   });
 
@@ -122,42 +143,33 @@ export function QuestionForm() {
     name: 'options',
   });
 
-  const currentCategoryInput = form.watch('category');
-
-  const refreshAllCategories = async () => {
-    const cats = await getCategories(); 
+  const refreshAllCategories = useCallback(async () => {
+    const cats = await getAllCategories();
     setAllCategories(cats);
-  };
-
-  useEffect(() => {
-    refreshAllCategories();
+    const options = cats.map(cat => ({
+      id: cat.id,
+      name: getFullCategoryPath(cat.id, cats) || cat.name, // Fallback to name if path is empty
+    })).sort((a,b) => a.name.localeCompare(b.name));
+    setCategoryOptionsForSelect(options);
   }, []);
 
   useEffect(() => {
-    if (currentCategoryInput && currentCategoryInput.trim() !== '') {
-      const lowercasedInput = currentCategoryInput.toLowerCase();
-      const suggestions = allCategories
-        .filter(cat => cat.toLowerCase().includes(lowercasedInput))
-        .slice(0, 5); 
-      setFilteredCategorySuggestions(suggestions);
-    } else {
-      setFilteredCategorySuggestions([]); 
-    }
-  }, [currentCategoryInput, allCategories]);
+    refreshAllCategories();
+  }, [refreshAllCategories]);
   
   useEffect(() => {
     if (exportCategorySearchTerm && exportCategorySearchTerm.trim() !== '') {
       const lowercasedInput = exportCategorySearchTerm.toLowerCase();
-      const suggestions = allCategories
-        .filter(cat => cat.toLowerCase().includes(lowercasedInput))
+      const suggestions = categoryOptionsForSelect
+        .filter(catOpt => catOpt.name.toLowerCase().includes(lowercasedInput))
         .slice(0, 5);
       setFilteredExportCategorySuggestions(suggestions);
     } else {
       setFilteredExportCategorySuggestions([]);
     }
-    setCategoryForExport(''); 
+    setCategoryForExport(null); 
     setExportedQuestionsText(''); 
-  }, [exportCategorySearchTerm, allCategories]);
+  }, [exportCategorySearchTerm, categoryOptionsForSelect]);
 
   useEffect(() => {
     const editId = searchParams.get('editId');
@@ -166,7 +178,12 @@ export function QuestionForm() {
         if (questionToEdit) {
             setEditingQuestionId(id);
             const optionsWithFreshIds = questionToEdit.options.map(opt => ({...opt}));
-            form.reset({ ...questionToEdit, options: optionsWithFreshIds });
+            form.reset({ 
+              text: questionToEdit.text,
+              options: optionsWithFreshIds,
+              correctAnswerId: questionToEdit.correctAnswerId,
+              categoryId: questionToEdit.categoryId,
+            });
             setPageTitle('Edit Question');
             setSubmitButtonText('Update Question');
         } else {
@@ -178,12 +195,12 @@ export function QuestionForm() {
     if (editId) {
         loadQuestionForEditing(editId);
     } else {
-        if (editingQuestionId) {
+        if (editingQuestionId) { // Clear form if was editing and now adding new
              form.reset({
                 text: '',
                 options: defaultAnswerOptions.map(opt => ({...opt})),
                 correctAnswerId: '',
-                category: '',
+                categoryId: '',
             });
         }
         setEditingQuestionId(null);
@@ -192,7 +209,6 @@ export function QuestionForm() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router, toast]); 
-
 
   const watchQuestionText = form.watch('text');
   const watchCorrectAnswerId = form.watch('correctAnswerId');
@@ -221,15 +237,10 @@ export function QuestionForm() {
     }
     remove(index);
   };
-  
-  const handleCategoryClick = (category: string) => {
-    form.setValue('category', category, { shouldValidate: true, shouldDirty: true });
-    setFilteredCategorySuggestions([]); 
-  };
 
-  const handleExportCategorySuggestionClick = (category: string) => {
-    setCategoryForExport(category);
-    setExportCategorySearchTerm(category);
+  const handleExportCategorySuggestionClick = (categoryOpt: CategoryOption) => {
+    setCategoryForExport(categoryOpt);
+    setExportCategorySearchTerm(categoryOpt.name); // Display full path in search
     setFilteredExportCategorySuggestions([]);
   };
 
@@ -320,12 +331,12 @@ export function QuestionForm() {
   const onSubmit = async (data: QuestionFormData) => {
     let result;
     if (editingQuestionId) {
-        const updatedQuestionData: Question = {
+        const updatedQuestionData: QuestionType = { // Use renamed QuestionType
             id: editingQuestionId,
             text: data.text,
             options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
             correctAnswerId: data.correctAnswerId,
-            category: data.category.trim().replace(/\s*\/\s*/g, '/'),
+            categoryId: data.categoryId,
         };
         result = await updateQuestion(updatedQuestionData);
         if (result.success) {
@@ -345,11 +356,11 @@ export function QuestionForm() {
             });
         }
     } else {
-        const newQuestionData: Omit<Question, 'id'> = {
+        const newQuestionData: Omit<QuestionType, 'id'> = { // Use renamed QuestionType
             text: data.text,
             options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
             correctAnswerId: data.correctAnswerId,
-            category: data.category.trim().replace(/\s*\/\s*/g, '/'), 
+            categoryId: data.categoryId, 
         };
         result = await addQuestion(newQuestionData);
         if (result.success) {
@@ -359,12 +370,11 @@ export function QuestionForm() {
                 variant: 'default',
                 className: 'bg-accent text-accent-foreground'
             });
-            await refreshAllCategories();
             form.reset({
                 text: '',
                 options: defaultAnswerOptions.map(opt => ({...opt})),
                 correctAnswerId: '',
-                category: data.category 
+                categoryId: data.categoryId // Keep category for next question
             });
         } else {
             toast({
@@ -388,11 +398,11 @@ export function QuestionForm() {
   };
 
   const handleProcessBatch = async () => {
-    const categoryValue = form.getValues('category');
-    if (!categoryValue.trim()) {
+    const currentCategoryId = form.getValues('categoryId');
+    if (!currentCategoryId) {
       toast({
         title: 'Category Required',
-        description: 'Please enter a category in the form above before processing batch questions.',
+        description: 'Please select a category from the dropdown above before processing batch questions.',
         variant: 'destructive',
       });
       return;
@@ -438,11 +448,11 @@ export function QuestionForm() {
           continue;
         }
 
-        const newQuestionData: Omit<Question, 'id'> = {
+        const newQuestionData: Omit<QuestionType, 'id'> = {
           text: questionText,
           options: answerOptions,
           correctAnswerId: correctOption.id,
-          category: categoryValue.trim().replace(/\s*\/\s*/g, '/'),
+          categoryId: currentCategoryId, // Use selected categoryId
         };
 
         const result = await addQuestion(newQuestionData);
@@ -462,7 +472,6 @@ export function QuestionForm() {
     }
 
     setIsProcessingBatch(false);
-
     let finalToastTitle = 'Batch Processing Complete';
     let finalToastVariant: "default" | "destructive" = 'default';
     let finalToastClassName = 'bg-accent text-accent-foreground';
@@ -500,7 +509,6 @@ export function QuestionForm() {
 
     if (questionsAddedCount > 0) {
       setBatchInput(''); 
-      await refreshAllCategories();
     }
   };
 
@@ -512,11 +520,11 @@ export function QuestionForm() {
     setIsExporting(true);
     setExportedQuestionsText(''); 
     try {
-      const allQuestionsFromDB = await getQuestions(); 
-      const questionsToExport = allQuestionsFromDB.filter(q => q.category === categoryForExport);
+      const allQuestionsFromDB = await getAllCategories().then(cats => getQuestionById(categoryForExport.id).then(() => getQuestions())); // A bit verbose, ensure correct function
+      const questionsToExport = allQuestionsFromDB.filter(q => q.categoryId === categoryForExport.id);
   
       if (questionsToExport.length === 0) {
-        toast({ title: "No Questions", description: `No questions found in category "${categoryForExport}" to export.`, variant: "default" });
+        toast({ title: "No Questions", description: `No questions found in category "${categoryForExport.name}" to export.`, variant: "default" });
         setIsExporting(false);
         return;
       }
@@ -529,7 +537,7 @@ export function QuestionForm() {
       }).join('\n');
       
       setExportedQuestionsText(formattedQuestions);
-      toast({ title: "Export Ready", description: `${questionsToExport.length} questions from "${categoryForExport}" are displayed below for copying.`, className: 'bg-accent text-accent-foreground' });
+      toast({ title: "Export Ready", description: `${questionsToExport.length} questions from "${categoryForExport.name}" are displayed below for copying.`, className: 'bg-accent text-accent-foreground' });
   
     } catch (error) {
       console.error("Error preparing questions for export:", error);
@@ -550,16 +558,92 @@ export function QuestionForm() {
     }
   };
 
+  const handleAddNewCategory = async () => {
+    if (!newCategoryName.trim()) {
+      toast({ title: "Category Name Required", description: "Please enter a name for the new category.", variant: "destructive" });
+      return;
+    }
+    setIsAddingCategory(true);
+    const result = await addCategory(newCategoryName, newCategoryParentId);
+    setIsAddingCategory(false);
+    if (result.success && result.id) {
+      toast({ title: "Category Added", description: `Category "${newCategoryName}" created.`, className: "bg-accent text-accent-foreground" });
+      setNewCategoryName('');
+      setNewCategoryParentId(null);
+      await refreshAllCategories(); // Refresh categories to include the new one in dropdowns
+      form.setValue('categoryId', result.id); // Optionally auto-select the new category
+    } else {
+      toast({ title: "Failed to Add Category", description: result.error || "Could not create category.", variant: "destructive" });
+    }
+  };
+
+  const handleSeedData = async () => {
+    setIsSeedingData(true);
+    const result = await seedSampleData();
+    setIsSeedingData(false);
+    toast({
+      title: result.success ? "Seeding Complete" : "Seeding Issue",
+      description: result.message,
+      variant: result.success ? "default" : "destructive",
+      className: result.success ? "bg-accent text-accent-foreground" : ""
+    });
+    if (result.success) {
+      await refreshAllCategories();
+    }
+  };
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
         <CardTitle className="font-headline text-2xl sm:text-3xl">{pageTitle}</CardTitle>
         <CardDescription className="text-sm sm:text-base">
-            {editingQuestionId ? "Modify the details of this question." : "Fill in the details for your multiple-choice question, or use the batch add/export features below."}
+            {editingQuestionId ? "Modify the details of this question." : "Fill in the details, or use batch/export features."}
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {/* Section to add new category */}
+        <div className="mb-8 p-4 border rounded-lg shadow-sm">
+            <h3 className="text-lg sm:text-xl font-semibold mb-3 flex items-center"><ListTree className="mr-2 h-5 w-5 text-primary" />Manage Categories</h3>
+            <div className="space-y-3">
+                <div>
+                    <Label htmlFor="new-category-name">New Category Name</Label>
+                    <Input 
+                        id="new-category-name"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        placeholder="e.g., Modern Poetry"
+                        className="mt-1 text-sm md:text-base"
+                    />
+                </div>
+                <div>
+                    <Label htmlFor="new-category-parent">Parent Category (Optional)</Label>
+                    <Select 
+                        value={newCategoryParentId || ""} 
+                        onValueChange={(value) => setNewCategoryParentId(value || null)}
+                    >
+                        <SelectTrigger className="w-full mt-1 text-sm md:text-base">
+                            <SelectValue placeholder="Select parent (optional, for root leave empty)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="">-- No Parent (Root Category) --</SelectItem>
+                            {categoryOptionsForSelect.map(catOpt => (
+                                <SelectItem key={catOpt.id} value={catOpt.id}>{catOpt.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <Button onClick={handleAddNewCategory} disabled={isAddingCategory || !newCategoryName.trim()} className="w-full sm:w-auto text-sm sm:text-base">
+                    {isAddingCategory ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />} Add Category
+                </Button>
+            </div>
+            <div className="mt-6 pt-4 border-t">
+                <Button onClick={handleSeedData} variant="outline" disabled={isSeedingData} className="w-full sm:w-auto text-sm sm:text-base">
+                    {isSeedingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Seed Sample Data
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">Adds sample categories and questions if none exist.</p>
+            </div>
+        </div>
+
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div>
             <Label htmlFor="text" className="text-base sm:text-lg">Question Text</Label>
@@ -644,37 +728,32 @@ export function QuestionForm() {
           </div>
 
           <div>
-            <Label htmlFor="category" className="text-base sm:text-lg">Category (for single & batch)</Label>
-            <Input
-              id="category"
-              {...form.register('category')}
-              placeholder="e.g., Science or TopFolder/SubFolder"
-              className="mt-1 text-sm md:text-base"
-              aria-invalid={form.formState.errors.category ? "true" : "false"}
-              autoComplete="off"
-            />
-            {form.formState.errors.category && <p className="text-sm text-destructive mt-1">{form.formState.errors.category.message}</p>}
-             {filteredCategorySuggestions.length > 0 && (
-              <div className="mt-2 border rounded-md bg-background shadow-md p-2">
-                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Suggestions (click to use):</p>
-                <div className="flex flex-wrap gap-1">
-                  {filteredCategorySuggestions.map(cat => (
-                    <Button
-                      key={cat}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCategoryClick(cat)}
-                      className="text-xs px-2 py-1 h-auto whitespace-normal"
-                      title={`Use category: ${cat}`}
+            <Label htmlFor="categoryId" className="text-base sm:text-lg">Category (for single & batch)</Label>
+            <Controller
+                name="categoryId"
+                control={form.control}
+                render={({ field }) => (
+                    <Select 
+                        value={field.value} 
+                        onValueChange={field.onChange}
+                        disabled={categoryOptionsForSelect.length === 0 && !editingQuestionId}
                     >
-                      <Folder className="mr-1.5 h-3 w-3 shrink-0" />
-                      <span className="min-w-0 break-all">{cat}</span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
+                        <SelectTrigger className="w-full mt-1 text-sm md:text-base">
+                            <SelectValue placeholder={categoryOptionsForSelect.length === 0 ? "No categories available - Add one first" : "Select a category"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {categoryOptionsForSelect.length === 0 ? (
+                                 <SelectItem value="--no-categories--" disabled>No categories available</SelectItem>
+                            ) : (
+                                categoryOptionsForSelect.map(catOpt => (
+                                    <SelectItem key={catOpt.id} value={catOpt.id}>{catOpt.name}</SelectItem>
+                                ))
+                            )}
+                        </SelectContent>
+                    </Select>
+                )}
+            />
+            {form.formState.errors.categoryId && <p className="text-sm text-destructive mt-1">{form.formState.errors.categoryId.message}</p>}
           </div>
 
           <CardFooter className="px-0 pt-6">
@@ -695,7 +774,7 @@ export function QuestionForm() {
                 Format: <code className="font-code bg-muted px-1 py-0.5 rounded text-xs">;;Question Text;; {'{OptionA - OptionB - OptionC}'} [Correct Option Text]</code>
             </p>
             <p className="text-xs sm:text-sm text-muted-foreground mb-1">
-                Enter one question per line. Uses the category specified above.
+                Enter one question per line. Uses the category selected above.
             </p>
             <p className="text-xs text-muted-foreground mb-4">
                 Example: <code className="font-code bg-muted px-1 py-0.5 rounded">;;What is 2+2?;; {'{Three - Four - Five}'} [Four]</code>
@@ -711,7 +790,7 @@ export function QuestionForm() {
             <Button 
                 onClick={handleProcessBatch} 
                 className="mt-4 w-full sm:w-auto text-sm sm:text-base" 
-                disabled={isProcessingBatch || !batchInput.trim() || !form.getValues('category').trim()}
+                disabled={isProcessingBatch || !batchInput.trim() || !form.getValues('categoryId')}
             >
                 {isProcessingBatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
                 Process Batch Questions
@@ -742,18 +821,18 @@ export function QuestionForm() {
                 <div className="mt-2 border rounded-md bg-background shadow-md p-2">
                   <p className="text-xs sm:text-sm text-muted-foreground mb-1">Suggestions (click to select for export):</p>
                   <div className="flex flex-wrap gap-1">
-                    {filteredExportCategorySuggestions.map(cat => (
+                    {filteredExportCategorySuggestions.map(catOpt => (
                       <Button
-                        key={`export-sugg-${cat}`}
+                        key={`export-sugg-${catOpt.id}`}
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => handleExportCategorySuggestionClick(cat)}
+                        onClick={() => handleExportCategorySuggestionClick(catOpt)}
                         className="text-xs px-2 py-1 h-auto whitespace-normal"
-                        title={`Select category for export: ${cat}`}
+                        title={`Select category for export: ${catOpt.name}`}
                       >
                         <Folder className="mr-1.5 h-3 w-3 shrink-0" />
-                        <span className="min-w-0 break-all">{cat}</span>
+                        <span className="min-w-0 break-all">{catOpt.name}</span>
                       </Button>
                     ))}
                   </div>
@@ -797,4 +876,3 @@ export function QuestionForm() {
     </Card>
   );
 }
-

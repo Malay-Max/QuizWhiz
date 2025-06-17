@@ -1,10 +1,22 @@
 
 "use client";
 
+// This file should be identical to src/app/page.tsx for now.
+// Duplicating content to ensure correct routing and potential future divergence.
+
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { Question, QuizSession, QuizAnswer } from '@/types';
-import { getQuestions, saveQuizSession, getQuizSession, clearQuizSession, deleteQuestionById, deleteQuestionsByCategory } from '@/lib/storage';
+import type { Question, QuizSession, Category as CategoryType } from '@/types';
+import { 
+  getQuestionsByCategoryIdAndDescendants, 
+  saveQuizSession, 
+  getQuizSession, 
+  clearQuizSession, 
+  deleteQuestionById, 
+  deleteQuestionsByCategoryId, 
+  getAllCategories,
+  getFullCategoryPath
+} from '@/lib/storage';
 import { CategorySelector, ALL_QUESTIONS_RANDOM_KEY } from '@/components/quiz/CategorySelector';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { Button } from '@/components/ui/button';
@@ -22,8 +34,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 
-// This page is very similar to src/app/page.tsx. 
-// Consider refactoring shared quiz logic into a custom hook or utility functions if complexity grows.
 
 function QuizPlayPageContent() {
   const router = useRouter();
@@ -33,29 +43,55 @@ function QuizPlayPageContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [showDeleteQuestionConfirmDialog, setShowDeleteQuestionConfirmDialog] = useState(false);
   const [showDeleteCategoryConfirmDialog, setShowDeleteCategoryConfirmDialog] = useState(false);
+  const [allCategories, setAllCategories] = useState<CategoryType[]>([]);
 
-  const startQuiz = useCallback(async (selectedCategoryPath: string, exactMatch: boolean = false, limit?: number) => {
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const cats = await getAllCategories();
+      setAllCategories(cats);
+    };
+    fetchCategories();
+  }, []);
+
+
+  const startQuiz = useCallback(async (selectedIdOrKey: string, limit?: number) => {
     setIsLoading(true);
-    const allQuestions = await getQuestions();
-    let filteredQuestions: Question[] = [];
-    let baseCategoryName = selectedCategoryPath;
+    let questionsForSession: Question[] = [];
+    let finalQuizCategoryName = "Quiz";
+    let finalQuizCategoryId = selectedIdOrKey;
 
-    if (selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY) {
-      filteredQuestions = allQuestions;
-      baseCategoryName = "All Categories (Random)"; // Default name for random
-      exactMatch = false;
-    } else if (exactMatch) {
-      filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category === selectedCategoryPath);
-      // baseCategoryName remains selectedCategoryPath
+    if (selectedIdOrKey === ALL_QUESTIONS_RANDOM_KEY) {
+      const allQuestionsFromAllCats: Question[] = [];
+      const topLevelCats = allCategories.filter(c => !c.parentId);
+      for (const cat of topLevelCats) {
+          const qs = await getQuestionsByCategoryIdAndDescendants(cat.id, allCategories);
+          allQuestionsFromAllCats.push(...qs);
+      }
+      questionsForSession = allQuestionsFromAllCats;
+      finalQuizCategoryId = ALL_QUESTIONS_RANDOM_KEY;
+      
+      if (questionsForSession.length > 0) {
+        if (limit && limit > 0 && limit < questionsForSession.length) {
+            questionsForSession = questionsForSession.slice(0, limit);
+            finalQuizCategoryName = `${questionsForSession.length} Random Questions`;
+        } else {
+            finalQuizCategoryName = `All ${questionsForSession.length} Random Questions`;
+        }
+      } else {
+          finalQuizCategoryName = "Random Quiz (No Questions Available)";
+      }
+
     } else {
-      filteredQuestions = allQuestions.filter(q => typeof q.category === 'string' && q.category.startsWith(selectedCategoryPath));
-      // baseCategoryName remains selectedCategoryPath
+      questionsForSession = await getQuestionsByCategoryIdAndDescendants(selectedIdOrKey, allCategories);
+      const selectedCategory = allCategories.find(c => c.id === selectedIdOrKey);
+      finalQuizCategoryName = selectedCategory ? getFullCategoryPath(selectedCategory.id, allCategories) : "Selected Category";
+      finalQuizCategoryId = selectedIdOrKey;
     }
     
-    if (filteredQuestions.length === 0) {
+    if (questionsForSession.length === 0) {
       toast({
         title: "No Questions Found",
-        description: `No questions found for "${baseCategoryName}". Please add questions or select a different category.`,
+        description: `No questions found for "${finalQuizCategoryName}". Please add questions or select a different category/option.`,
         variant: "destructive",
       });
       setIsLoading(false);
@@ -70,24 +106,9 @@ function QuizPlayPageContent() {
       }
       return newArray;
     };
-
-    let questionsForSession = shuffleArray(filteredQuestions);
-    let finalQuizCategoryName = baseCategoryName;
-
-    if (selectedCategoryPath === ALL_QUESTIONS_RANDOM_KEY) {
-        if (questionsForSession.length > 0) {
-            if (limit && limit > 0 && limit < questionsForSession.length) {
-                questionsForSession = questionsForSession.slice(0, limit);
-                finalQuizCategoryName = `${questionsForSession.length} Random Questions`;
-            } else if (limit && limit > 0 && limit >= questionsForSession.length) {
-                 finalQuizCategoryName = `${questionsForSession.length} Random Questions (All Available)`;
-            } else { // No valid limit, or limit is for more than available
-                 finalQuizCategoryName = `All ${questionsForSession.length} Random Questions`;
-            }
-        } else {
-            finalQuizCategoryName = "Random Quiz (No Questions Available)";
-        }
-    } else if (limit && limit > 0 && limit < questionsForSession.length) { 
+    
+    questionsForSession = shuffleArray(questionsForSession);
+    if (selectedIdOrKey !== ALL_QUESTIONS_RANDOM_KEY && limit && limit > 0 && limit < questionsForSession.length) { 
         questionsForSession = questionsForSession.slice(0, limit);
     }
     
@@ -98,7 +119,8 @@ function QuizPlayPageContent() {
 
     const newSession: QuizSession = {
       id: crypto.randomUUID(),
-      category: finalQuizCategoryName,
+      categoryId: finalQuizCategoryId,
+      categoryName: finalQuizCategoryName,
       questions: questionsWithShuffledOptions, 
       currentQuestionIndex: 0,
       answers: [],
@@ -118,23 +140,21 @@ function QuizPlayPageContent() {
     setQuizSession(newSession);
     setIsLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast]);
+  }, [allCategories, toast]);
 
   const loadActiveSessionOrFromParams = useCallback(async () => {
-    const categoryFromParams = searchParams.get('category');
-    const exactMatchFromParams = searchParams.get('exact') === 'true';
+    const categoryIdFromParams = searchParams.get('categoryId');
     const limitFromParams = searchParams.get('limit');
 
-    if (categoryFromParams) {
+    if (categoryIdFromParams) {
       const current = new URLSearchParams(Array.from(searchParams.entries()));
-      current.delete('category');
-      current.delete('exact');
+      current.delete('categoryId');
       current.delete('limit');
       const query = current.toString() ? `?${current}` : '';
       router.replace(`${window.location.pathname}${query}`, {scroll: false});
 
       const numLimit = limitFromParams ? parseInt(limitFromParams, 10) : undefined;
-      await startQuiz(categoryFromParams, exactMatchFromParams, numLimit);
+      await startQuiz(categoryIdFromParams, numLimit);
       return;
     }
 
@@ -144,11 +164,13 @@ function QuizPlayPageContent() {
     }
     setIsLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, router, startQuiz]);
+  }, [searchParams, router, startQuiz, allCategories]);
 
   useEffect(() => {
-    loadActiveSessionOrFromParams();
-  }, [loadActiveSessionOrFromParams]);
+    if (allCategories.length > 0) {
+        loadActiveSessionOrFromParams();
+    }
+  }, [allCategories, loadActiveSessionOrFromParams]);
 
   useEffect(() => {
     if (quizSession?.status === 'completed') {
@@ -157,16 +179,16 @@ function QuizPlayPageContent() {
   }, [quizSession, router]);
 
 
-  const handleCategoryAction = async (categoryPath: string, isLeafNode: boolean) => {
+  const handleCategoryAction = async (categoryId: string, isLeafNode: boolean) => {
     if (isLeafNode) {
-      router.push(`/quiz/manage/${categoryPath.split('/').map(segment => encodeURIComponent(segment)).join('/')}`);
+      router.push(`/quiz/manage/${categoryId}`);
     } else {
-      await startQuiz(categoryPath, false);
+      await startQuiz(categoryId);
     }
   };
 
   const handleStartRandomQuiz = async (limit?: number) => {
-    await startQuiz(ALL_QUESTIONS_RANDOM_KEY, false, limit);
+    await startQuiz(ALL_QUESTIONS_RANDOM_KEY, limit);
   };
 
   const handleAnswer = (selectedAnswerId: string, timeTaken: number) => {
@@ -178,7 +200,7 @@ function QuizPlayPageContent() {
       }
       
       const isCorrect = currentQuestion.correctAnswerId === selectedAnswerId;
-      const newAnswer: QuizAnswer = {
+      const newAnswer: QuizSession['answers'][0] = {
         questionId: currentQuestion.id,
         selectedAnswerId,
         isCorrect,
@@ -206,7 +228,7 @@ function QuizPlayPageContent() {
         return prevSession; 
       }
       
-      const newAnswer: QuizAnswer = {
+      const newAnswer: QuizSession['answers'][0] = {
         questionId: currentQuestion.id,
         timeTaken,
         skipped: true,
@@ -258,7 +280,7 @@ function QuizPlayPageContent() {
     setQuizSession(null);
     setIsLoading(true); 
     setTimeout(() => {
-      loadActiveSessionOrFromParams();
+      if (allCategories.length > 0) loadActiveSessionOrFromParams();
     }, 50);
   };
 
@@ -267,7 +289,7 @@ function QuizPlayPageContent() {
   };
 
   const handleDeleteCategoryDialog = () => {
-     if (quizSession?.category && quizSession.category.toLowerCase().includes("random")) {
+     if (quizSession?.categoryId && quizSession.categoryId === ALL_QUESTIONS_RANDOM_KEY) {
         toast({
             title: "Action Not Allowed",
             description: "Cannot delete a dynamically generated 'Random Questions' quiz category.",
@@ -339,28 +361,28 @@ function QuizPlayPageContent() {
   };
 
   const handleConfirmDeleteCategory = async () => {
-    if (!quizSession || !quizSession.category || quizSession.category.toLowerCase().includes("random")) {
+    if (!quizSession || !quizSession.categoryId || quizSession.categoryId === ALL_QUESTIONS_RANDOM_KEY) {
         toast({ title: "Invalid Category", description: "Cannot delete a random quiz category.", variant: "destructive" });
         setShowDeleteCategoryConfirmDialog(false);
         return;
     }
 
-    const categoryToDelete = quizSession.category;
-    const deleteResult = await deleteQuestionsByCategory(categoryToDelete);
+    const categoryIdToDelete = quizSession.categoryId;
+    const deleteResult = await deleteQuestionsByCategoryId(categoryIdToDelete, allCategories);
     setShowDeleteCategoryConfirmDialog(false);
 
     if (!deleteResult.success) {
         toast({
-            title: "Category Deletion Failed",
-            description: deleteResult.error || "Could not delete the quiz category.",
+            title: "Category Questions Deletion Failed",
+            description: deleteResult.error || "Could not delete questions in the category.",
             variant: "destructive",
         });
         return;
     }
 
     toast({
-      title: "Quiz Category Deleted",
-      description: `All questions in category "${categoryToDelete}" have been removed.`,
+      title: "Quiz Category Questions Deleted",
+      description: `All questions in category "${quizSession.categoryName || 'Selected'}" have been removed.`,
       variant: "default",
     });
 
@@ -368,15 +390,15 @@ function QuizPlayPageContent() {
     setQuizSession(null);
     setIsLoading(true); 
     setTimeout(() => {
-      loadActiveSessionOrFromParams();
+      if (allCategories.length > 0) loadActiveSessionOrFromParams();
     }, 50);
   };
 
-  if (isLoading) {
+  if (isLoading || allCategories.length === 0 && !quizSession) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-lg text-muted-foreground">Loading Quiz...</p>
+        <p className="mt-4 text-lg text-muted-foreground">Loading Quiz Data...</p>
       </div>
     );
   }
@@ -445,9 +467,9 @@ function QuizPlayPageContent() {
           <Button onClick={handleDeleteCurrentQuestionDialog} variant="destructive" className="flex-1">
             <Trash2 className="mr-2 h-4 w-4" /> Delete This Question
           </Button>
-          {quizSession.category && !quizSession.category.toLowerCase().includes("random") && (
+          {quizSession.categoryId && quizSession.categoryId !== ALL_QUESTIONS_RANDOM_KEY && (
             <Button onClick={handleDeleteCategoryDialog} variant="destructive" className="flex-1 bg-red-700 hover:bg-red-800">
-              <Library className="mr-2 h-4 w-4" /> Delete Entire Quiz Category
+              <Library className="mr-2 h-4 w-4" /> Delete Questions in This Category
             </Button>
           )}
         </div>
@@ -478,17 +500,17 @@ function QuizPlayPageContent() {
       <AlertDialog open={showDeleteCategoryConfirmDialog} onOpenChange={setShowDeleteCategoryConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Entire Quiz Category?</AlertDialogTitle>
+            <AlertDialogTitle>Delete All Questions in Category?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete all questions in the category: <br />
-              <strong className="text-primary font-semibold">{quizSession?.category}</strong>
-              <br /> and all its sub-categories from your library.
+              <strong className="text-primary font-semibold">{quizSession?.categoryName || 'Selected Category'}</strong>
+              <br /> and its sub-categories from your library.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDeleteCategory} className="bg-destructive hover:bg-destructive/90">
-              Delete Category
+              Delete Category Questions
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

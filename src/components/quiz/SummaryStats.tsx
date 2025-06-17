@@ -1,12 +1,13 @@
 
 "use client";
 
-import type { QuizSession } from '@/types';
+import type { QuizSession, Category as CategoryType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, CheckCircle, XCircle, SkipForward, Clock, Folder } from 'lucide-react'; 
 import { useRouter } from 'next/navigation';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTooltip } from 'recharts';
+// Removed: getFullCategoryPath and getAllCategories as session should now store categoryName
 
 interface SummaryStatsProps {
   session: QuizSession | null;
@@ -20,6 +21,24 @@ const COLORS = {
 
 export function SummaryStats({ session }: SummaryStatsProps) {
   const router = useRouter();
+  // const [categoryName, setCategoryName] = useState<string>('Quiz');
+
+  // useEffect(() => {
+  //   const fetchCategoryName = async () => {
+  //     if (session && session.categoryId && session.categoryId !== ALL_QUESTIONS_RANDOM_KEY) {
+  //       const cats = await getAllCategories(); // Potentially inefficient if called often here
+  //       const name = getFullCategoryPath(session.categoryId, cats);
+  //       setCategoryName(name || "Selected Category");
+  //     } else if (session && session.categoryId === ALL_QUESTIONS_RANDOM_KEY) {
+  //       setCategoryName("Random Quiz");
+  //     }
+  //   };
+  //   fetchCategoryName();
+  // }, [session]);
+  // Using session.categoryName directly now, populated at session start.
+
+  const displayCategoryName = session?.categoryName || "Quiz";
+
 
   if (!session || session.status !== 'completed') {
     return (
@@ -74,7 +93,7 @@ export function SummaryStats({ session }: SummaryStatsProps) {
     <Card className="w-full max-w-2xl mx-auto shadow-2xl">
       <CardHeader className="text-center">
         <CardTitle className="font-headline text-2xl sm:text-3xl md:text-4xl mb-1">Quiz Completed!</CardTitle>
-        <CardDescription className="text-base sm:text-lg">Here's how you performed on the <span className="font-semibold text-primary inline-flex items-center"><Folder className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-1.5"/>{session.category}</span> quiz.</CardDescription>
+        <CardDescription className="text-base sm:text-lg">Here's how you performed on the <span className="font-semibold text-primary inline-flex items-center"><Folder className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-1.5"/>{displayCategoryName}</span> quiz.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="text-center my-4">
@@ -100,7 +119,7 @@ export function SummaryStats({ session }: SummaryStatsProps) {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    outerRadius={window.innerWidth < 640 ? 60 : 80} // Smaller radius on small screens
+                    outerRadius={window.innerWidth < 640 ? 60 : 80} 
                     dataKey="value"
                     stroke="hsl(var(--background))"
                     strokeWidth={2}
@@ -114,7 +133,7 @@ export function SummaryStats({ session }: SummaryStatsProps) {
                       backgroundColor: 'hsl(var(--card))', 
                       borderColor: 'hsl(var(--border))',
                       borderRadius: 'var(--radius)',
-                      fontSize: '0.875rem' // text-sm
+                      fontSize: '0.875rem' 
                     }}
                   />
                   <Legend iconSize={10} wrapperStyle={{fontSize: '0.875rem'}}/>

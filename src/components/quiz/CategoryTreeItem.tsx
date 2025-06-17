@@ -1,20 +1,20 @@
 
 "use client";
 
-import type { CategoryTreeNode } from '@/types';
+import type { Category as CategoryType } from '@/types'; // Use new Category type
 import { Button } from '@/components/ui/button';
 import { Folder, ChevronRight, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface CategoryTreeItemProps {
-  node: CategoryTreeNode;
-  onSelectNode: (path: string, isLeaf: boolean) => void; // Updated prop
+  node: CategoryType; // Changed to CategoryType
+  onSelectNode: (categoryId: string, isLeaf: boolean) => void; // Changed to categoryId
   level: number;
 }
 
 export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItemProps) {
-  const [isOpen, setIsOpen] = useState(false); // Default to closed
+  const [isOpen, setIsOpen] = useState(false); 
 
   const hasChildren = node.children && node.children.length > 0;
   const isLeafNode = !hasChildren;
@@ -27,10 +27,8 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
   };
   
   const handleSelect = () => {
-    if (hasChildren && !isOpen && level < 2) { 
-        // setIsOpen(true); 
-    }
-    onSelectNode(node.path, isLeafNode);
+    // Pass node.id (categoryId) and isLeafNode status
+    onSelectNode(node.id, isLeafNode);
   };
 
   return (
@@ -58,17 +56,19 @@ export function CategoryTreeItem({ node, onSelectNode, level }: CategoryTreeItem
           className={cn(
             "w-full justify-start text-left h-auto py-2 px-3 shadow-sm hover:bg-primary/10 hover:text-primary transition-all whitespace-normal flex items-center min-w-0",
           )}
-          title={`${isLeafNode ? 'Manage questions in' : 'Start quiz for'} category: ${node.path}`}
+          // Display full path if available, otherwise just node name. Title reflects action.
+          title={`${isLeafNode ? 'Manage questions in' : 'Start quiz for'} category: ${node.fullPath || node.name}`}
         >
           <Folder className="mr-2 h-4 w-4 text-primary/80 flex-shrink-0" />
-          <span className="min-w-0 break-words">{node.name}</span>
+          {/* Display fullPath if available for context, otherwise just the node name */}
+          <span className="min-w-0 break-words">{node.fullPath || node.name}</span>
         </Button>
       </div>
       {isOpen && hasChildren && (
         <div className="mt-1">
-          {node.children.map((childNode) => (
+          {node.children!.map((childNode) => ( // Use ! as hasChildren check ensures children exist
             <CategoryTreeItem
-              key={childNode.path}
+              key={childNode.id} // Use childNode.id
               node={childNode}
               onSelectNode={onSelectNode}
               level={level + 1}

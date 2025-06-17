@@ -1,10 +1,19 @@
 
+import type { Timestamp } from 'firebase/firestore'; 
 import { z } from 'genkit';
-import type { Timestamp } from 'firebase/firestore'; // Added Timestamp import
 
 export interface AnswerOption {
   id: string;
   text: string;
+}
+
+// New Category Interface
+export interface Category {
+  id: string;
+  name: string;
+  parentId: string | null;
+  children?: Category[]; // Populated by buildCategoryTree
+  fullPath?: string;    // Populated by getFullCategoryPath or buildCategoryTree
 }
 
 export interface Question {
@@ -12,7 +21,7 @@ export interface Question {
   text: string;
   options: AnswerOption[];
   correctAnswerId: string;
-  category: string; // Represents a path, e.g., "Science/Physics"
+  categoryId: string; // Changed from category: string (path)
 }
 
 export interface QuizAnswer {
@@ -25,27 +34,28 @@ export interface QuizAnswer {
 
 export interface QuizSession {
   id: string;
-  category: string; // The selected category path for the quiz
+  categoryId: string; // Changed from category: string (path)
+  categoryName?: string; // Optional: For storing resolved path at session start
   questions: Question[];
   currentQuestionIndex: number;
   answers: QuizAnswer[];
   startTime: number; // timestamp
   endTime?: number; // timestamp
   status: 'active' | 'completed';
-  userId?: string; // Optional: for authenticated users
+  userId?: string; 
 }
 
-// Represents the QuizSession as stored in Firestore, with Timestamps
 export interface StorableQuizSession {
   id: string;
-  category: string;
+  categoryId: string; // Changed from category: string (path)
+  categoryName?: string; 
   questions: Question[];
   currentQuestionIndex: number;
   answers: QuizAnswer[];
-  startTime: Timestamp; // Firestore Timestamp
-  endTime?: Timestamp; // Firestore Timestamp, optional
+  startTime: Timestamp; 
+  endTime?: Timestamp; 
   status: 'active' | 'completed';
-  userId?: string; // Optional: for authenticated users
+  userId?: string; 
 }
 
 
@@ -78,9 +88,9 @@ export const GenerateDistractorsOutputSchema = z.object({
 });
 export type GenerateDistractorsOutput = z.infer<typeof GenerateDistractorsOutputSchema>;
 
-// For Nested Category Tree
-export interface CategoryTreeNode {
-  name: string; // The display name of this node (e.g., "Physics")
-  path: string; // The full path to this node (e.g., "Science/Physics")
-  children: CategoryTreeNode[];
-}
+// CategoryTreeNode is deprecated, use Category interface with populated children/fullPath
+// export interface CategoryTreeNode {
+//   name: string; 
+//   path: string; 
+//   children: CategoryTreeNode[];
+// }
