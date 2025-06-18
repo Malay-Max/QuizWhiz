@@ -16,6 +16,7 @@ import {
 } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label'; // Added missing import
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -29,9 +30,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // New import
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; 
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Edit, Trash2, Play, ListChecks, FolderOpen, Loader2, Save, X, Folder, Replace } from 'lucide-react'; // Added Replace
+import { ArrowLeft, Edit, Trash2, Play, ListChecks, FolderOpen, Loader2, Save, X, Folder, Replace } from 'lucide-react'; 
 
 interface CategoryOption {
   id: string;
@@ -299,13 +300,13 @@ export default function ManageCategoryPage() {
                   <Separator className="my-4 sm:my-6 shrink-0" />
               )}
               
-              <div className="flex flex-col min-h-0"> 
+              <div className="flex flex-col flex-grow min-h-0"> 
                 {questions.length > 0 ? (
                   <>
                     <h3 className="text-lg sm:text-xl font-semibold mb-3 text-foreground shrink-0">
                       Questions in "{currentCategory?.name || 'Current Category'}" (and its sub-categories)
                     </h3>
-                    <ScrollArea className="h-[50vh] pr-2 sm:pr-4"> {/* Fixed height for scrolling */}
+                    <ScrollArea className="flex-grow h-[50vh] pr-2 sm:pr-4">
                       <div className="space-y-3 sm:space-y-4">
                         {questions.map((q, index) => (
                           <Card key={q.id} className="p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow">
@@ -465,3 +466,4 @@ export default function ManageCategoryPage() {
     </div>
   );
 }
+
