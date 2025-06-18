@@ -4,7 +4,7 @@
 import type { Question, QuizSession, StorableQuizSession, Category, AnswerOption } from '@/types';
 import { db, auth } from './firebase';
 import { 
-  collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, writeBatch, Timestamp, orderBy, limit as firestoreLimit
+  collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, writeBatch, Timestamp, orderBy, updateDoc
 } from 'firebase/firestore';
 import { FirebaseError } from 'firebase/app';
 
@@ -101,8 +101,7 @@ export async function deleteCategory(id: string): Promise<{ success: boolean; er
     const batch = writeBatch(db);
     let operationsCount = 0;
 
-    // Delete questions associated with these categories
-    const CHUNK_SIZE = 30; // Firestore 'in' query limit for array-contains-any or 'in'
+    const CHUNK_SIZE = 30; 
     for (let i = 0; i < allCategoryIdsToDelete.length; i += CHUNK_SIZE) {
       const chunk = allCategoryIdsToDelete.slice(i, i + CHUNK_SIZE);
       const questionsQuery = query(collection(db, QUESTIONS_COLLECTION), where("categoryId", "in", chunk));
@@ -111,12 +110,9 @@ export async function deleteCategory(id: string): Promise<{ success: boolean; er
       questionsSnapshot.forEach((docSnap) => {
         batch.delete(docSnap.ref);
         operationsCount++;
-        // Note: If operationsCount exceeds ~490, a more complex solution to commit in multiple batches would be needed.
-        // For simplicity, this implementation assumes the total operations will be within Firestore's single batch limit (500).
       });
     }
 
-    // Delete the categories themselves
     allCategoryIdsToDelete.forEach(catId => {
       const categoryRef = doc(db, CATEGORIES_COLLECTION, catId);
       batch.delete(categoryRef);
@@ -126,9 +122,6 @@ export async function deleteCategory(id: string): Promise<{ success: boolean; er
     if (operationsCount > 0) {
         await batch.commit();
     } else {
-        // If no operations (e.g., deleting an already empty and non-existent category path),
-        // still commit to ensure the target category itself is attempted to be deleted if it exists.
-        // This case is mostly handled by `targetCategory` check, but good to be robust.
         const categoryRef = doc(db, CATEGORIES_COLLECTION, id);
         const categoryDoc = await getDoc(categoryRef);
         if (categoryDoc.exists()) {
@@ -175,18 +168,11 @@ export function getDescendantCategoryIds(categoryId: string, allCategories: Cate
     directChildrenMap.get(cat.parentId)!.push(cat.id);
   });
   
-  // We only want descendants, not the categoryId itself in the list of descendants.
-  // So, initialize queue with children of categoryId if we want to be strict about "descendants"
-  // Or, more simply, filter categoryId out after processing if it was added.
-  // The current logic of adding to queue then processing children is okay,
-  // but the result `descendants` should not include the initial `categoryId`.
-  // The current use in deleteCategory expects `categoryId` to be added back to the list, so it's fine.
-
-  const processedForQueue: string[] = []; // To avoid re-processing if there were cycles
+  const processedForQueue: string[] = []; 
 
   while (queue.length > 0) {
     const currentParentId = queue.shift()!;
-    if(processedForQueue.includes(currentParentId) && currentParentId !== categoryId) continue; // Avoid reprocessing for cycles
+    if(processedForQueue.includes(currentParentId) && currentParentId !== categoryId) continue; 
     if(currentParentId !== categoryId) processedForQueue.push(currentParentId);
 
 
@@ -301,6 +287,18 @@ export async function updateQuestion(updatedQuestion: Question): Promise<{ succe
   }
 }
 
+export async function updateQuestionCategory(questionId: string, newCategoryId: string): Promise<{ success: boolean; error?: string }> {
+  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
+  try {
+    const questionRef = doc(db, QUESTIONS_COLLECTION, questionId);
+    await setDoc(questionRef, { categoryId: newCategoryId }, { merge: true });
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating question category in Firestore:", error);
+    return { success: false, error: handleFirestoreError(error, "Could not update question category.") };
+  }
+}
+
 export async function deleteQuestionById(questionId: string): Promise<{ success: boolean; error?: string }> {
   if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
@@ -324,7 +322,7 @@ export async function deleteQuestionsByCategoryId(categoryId: string, allCategor
     const CHUNK_SIZE = 30;
     let deletedCount = 0;
     const batch = writeBatch(db);
-    let currentBatchOperations = 0;
+    // let currentBatchOperations = 0; // Not strictly needed if we commit once at the end for simplicity
 
     for (let i = 0; i < categoryIdsToDeleteFrom.length; i += CHUNK_SIZE) {
         const chunk = categoryIdsToDeleteFrom.slice(i, i + CHUNK_SIZE);
@@ -334,12 +332,10 @@ export async function deleteQuestionsByCategoryId(categoryId: string, allCategor
         querySnapshot.forEach((docSnap) => {
             batch.delete(docSnap.ref);
             deletedCount++;
-            currentBatchOperations++;
-            // Batch commit logic would be needed here if >500 operations are expected.
         });
     }
     
-    if (deletedCount > 0) {
+    if (deletedCount > 0) { // Only commit if there were actual deletions
         await batch.commit();
     }
     
@@ -440,3 +436,4 @@ export function clearQuizSession(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(ACTIVE_QUIZ_SESSION_ID_KEY);
 }
+

@@ -11,7 +11,8 @@ import {
   getAllCategories,
   getFullCategoryPath,
   updateCategoryName,
-  deleteCategory
+  deleteCategory,
+  updateQuestionCategory // New import
 } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,9 +29,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // New import
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Edit, Trash2, Play, ListChecks, FolderOpen, Loader2, Save, X, Folder } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Play, ListChecks, FolderOpen, Loader2, Save, X, Folder, Replace } from 'lucide-react'; // Added Replace
 
+interface CategoryOption {
+  id: string;
+  name: string; 
+}
 
 export default function ManageCategoryPage() {
   const router = useRouter();
@@ -50,6 +56,12 @@ export default function ManageCategoryPage() {
   const [showDeleteQuestionConfirm, setShowDeleteQuestionConfirm] = useState(false);
   const [showDeleteCategoryConfirm, setShowDeleteCategoryConfirm] = useState(false);
 
+  // State for Change Category Dialog
+  const [showChangeCategoryDialog, setShowChangeCategoryDialog] = useState(false);
+  const [questionToChangeCategory, setQuestionToChangeCategory] = useState<Question | null>(null);
+  const [selectedNewCategoryIdForDialog, setSelectedNewCategoryIdForDialog] = useState<string>('');
+  const [categoryOptionsForSelect, setCategoryOptionsForSelect] = useState<CategoryOption[]>([]);
+
 
   const loadCategoryAndQuestions = useCallback(async () => {
     if (!categoryIdFromParams) return;
@@ -57,6 +69,12 @@ export default function ManageCategoryPage() {
     
     const cats = await getAllCategories();
     setAllCategories(cats);
+    
+    const optionsForSelect = cats.map(cat => ({
+      id: cat.id,
+      name: getFullCategoryPath(cat.id, cats) || cat.name, 
+    })).sort((a,b) => a.name.localeCompare(b.name));
+    setCategoryOptionsForSelect(optionsForSelect);
     
     const fetchedCategory = cats.find(c => c.id === categoryIdFromParams);
     if (fetchedCategory) {
@@ -161,6 +179,35 @@ export default function ManageCategoryPage() {
     router.push(`/add-question?editId=${question.id}`);
   };
 
+  const handleChangeCategoryClick = (question: Question) => {
+    setQuestionToChangeCategory(question);
+    setSelectedNewCategoryIdForDialog(question.categoryId); // Pre-select current category
+    setShowChangeCategoryDialog(true);
+  };
+
+  const handleConfirmChangeCategory = async () => {
+    if (!questionToChangeCategory || !selectedNewCategoryIdForDialog) return;
+
+    const result = await updateQuestionCategory(questionToChangeCategory.id, selectedNewCategoryIdForDialog);
+    setShowChangeCategoryDialog(false);
+
+    if (result.success) {
+      toast({
+        title: 'Category Changed',
+        description: `Question category updated successfully.`,
+        className: 'bg-accent text-accent-foreground'
+      });
+      await loadCategoryAndQuestions(); // Refresh the list
+    } else {
+      toast({
+        title: 'Update Failed',
+        description: result.error || 'Could not change question category.',
+        variant: 'destructive',
+      });
+    }
+    setQuestionToChangeCategory(null);
+  };
+
   const fullPathDisplay = currentCategory ? getFullCategoryPath(currentCategory.id, allCategories) : 'Loading...';
 
   return (
@@ -252,13 +299,13 @@ export default function ManageCategoryPage() {
                   <Separator className="my-4 sm:my-6 shrink-0" />
               )}
               
-              <div className="flex flex-col"> 
+              <div className="flex flex-col min-h-0"> 
                 {questions.length > 0 ? (
                   <>
                     <h3 className="text-lg sm:text-xl font-semibold mb-3 text-foreground shrink-0">
                       Questions in "{currentCategory?.name || 'Current Category'}" (and its sub-categories)
                     </h3>
-                    <ScrollArea className="h-[50vh] pr-2 sm:pr-4">
+                    <ScrollArea className="h-[50vh] pr-2 sm:pr-4"> {/* Fixed height for scrolling */}
                       <div className="space-y-3 sm:space-y-4">
                         {questions.map((q, index) => (
                           <Card key={q.id} className="p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow">
@@ -273,9 +320,12 @@ export default function ManageCategoryPage() {
                                   ))}
                                 </ul>
                               </div>
-                              <div className="flex gap-2 ml-0 sm:ml-4 shrink-0 self-start sm:self-auto w-full sm:w-auto justify-end">
+                              <div className="flex gap-1.5 sm:gap-2 ml-0 sm:ml-4 shrink-0 self-start sm:self-auto w-full sm:w-auto justify-end">
                                 <Button variant="outline" size="sm" onClick={() => handleEditQuestionClick(q)} title="Edit Question" className="flex-1 sm:flex-initial">
                                   <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" /> <span className="hidden sm:inline">Edit</span>
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => handleChangeCategoryClick(q)} title="Change Category" className="flex-1 sm:flex-initial">
+                                  <Replace className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" /> <span className="hidden sm:inline">Category</span>
                                 </Button>
                                 <Button variant="destructive" size="sm" onClick={() => handleDeleteQuestionClick(q)} title="Delete Question" className="flex-1 sm:flex-initial">
                                   <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" /> <span className="hidden sm:inline">Delete</span>
@@ -368,6 +418,50 @@ export default function ManageCategoryPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog for Changing Question Category */}
+      <AlertDialog open={showChangeCategoryDialog} onOpenChange={setShowChangeCategoryDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg sm:text-xl">Change Question Category</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm sm:text-base">
+              Move question: "<strong className="text-primary break-words">{questionToChangeCategory?.text.substring(0, 70)}{questionToChangeCategory && questionToChangeCategory.text.length > 70 ? "..." : ""}</strong>" to a new category.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-2">
+            <Label htmlFor="new-category-select">New Category</Label>
+            <Select
+              value={selectedNewCategoryIdForDialog}
+              onValueChange={setSelectedNewCategoryIdForDialog}
+              disabled={categoryOptionsForSelect.length === 0}
+            >
+              <SelectTrigger id="new-category-select" className="w-full text-sm md:text-base">
+                <SelectValue placeholder={categoryOptionsForSelect.length === 0 ? "No categories available" : "Select new category"} />
+              </SelectTrigger>
+              <SelectContent>
+                {categoryOptionsForSelect.length === 0 ? (
+                    <SelectItem value="--no-categories--" disabled>No categories available</SelectItem>
+                ) : (
+                    categoryOptionsForSelect.map(catOpt => (
+                        <SelectItem key={catOpt.id} value={catOpt.id}>{catOpt.name}</SelectItem>
+                    ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setShowChangeCategoryDialog(false); setQuestionToChangeCategory(null);}} className="text-sm sm:text-base">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmChangeCategory} 
+              disabled={!selectedNewCategoryIdForDialog || selectedNewCategoryIdForDialog === questionToChangeCategory?.categoryId}
+              className="text-sm sm:text-base"
+            >
+              Save New Category
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
