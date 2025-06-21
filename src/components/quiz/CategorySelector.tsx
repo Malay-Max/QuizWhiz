@@ -8,10 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { CategoryTreeItem } from './CategoryTreeItem';
 import { useRouter } from 'next/navigation';
-import { Zap, Loader2, ListTree, PlusCircle } from 'lucide-react';
+import { Zap, Loader2, ListTree, PlusCircle, Folder } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
 
 interface CategorySelectorProps {
@@ -20,7 +19,6 @@ interface CategorySelectorProps {
 }
 
 export const ALL_QUESTIONS_RANDOM_KEY = "__ALL_QUESTIONS_RANDOM__";
-const ROOT_CATEGORY_PLACEHOLDER_VALUE = "--root--";
 
 export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: CategorySelectorProps) {
   const [categoryTree, setCategoryTree] = useState<CategoryType[]>([]);
@@ -35,6 +33,10 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
   const [newCategoryParentId, setNewCategoryParentId] = useState<string | null>(null);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [categoryOptionsForSelect, setCategoryOptionsForSelect] = useState<Array<{ id: string, name: string }>>([]);
+
+  // New state for parent category search
+  const [parentCategorySearchTerm, setParentCategorySearchTerm] = useState('');
+  const [filteredParentSuggestions, setFilteredParentSuggestions] = useState<Array<{ id: string, name: string }>>([]);
 
   const loadCategoriesData = useCallback(async () => {
     setIsLoading(true);
@@ -63,9 +65,32 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
     loadCategoriesData();
   }, [loadCategoriesData]);
 
+  // Effect for parent category search
+  useEffect(() => {
+    if (parentCategorySearchTerm.trim() !== '') {
+        const lowercasedInput = parentCategorySearchTerm.toLowerCase();
+        const suggestions = categoryOptionsForSelect
+            .filter(catOpt => catOpt.name.toLowerCase().includes(lowercasedInput))
+            .slice(0, 5); // Limit suggestions to 5
+        setFilteredParentSuggestions(suggestions);
+    } else {
+        setFilteredParentSuggestions([]);
+    }
+    // If user clears the input, reset the parentId
+    if (parentCategorySearchTerm.trim() === '') {
+        setNewCategoryParentId(null);
+    }
+  }, [parentCategorySearchTerm, categoryOptionsForSelect]);
+
   const handleRandomQuizButtonClick = () => {
     const count = parseInt(randomQuizCountInput, 10);
     onStartRandomQuiz(isNaN(count) || count <= 0 ? undefined : count);
+  };
+  
+  const handleParentSuggestionClick = (categoryOpt: { id: string, name: string }) => {
+    setNewCategoryParentId(categoryOpt.id);
+    setParentCategorySearchTerm(categoryOpt.name);
+    setFilteredParentSuggestions([]); // Hide suggestions after selection
   };
 
   const handleAddNewCategoryInternal = async () => {
@@ -80,6 +105,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
       toast({ title: "Category Added", description: `Category "${newCategoryName}" created.`, className: "bg-accent text-accent-foreground" });
       setNewCategoryName('');
       setNewCategoryParentId(null);
+      setParentCategorySearchTerm('');
       setShowAddCategoryForm(false); 
       await loadCategoriesData(); 
     } else {
@@ -175,21 +201,38 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
             </div>
             <div>
               <Label htmlFor="new-category-parent-inline">Parent Category (Optional)</Label>
-              <Select
-                value={newCategoryParentId === null ? ROOT_CATEGORY_PLACEHOLDER_VALUE : newCategoryParentId}
-                onValueChange={(value) => setNewCategoryParentId(value === ROOT_CATEGORY_PLACEHOLDER_VALUE ? null : value)}
-                disabled={categoryOptionsForSelect.length === 0}
-              >
-                <SelectTrigger className="w-full mt-1 text-sm md:text-base">
-                  <SelectValue placeholder={categoryOptionsForSelect.length === 0 ? "No parent categories available" : "Select parent..."} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ROOT_CATEGORY_PLACEHOLDER_VALUE}>-- No Parent (Root Category) --</SelectItem>
-                  {categoryOptionsForSelect.map(catOpt => (
-                    <SelectItem key={catOpt.id} value={catOpt.id}>{catOpt.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+               <Input
+                  id="new-category-parent-inline"
+                  value={parentCategorySearchTerm}
+                  onChange={(e) => setParentCategorySearchTerm(e.target.value)}
+                  placeholder="Search for a parent category..."
+                  className="mt-1 text-sm md:text-base"
+                  autoComplete="off"
+                  disabled={categoryOptionsForSelect.length === 0}
+              />
+              {filteredParentSuggestions.length > 0 && (
+                  <div className="mt-2 border rounded-md bg-background shadow-md p-2">
+                      <p className="text-xs text-muted-foreground mb-1">Suggestions:</p>
+                      <div className="flex flex-wrap gap-1">
+                          {filteredParentSuggestions.map(catOpt => (
+                              <Button
+                                  key={`parent-sugg-${catOpt.id}`}
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleParentSuggestionClick(catOpt)}
+                                  className="text-xs px-2 py-1 h-auto whitespace-normal"
+                              >
+                                  <Folder className="mr-1.5 h-3 w-3 shrink-0" />
+                                  <span className="min-w-0 break-all">{catOpt.name}</span>
+                              </Button>
+                          ))}
+                      </div>
+                  </div>
+              )}
+              {categoryOptionsForSelect.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">No parent categories available to select.</p>
+              )}
             </div>
             <Button onClick={handleAddNewCategoryInternal} disabled={isAddingCategory || !newCategoryName.trim()} className="w-full text-sm sm:text-base">
               {isAddingCategory ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
