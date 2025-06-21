@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -28,8 +28,6 @@ import { generateDistractorsAction } from '@/app/actions';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
 
 const answerOptionSchema = z.object({
   id: z.string().default(() => crypto.randomUUID()),
@@ -109,6 +107,10 @@ export function QuestionForm() {
   const [allCategories, setAllCategories] = useState<CategoryType[]>([]);
   const [categoryOptionsForSelect, setCategoryOptionsForSelect] = useState<CategoryOption[]>([]);
   
+  // State for category search
+  const [categorySearchTerm, setCategorySearchTerm] = useState('');
+  const [filteredCategorySuggestions, setFilteredCategorySuggestions] = useState<CategoryOption[]>([]);
+
   const [batchInput, setBatchInput] = useState('');
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
 
@@ -151,6 +153,44 @@ export function QuestionForm() {
     refreshAllCategories();
   }, [refreshAllCategories]);
   
+  const watchCategoryId = form.watch('categoryId');
+
+  useEffect(() => {
+    if (watchCategoryId) {
+      const selectedCategory = categoryOptionsForSelect.find(c => c.id === watchCategoryId);
+      if (selectedCategory && selectedCategory.name !== categorySearchTerm) {
+        setCategorySearchTerm(selectedCategory.name);
+      }
+    } else if (!editingQuestionId) {
+      setCategorySearchTerm('');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchCategoryId, categoryOptionsForSelect]);
+
+
+  useEffect(() => {
+    if (categorySearchTerm && categoryOptionsForSelect.some(opt => opt.name === categorySearchTerm)) {
+      setFilteredCategorySuggestions([]);
+      return;
+    }
+
+    if (categorySearchTerm.trim() !== '') {
+      const lowercasedInput = categorySearchTerm.toLowerCase();
+      const suggestions = categoryOptionsForSelect
+        .filter(catOpt => catOpt.name.toLowerCase().includes(lowercasedInput))
+        .slice(0, 5);
+      setFilteredCategorySuggestions(suggestions);
+    } else {
+      setFilteredCategorySuggestions([]);
+    }
+  }, [categorySearchTerm, categoryOptionsForSelect]);
+
+  const handleCategorySuggestionClick = (categoryOpt: CategoryOption) => {
+    form.setValue('categoryId', categoryOpt.id, { shouldValidate: true });
+    setCategorySearchTerm(categoryOpt.name);
+    setFilteredCategorySuggestions([]);
+  };
+
   useEffect(() => {
     if (exportCategorySearchTerm && exportCategorySearchTerm.trim() !== '') {
       const lowercasedInput = exportCategorySearchTerm.toLowerCase();
@@ -615,62 +655,69 @@ export function QuestionForm() {
           
           <div>
             <Label className="text-base sm:text-lg">Correct Answer</Label>
-            <Controller
-              control={form.control}
-              name="correctAnswerId"
-              render={({ field }) => (
-                <RadioGroup
-                  onValueChange={field.onChange}
-                  value={field.value}
-                  className="mt-2 space-y-2"
-                  aria-invalid={form.formState.errors.correctAnswerId ? "true" : "false"}
-                >
-                  {form.getValues('options').map((option, index) => (
-                    option.text.trim() && ( 
-                    <div key={`${option.id}-radio-item`} className="flex items-start space-x-2 p-2 border rounded-md hover:bg-secondary/50 transition-colors">
-                      <RadioGroupItem value={option.id} id={`${option.id}-radio`} className="mt-1 flex-shrink-0" />
-                      <Label htmlFor={`${option.id}-radio`} className="flex-grow cursor-pointer font-normal">
-                        <div className="prose prose-base sm:prose-lg dark:prose-invert max-w-none text-inherit">
-                            <ReactMarkdown components={optionMarkdownComponents}>
-                                {option.text || `Option ${index + 1}`}
-                            </ReactMarkdown>
-                        </div>
-                      </Label>
+            <RadioGroup
+              onValueChange={(value) => form.setValue('correctAnswerId', value, { shouldValidate: true })}
+              value={form.getValues('correctAnswerId')}
+              className="mt-2 space-y-2"
+              aria-invalid={form.formState.errors.correctAnswerId ? "true" : "false"}
+            >
+              {form.getValues('options').map((option, index) => (
+                option.text.trim() && ( 
+                <div key={`${option.id}-radio-item`} className="flex items-start space-x-2 p-2 border rounded-md hover:bg-secondary/50 transition-colors">
+                  <RadioGroupItem value={option.id} id={`${option.id}-radio`} className="mt-1 flex-shrink-0" />
+                  <Label htmlFor={`${option.id}-radio`} className="flex-grow cursor-pointer font-normal">
+                    <div className="prose prose-base sm:prose-lg dark:prose-invert max-w-none text-inherit">
+                        <ReactMarkdown components={optionMarkdownComponents}>
+                            {option.text || `Option ${index + 1}`}
+                        </ReactMarkdown>
                     </div>
-                    )
-                  ))}
-                </RadioGroup>
-              )}
-            />
+                  </Label>
+                </div>
+                )
+              ))}
+            </RadioGroup>
             {form.formState.errors.correctAnswerId && <p className="text-sm text-destructive mt-1">{form.formState.errors.correctAnswerId.message}</p>}
           </div>
 
           <div>
-            <Label htmlFor="categoryId" className="text-base sm:text-lg">Category (for single & batch)</Label>
-            <Controller
-                name="categoryId"
-                control={form.control}
-                render={({ field }) => (
-                    <Select 
-                        value={field.value} 
-                        onValueChange={field.onChange}
-                        disabled={categoryOptionsForSelect.length === 0 && !editingQuestionId}
-                    >
-                        <SelectTrigger className="w-full mt-1 text-sm md:text-base">
-                            <SelectValue placeholder={categoryOptionsForSelect.length === 0 ? "No categories available - Add one first" : "Select a category"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {categoryOptionsForSelect.length === 0 && !editingQuestionId ? (
-                                 <SelectItem value="--no-categories--" disabled>No categories available</SelectItem>
-                            ) : (
-                                categoryOptionsForSelect.map(catOpt => (
-                                    <SelectItem key={catOpt.id} value={catOpt.id}>{catOpt.name}</SelectItem>
-                                ))
-                            )}
-                        </SelectContent>
-                    </Select>
-                )}
+            <Label htmlFor="category-search" className="text-base sm:text-lg">Category (for single & batch)</Label>
+            <Input
+              id="category-search"
+              value={categorySearchTerm}
+              onChange={(e) => {
+                setCategorySearchTerm(e.target.value);
+                if (!categoryOptionsForSelect.some(c => c.name === e.target.value)) {
+                  form.setValue('categoryId', '', { shouldValidate: true });
+                }
+              }}
+              placeholder="Type to search for a category..."
+              className="mt-1 text-sm md:text-base"
+              autoComplete="off"
+              disabled={categoryOptionsForSelect.length === 0 && !editingQuestionId}
             />
+            {filteredCategorySuggestions.length > 0 && (
+              <div className="mt-2 border rounded-md bg-background shadow-md p-2">
+                <p className="text-xs text-muted-foreground mb-1">Suggestions:</p>
+                <div className="flex flex-wrap gap-1">
+                  {filteredCategorySuggestions.map(catOpt => (
+                    <Button
+                      key={`cat-sugg-${catOpt.id}`}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCategorySuggestionClick(catOpt)}
+                      className="text-xs px-2 py-1 h-auto whitespace-normal"
+                    >
+                      <Folder className="mr-1.5 h-3 w-3 shrink-0" />
+                      <span className="min-w-0 break-all">{catOpt.name}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {categoryOptionsForSelect.length === 0 && !editingQuestionId && (
+              <p className="text-xs text-muted-foreground mt-1">No categories available. Please add one via the home page.</p>
+            )}
             {form.formState.errors.categoryId && <p className="text-sm text-destructive mt-1">{form.formState.errors.categoryId.message}</p>}
           </div>
 
