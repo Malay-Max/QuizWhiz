@@ -16,7 +16,7 @@ import {
 } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label'; // Added missing import
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -30,7 +30,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; 
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Edit, Trash2, Play, ListChecks, FolderOpen, Loader2, Save, X, Folder, Replace } from 'lucide-react'; 
 
@@ -62,6 +61,8 @@ export default function ManageCategoryPage() {
   const [questionToChangeCategory, setQuestionToChangeCategory] = useState<Question | null>(null);
   const [selectedNewCategoryIdForDialog, setSelectedNewCategoryIdForDialog] = useState<string>('');
   const [categoryOptionsForSelect, setCategoryOptionsForSelect] = useState<CategoryOption[]>([]);
+  const [changeCategorySearchTerm, setChangeCategorySearchTerm] = useState('');
+  const [filteredChangeCategorySuggestions, setFilteredChangeCategorySuggestions] = useState<CategoryOption[]>([]);
 
 
   const loadCategoryAndQuestions = useCallback(async () => {
@@ -98,6 +99,24 @@ export default function ManageCategoryPage() {
   useEffect(() => {
     loadCategoryAndQuestions();
   }, [loadCategoryAndQuestions]);
+  
+  // Effect for handling search in the "Change Category" dialog
+  useEffect(() => {
+    if (changeCategorySearchTerm && categoryOptionsForSelect.some(opt => opt.name === changeCategorySearchTerm)) {
+      setFilteredChangeCategorySuggestions([]);
+      return;
+    }
+    
+    if (changeCategorySearchTerm.trim() !== '') {
+      const lowercasedInput = changeCategorySearchTerm.toLowerCase();
+      const suggestions = categoryOptionsForSelect
+        .filter(catOpt => catOpt.name.toLowerCase().includes(lowercasedInput))
+        .slice(0, 5);
+      setFilteredChangeCategorySuggestions(suggestions);
+    } else {
+      setFilteredChangeCategorySuggestions([]);
+    }
+  }, [changeCategorySearchTerm, categoryOptionsForSelect]);
 
   const handleSaveCategoryName = async () => {
     if (!currentCategory || !categoryName.trim() || categoryName.trim() === currentCategory.name) {
@@ -128,7 +147,7 @@ export default function ManageCategoryPage() {
     setShowDeleteCategoryConfirm(false);
 
     if (result.success) {
-      toast({ title: "Category Deleted", description: `Category "${currentCategory.name}" and its contents (including sub-categories and their questions) have been removed.`, className: "bg-accent text-accent-foreground" });
+      toast({ title: "Category Deleted", description: `Category "${currentCategory.name}" and all its contents (including sub-categories and their questions) have been removed.`, className: "bg-accent text-accent-foreground" });
       router.push('/'); 
     } else {
       toast({ title: "Deletion Failed", description: result.error || "Could not delete the category and its contents.", variant: "destructive" });
@@ -181,9 +200,17 @@ export default function ManageCategoryPage() {
   };
 
   const handleChangeCategoryClick = (question: Question) => {
+    const currentCategoryFullPath = getFullCategoryPath(question.categoryId, allCategories);
     setQuestionToChangeCategory(question);
     setSelectedNewCategoryIdForDialog(question.categoryId); // Pre-select current category
+    setChangeCategorySearchTerm(currentCategoryFullPath);
     setShowChangeCategoryDialog(true);
+  };
+  
+  const handleChangeCategoryDialogSuggestionClick = (categoryOpt: CategoryOption) => {
+    setSelectedNewCategoryIdForDialog(categoryOpt.id);
+    setChangeCategorySearchTerm(categoryOpt.name);
+    setFilteredChangeCategorySuggestions([]);
   };
 
   const handleConfirmChangeCategory = async () => {
@@ -306,7 +333,7 @@ export default function ManageCategoryPage() {
                     <h3 className="text-lg sm:text-xl font-semibold mb-3 text-foreground shrink-0">
                       Questions in "{currentCategory?.name || 'Current Category'}" (and its sub-categories)
                     </h3>
-                    <ScrollArea className="flex-grow h-[50vh] pr-2 sm:pr-4">
+                    <ScrollArea className="h-[50vh] pr-2 sm:pr-4">
                       <div className="space-y-3 sm:space-y-4">
                         {questions.map((q, index) => (
                           <Card key={q.id} className="p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow">
@@ -430,25 +457,40 @@ export default function ManageCategoryPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4 space-y-2">
-            <Label htmlFor="new-category-select">New Category</Label>
-            <Select
-              value={selectedNewCategoryIdForDialog}
-              onValueChange={setSelectedNewCategoryIdForDialog}
-              disabled={categoryOptionsForSelect.length === 0}
-            >
-              <SelectTrigger id="new-category-select" className="w-full text-sm md:text-base">
-                <SelectValue placeholder={categoryOptionsForSelect.length === 0 ? "No categories available" : "Select new category"} />
-              </SelectTrigger>
-              <SelectContent>
-                {categoryOptionsForSelect.length === 0 ? (
-                    <SelectItem value="--no-categories--" disabled>No categories available</SelectItem>
-                ) : (
-                    categoryOptionsForSelect.map(catOpt => (
-                        <SelectItem key={catOpt.id} value={catOpt.id}>{catOpt.name}</SelectItem>
-                    ))
-                )}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="change-category-search">New Category</Label>
+            <Input
+              id="change-category-search"
+              value={changeCategorySearchTerm}
+              onChange={(e) => {
+                setChangeCategorySearchTerm(e.target.value);
+                if (!categoryOptionsForSelect.some(c => c.name === e.target.value)) {
+                  setSelectedNewCategoryIdForDialog('');
+                }
+              }}
+              placeholder="Type to search for a category..."
+              className="mt-1 text-sm md:text-base"
+              autoComplete="off"
+            />
+            {filteredChangeCategorySuggestions.length > 0 && (
+              <div className="mt-2 border rounded-md bg-background shadow-md p-2">
+                <p className="text-xs text-muted-foreground mb-1">Suggestions:</p>
+                <div className="flex flex-wrap gap-1">
+                  {filteredChangeCategorySuggestions.map(catOpt => (
+                    <Button
+                      key={`change-cat-sugg-${catOpt.id}`}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleChangeCategoryDialogSuggestionClick(catOpt)}
+                      className="text-xs px-2 py-1 h-auto whitespace-normal"
+                    >
+                      <Folder className="mr-1.5 h-3 w-3 shrink-0" />
+                      <span className="min-w-0 break-all">{catOpt.name}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => { setShowChangeCategoryDialog(false); setQuestionToChangeCategory(null);}} className="text-sm sm:text-base">Cancel</AlertDialogCancel>
@@ -466,4 +508,3 @@ export default function ManageCategoryPage() {
     </div>
   );
 }
-
