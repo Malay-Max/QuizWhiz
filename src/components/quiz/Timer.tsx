@@ -20,6 +20,7 @@ export function Timer({ duration, onTimeout, onTick, isPaused, resetKey, isExter
 
   useEffect(() => {
     setTimeLeft(duration); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [duration, resetKey]);
 
   useEffect(() => {
@@ -30,36 +31,31 @@ export function Timer({ duration, onTimeout, onTick, isPaused, resetKey, isExter
       return;
     }
 
-    if (timeLeft <= 0) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      if (isExternallyAnsweredRef?.current) {
-        return;
-      }
-      onTimeout();
-      return;
-    }
-
-    intervalRef.current = setInterval(() => {
-      setTimeLeft((prevTime) => {
-        if (isExternallyAnsweredRef?.current) {
-           if(intervalRef.current) clearInterval(intervalRef.current);
-           return prevTime; 
-        }
-        if (prevTime -1 <= 0) {
-            if(intervalRef.current) clearInterval(intervalRef.current);
+    // This handles the resume case.
+    if (!intervalRef.current && timeLeft > 0) {
+        intervalRef.current = setInterval(() => {
+        setTimeLeft((prevTime) => {
+            const newTime = prevTime - 1;
+            if (isExternallyAnsweredRef?.current) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            return prevTime;
+            }
+            if (newTime <= 0) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
             if (!isExternallyAnsweredRef?.current) {
                 onTimeout();
             }
-        }
-        return prevTime - 1;
-      });
-    }, 1000);
-
+            return 0;
+            }
+            return newTime;
+        });
+        }, 1000);
+    }
+    
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
   }, [isPaused, timeLeft, duration, onTimeout, isExternallyAnsweredRef]);
@@ -89,3 +85,4 @@ export function Timer({ duration, onTimeout, onTick, isPaused, resetKey, isExter
   );
 }
 
+    

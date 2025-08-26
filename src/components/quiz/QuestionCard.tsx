@@ -6,20 +6,8 @@ import type { Question } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Timer } from '@/components/quiz/Timer';
-import { CheckCircle2, XCircle, ArrowRight, AlertTriangle, Lightbulb, Loader2, SkipForwardIcon } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowRight, AlertTriangle, SkipForwardIcon, Pause, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { explainAnswerAction } from '@/app/actions';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useToast } from '@/hooks/use-toast';
 import ReactMarkdown from 'react-markdown';
 
 
@@ -41,12 +29,8 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const isAnsweredRef = useRef(false);
   const [timeLeft, setTimeLeft] = useState(QUESTION_DURATION);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [explanation, setExplanation] = useState<string | null>(null);
-  const [isExplanationLoading, setIsExplanationLoading] = useState(false);
-  const [showExplanationDialog, setShowExplanationDialog] = useState(false);
   const [autoAdvanceMessage, setAutoAdvanceMessage] = useState<string | null>(null);
-
-  const { toast } = useToast();
+  const [isQuizPaused, setIsQuizPaused] = useState(false);
 
   const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -106,10 +90,8 @@ const optionMarkdownComponents = {
     isAnsweredRef.current = false;
     setTimeLeft(QUESTION_DURATION);
     setShowFeedback(false);
-    setExplanation(null);
-    setIsExplanationLoading(false);
-    setShowExplanationDialog(false); 
     setAutoAdvanceMessage(null);
+    setIsQuizPaused(false);
 
     if (autoAdvanceTimerRef.current) {
       clearTimeout(autoAdvanceTimerRef.current);
@@ -148,8 +130,8 @@ const optionMarkdownComponents = {
     }, AUTO_ADVANCE_DELAY);
   };
   
-   useEffect(() => {
-    if (!showExplanationDialog && isAnsweredRef.current) {
+  useEffect(() => {
+    if (isAnsweredRef.current) {
         const wasCorrect = selectedAnswerId === question.correctAnswerId;
         const wasSkippedOrTimedOut = selectedAnswerId === null && isAnsweredRef.current; 
         
@@ -161,7 +143,7 @@ const optionMarkdownComponents = {
         }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showExplanationDialog, isAnsweredRef.current, selectedAnswerId, question.correctAnswerId]);
+  }, [isAnsweredRef.current, selectedAnswerId, question.correctAnswerId]);
 
 
   const triggerSkipOrTimeout = (currentTimeLeft: number) => {
@@ -178,7 +160,7 @@ const optionMarkdownComponents = {
   };
 
   const handleAnswerClick = (answerId: string) => {
-    if (isAnsweredRef.current) return;
+    if (isAnsweredRef.current || isQuizPaused) return;
     isAnsweredRef.current = true;
 
     const timeTaken = QUESTION_DURATION - timeLeft;
@@ -203,44 +185,6 @@ const optionMarkdownComponents = {
 
   const handleTimerTimeout = () => {
     triggerSkipOrTimeout(0);
-  };
-
-  const handleShowExplanation = async () => {
-    if (autoAdvanceTimerRef.current) {
-      clearTimeout(autoAdvanceTimerRef.current);
-      autoAdvanceTimerRef.current = null;
-    }
-    if (visualCountdownTimerRef.current) {
-      clearInterval(visualCountdownTimerRef.current);
-      visualCountdownTimerRef.current = null;
-    }
-    setAutoAdvanceMessage(null);
-
-    setIsExplanationLoading(true);
-    setExplanation(null);
-    setShowExplanationDialog(true);
-
-    try {
-      const result = await explainAnswerAction({
-        questionText: question.text,
-        options: question.options.map(opt => ({ id: opt.id, text: opt.text })),
-        correctAnswerId: question.correctAnswerId,
-        selectedAnswerId: selectedAnswerId,
-      });
-
-      if (result.success && result.data) {
-        setExplanation(result.data.explanation);
-      } else {
-        setExplanation(result.error || "Failed to load explanation.");
-        toast({ title: "Explanation Error", description: result.error || "Could not generate explanation.", variant: "destructive"});
-      }
-    } catch (error) {
-      console.error("Error in handleShowExplanation:", error);
-      setExplanation("An unexpected error occurred while fetching the explanation.");
-      toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive"});
-    } finally {
-      setIsExplanationLoading(false);
-    }
   };
 
   const getButtonVariant = (optionId: string) => {
@@ -279,20 +223,30 @@ const optionMarkdownComponents = {
                 duration={QUESTION_DURATION}
                 onTimeout={handleTimerTimeout}
                 onTick={setTimeLeft}
-                isPaused={isAnswered}
+                isPaused={isAnswered || isQuizPaused}
                 isExternallyAnsweredRef={isAnsweredRef}
               />
             </div>
           </div>
           <CardDescription asChild className="pt-1 prose prose-base sm:prose-lg dark:prose-invert max-w-none">
-             <div> {/* Outer div for CardDescription content */}
+             <div className={cn("relative", isQuizPaused && "blur-sm pointer-events-none")}>
                 <ReactMarkdown components={markdownComponents}>
                     {question.text}
                 </ReactMarkdown>
             </div>
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2 sm:space-y-3 px-4 sm:px-6">
+        <CardContent className="space-y-2 sm:space-y-3 px-4 sm:px-6 relative">
+           {isQuizPaused && (
+            <div className="absolute inset-0 bg-background/80 z-10 flex items-center justify-center rounded-lg">
+                <div className="text-center">
+                    <p className="text-xl font-semibold">Quiz Paused</p>
+                    <Button onClick={() => setIsQuizPaused(false)} className="mt-4">
+                        <Play className="mr-2 h-4 w-4" /> Resume
+                    </Button>
+                </div>
+            </div>
+          )}
           {question.options.map((option) => (
             <Button
               key={option.id}
@@ -307,7 +261,7 @@ const optionMarkdownComponents = {
                 isAnswered && option.id === question.correctAnswerId && "bg-accent hover:bg-accent/90 text-accent-foreground",
               )}
               onClick={() => handleAnswerClick(option.id)}
-              disabled={isAnswered}
+              disabled={isAnswered || isQuizPaused}
               aria-pressed={selectedAnswerId === option.id}
             >
               {showFeedback && option.id === selectedAnswerId && option.id === question.correctAnswerId && CorrectIcon}
@@ -352,26 +306,24 @@ const optionMarkdownComponents = {
 
           <div className="flex flex-col sm:flex-row gap-2 w-full justify-center">
             {!isAnswered && (
-                <Button
-                    variant="outline"
-                    onClick={handleSkipButtonClick}
-                    className="w-full sm:w-auto text-xs sm:text-sm"
-                    disabled={isAnswered}
-                >
-                    <SkipForwardIcon className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Skip Question
-                </Button>
-            )}
-
-            {showFeedback && (
-                <Button
-                variant="outline"
-                className="w-full sm:w-auto text-xs sm:text-sm"
-                onClick={handleShowExplanation}
-                disabled={isExplanationLoading}
-                >
-                {isExplanationLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" /> : <Lightbulb className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />}
-                Show Explanation
-                </Button>
+                <>
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsQuizPaused(true)}
+                        className="w-full sm:w-auto text-xs sm:text-sm"
+                        disabled={isAnswered || isQuizPaused}
+                    >
+                        <Pause className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Pause
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={handleSkipButtonClick}
+                        className="w-full sm:w-auto text-xs sm:text-sm"
+                        disabled={isAnswered || isQuizPaused}
+                    >
+                        <SkipForwardIcon className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Skip Question
+                    </Button>
+                </>
             )}
           </div>
 
@@ -396,35 +348,6 @@ const optionMarkdownComponents = {
           )}
         </CardFooter>
       </Card>
-
-      <AlertDialog open={showExplanationDialog} onOpenChange={setShowExplanationDialog}>
-        <AlertDialogContent className="max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-lg sm:text-xl md:text-2xl">Explanation</AlertDialogTitle>
-          </AlertDialogHeader>
-          <AlertDialogDescription asChild>
-            <ScrollArea className="max-h-[50vh] sm:max-h-[60vh] w-full rounded-md">
-              <div className="prose prose-base sm:prose-lg dark:prose-invert max-w-none p-1 sm:p-2 md:p-4">
-                  {isExplanationLoading && (
-                  <div className="flex items-center justify-center">
-                      <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin text-primary" />
-                      <span className="ml-2 text-xs sm:text-sm">Generating explanation...</span>
-                  </div>
-                  )}
-                  {!isExplanationLoading && explanation && (
-                  <ReactMarkdown components={markdownComponents}>
-                      {explanation}
-                  </ReactMarkdown>
-                  )}
-                  {!isExplanationLoading && !explanation && "No explanation available or an error occurred."}
-              </div>
-            </ScrollArea>
-          </AlertDialogDescription>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowExplanationDialog(false)} disabled={isExplanationLoading}>Close</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }
@@ -433,3 +356,6 @@ const optionMarkdownComponents = {
     
 
 
+
+
+    
