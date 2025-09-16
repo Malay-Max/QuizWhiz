@@ -1,8 +1,7 @@
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Code, BookOpen } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 const CodeBlock = ({ children }: { children: React.ReactNode }) => (
@@ -33,7 +32,7 @@ const Endpoint = ({ method, path, description }: { method: 'GET' | 'POST' | 'PUT
 
 export default function ApiDocumentationPage() {
   return (
-    <div className="container mx-auto py-8 prose prose-lg dark:prose-invert max-w-4xl">
+    <div className="container mx-auto py-8 max-w-4xl">
       <div className="flex items-center mb-6">
         <BookOpen className="h-10 w-10 mr-3 text-primary" />
         <h1 className="font-headline text-4xl m-0">API Documentation for MCP Server Integration</h1>
@@ -47,12 +46,12 @@ export default function ApiDocumentationPage() {
       <Separator className="my-8" />
       
       <section>
-        <h2 id="testing">Testing the API</h2>
+        <h2 id="testing" className="text-2xl font-semibold mb-4">Testing the API</h2>
         <p>
           Since authentication has been removed, all API endpoints are public and can be tested directly without needing an authentication token. You can use tools like <code>curl</code> or any API client like Postman or Insomnia.
         </p>
-        <p className="text-sm">
-          <strong>Important:</strong> The examples below use a placeholder `https://<YOUR_APP_URL>`. You must replace this with your application's public URL (e.g., your Vercel deployment URL). For local testing, this would be `http://localhost:3000`.
+        <p className="text-sm mt-2">
+          <strong>Important:</strong> The examples below use a placeholder <code>https://&lt;YOUR_APP_URL&gt;</code>. You must replace this with your application's public URL (e.g., your Vercel deployment URL). For local testing, this would be <code>http://localhost:3000</code>.
         </p>
 
         <Card className="my-6">
@@ -87,7 +86,7 @@ export default function ApiDocumentationPage() {
 
 
       <section>
-        <h2 id="endpoints">API Endpoints</h2>
+        <h2 id="endpoints" className="text-2xl font-semibold mb-4">API Endpoints</h2>
         <p>The base URL for all API endpoints is your application's root URL.</p>
         
         <Card className="my-6">
