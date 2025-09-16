@@ -51,6 +51,9 @@ export default function ApiDocumentationPage() {
         <p>
           Since authentication has been removed, all API endpoints are public and can be tested directly without needing an authentication token. You can use tools like <code>curl</code> or any API client like Postman or Insomnia.
         </p>
+        <p className="text-sm">
+          <strong>Note on `localhost:3000`:</strong> The examples below use `http://localhost:3000`, which is the default address for the local development server. When your application is deployed to production, you will need to replace `http://localhost:3000` with your public application URL.
+        </p>
 
         <Card className="my-6">
             <CardHeader>
