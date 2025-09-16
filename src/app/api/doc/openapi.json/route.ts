@@ -2,6 +2,8 @@
 import { NextResponse } from 'next/server';
 import { getApiDocs } from '@/lib/openapi';
 
+export const runtime = 'nodejs'; // Use the Node.js runtime
+
 export async function GET() {
     const spec = getApiDocs();
     if (!spec) {
