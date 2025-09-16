@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow public read and write access to categories.
+    match /categories/{categoryId=**} {
+      allow read, write: if true;
+    }
+
+    // Allow public read and write access to questions.
+    match /allQuestions/{questionId} {
+      allow read, write: if true;
+    }
+
+    // Allow public read and write access to quiz sessions.
+    // In a production app with user accounts, you would restrict this
+    // to only allow a user to access their own sessions.
+    match /quizSessions/{sessionId} {
+      allow read, write: if true;
+    }
+  }
+}
