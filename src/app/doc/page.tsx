@@ -1,30 +1,26 @@
+
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BookOpen } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
+import { BookOpen, Server, Terminal } from 'lucide-react';
+import React, { ReactNode } from 'react';
 
-const CodeBlock = ({ children }: { children: React.ReactNode }) => (
-  <pre className="bg-muted p-4 rounded-md text-sm font-code overflow-x-auto">
-    <code>{children}</code>
-  </pre>
-);
-
-const Endpoint = ({ method, path, description }: { method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, description: string }) => {
+// Helper component to format endpoint documentation
+const Endpoint = ({ method, path, description, children }: { method: string, path: string, description: string, children?: ReactNode }) => {
   const methodColor = {
-    GET: 'text-blue-500',
-    POST: 'text-green-500',
+    GET: 'text-green-500',
+    POST: 'text-blue-500',
     PUT: 'text-yellow-500',
     DELETE: 'text-red-500',
-  }[method];
+  }[method] || 'text-gray-500';
 
   return (
-    <div className="mb-4">
-      <h4 className="font-semibold text-lg">
-        <span className={`${methodColor} font-bold mr-2`}>{method}</span>
-        <code className="font-code">{path}</code>
-      </h4>
-      <p className="text-muted-foreground mt-1 text-sm">{description}</p>
+    <div className="mb-8 p-4 border rounded-lg shadow-sm bg-card">
+      <h3 className="font-code text-lg sm:text-xl font-bold">
+        <span className={`mr-2 font-extrabold ${methodColor}`}>{method}</span>
+        <span>{path}</span>
+      </h3>
+      <p className="mt-1 text-muted-foreground">{description}</p>
+      {children && <div className="mt-4">{children}</div>}
     </div>
   );
 };
@@ -37,110 +33,122 @@ export default function ApiDocumentationPage() {
         <BookOpen className="h-10 w-10 mr-3 text-primary" />
         <h1 className="font-headline text-4xl m-0">API Documentation for MCP Server Integration</h1>
       </div>
-
-      <p className="text-muted-foreground">
-        This document provides instructions on how to integrate an external server (like an MCP server)
-        with the QuizCraft API. All endpoints are public and do not require authentication.
-      </p>
-
-      <Separator className="my-8" />
       
-      <section>
-        <h2 id="testing" className="text-2xl font-semibold mb-4">Testing the API</h2>
-        <p>
-          Since authentication has been removed, all API endpoints are public and can be tested directly without needing an authentication token. You can use tools like <code>curl</code> or any API client like Postman or Insomnia.
-        </p>
-        <p className="text-sm mt-2">
-          <strong>Important:</strong> The examples below use a placeholder <code>https://&lt;YOUR_APP_URL&gt;</code>. You must replace this with your application's public URL (e.g., your Vercel deployment URL). For local testing, this would be <code>http://localhost:3000</code>.
-        </p>
-
-        <Card className="my-6">
-            <CardHeader>
-                <CardTitle id="testing-examples">Testing Examples (using curl)</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div>
-                    <h4 className="font-semibold">1. List All Categories</h4>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      This command makes a GET request to retrieve all existing quiz categories.
-                    </p>
-                    <CodeBlock>
-                      {`curl https://<YOUR_APP_URL>/api/categories`}
-                    </CodeBlock>
-                </div>
-
-                <div>
-                    <h4 className="font-semibold">2. Start a New Random Quiz</h4>
-                     <p className="text-sm text-muted-foreground mb-2">
-                      This command sends a POST request to start a new quiz session with 5 random questions.
-                    </p>
-                    <CodeBlock>
-                      {`curl -X POST -H "Content-Type: application/json" -d '{"random": true, "questionCount": 5}' https://<YOUR_APP_URL>/api/quizzes`}
-                    </CodeBlock>
-                </div>
-            </CardContent>
-        </Card>
+      <section id="introduction" className="mb-10">
+        <h2 className="font-headline text-2xl border-b pb-2 mb-4">Introduction</h2>
+        <p>This document provides the necessary details for integrating an external MCP (Multiple Choice Platform) server with this Quiz application. The API is designed to be simple and follows RESTful principles.</p>
+        <p>The API is currently public, meaning no authentication is required to access the endpoints. This simplifies development and testing but should be secured if sensitive data is involved.</p>
       </section>
 
-      <Separator className="my-8" />
+      <section id="api-host" className="mb-10">
+          <h2 className="font-headline text-2xl border-b pb-2 mb-4">Note on API Host</h2>
+          <p>
+              The examples below use a placeholder URL <code>https://&lt;YOUR_APP_URL&gt;</code>. 
+              When making API calls, you must replace this placeholder with the actual domain of your deployed Vercel application.
+          </p>
+          <p>
+              If you are testing on your local machine, the URL will typically be <code>http://localhost:3000</code>, as 3000 is the default port for the Next.js development server.
+          </p>
+      </section>
 
-
-      <section>
-        <h2 id="endpoints" className="text-2xl font-semibold mb-4">API Endpoints</h2>
-        <p>The base URL for all API endpoints is your application's root URL.</p>
+      <section id="testing" className="mb-10">
+        <h2 className="font-headline text-2xl border-b pb-2 mb-4 flex items-center"><Terminal className="mr-2"/> Testing the API</h2>
+        <p>You can test the public API using any HTTP client, such as <code>curl</code> from your command line.</p>
         
-        <Card className="my-6">
-            <CardHeader>
-                <CardTitle id="categories-api">Categories API</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <Endpoint method="GET" path="/api/categories" description="Retrieves a list of all categories. Use ?format=tree for a hierarchical view." />
-                <Endpoint method="POST" path="/api/categories" description="Creates a new category. Body: { name: string, parentId?: string | null }" />
-                <Endpoint method="GET" path="/api/categories/{categoryId}" description="Retrierives a single category by its ID." />
-                <Endpoint method="PUT" path="/api/categories/{categoryId}" description="Updates a category's name. Body: { name: string }" />
-                <Endpoint method="DELETE" path="/api/categories/{categoryId}" description="Deletes a category, its sub-categories, and all associated questions." />
-            </CardContent>
-        </Card>
+        <div className="mt-6">
+          <h4 className="font-semibold text-lg mb-2">Example: Listing All Categories</h4>
+          <p>This command fetches all question categories in a flat list.</p>
+          <pre className="bg-gray-800 text-white p-3 rounded-md my-2 text-sm overflow-x-auto"><code>
+{`curl https://<YOUR_APP_URL>/api/categories`}
+          </code></pre>
+        </div>
 
-        <Card className="my-6">
-            <CardHeader>
-                <CardTitle id="questions-api">Questions API</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <Endpoint method="POST" path="/api/categories/{categoryId}/questions" description="Adds a new question to a category. See `CreateQuestionInputSchema` in `src/types/index.ts` for body." />
-                <Endpoint method="GET" path="/api/categories/{categoryId}/questions" description="Gets questions for a category. Use ?includeSubcategories=true to include all descendants." />
-                <Endpoint method="GET" path="/api/questions/{questionId}" description="Retrieves a single question by its ID." />
-                <Endpoint method="PUT" path="/api/questions/{questionId}" description="Updates a question. See `UpdateQuestionInputSchema` in `src/types/index.ts` for body." />
-                <Endpoint method="DELETE" path="/api/questions/{questionId}" description="Deletes a single question by its ID." />
-            </CardContent>
-        </Card>
-
-        <Card className="my-6">
-            <CardHeader>
-                <CardTitle id="batch-ai-api">Batch & AI API</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <Endpoint method="POST" path="/api/categories/{categoryId}/questions/batch" description="Batch-adds questions from a formatted text block. Body: { text: string }" />
-                <Endpoint method="GET" path="/api/categories/{categoryId}/questions/export" description="Exports all questions from a category (and its sub-categories) into a text format." />
-                <Endpoint method="POST" path="/api/ai/suggest-distractors" description="Suggests incorrect answer options (distractors) for a given question and correct answer." />
-            </CardContent>
-        </Card>
-
-        <Card className="my-6">
-            <CardHeader>
-                <CardTitle id="quiz-api">Quiz Session API</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <Endpoint method="POST" path="/api/quizzes" description="Starts a new quiz session. Body: { categoryId?: string, random?: boolean, questionCount?: number }" />
-                <Endpoint method="GET" path="/api/quizzes/{quizId}" description="Retrieves the current status of an active quiz session." />
-                <Endpoint method="POST" path="/api/quizzes/{quizId}/answer" description="Submits an answer for the current question in the session. Body: { questionId: string, selectedAnswerId: string }" />
-                <Endpoint method="POST" path="/api/quizzes/{quizId}/pause" description="Pauses an active quiz session." />
-                <Endpoint method="POST" path="/api/quizzes/{quizId}/resume" description="Resumes a paused quiz session." />
-                <Endpoint method="GET" path="/api/quizzes/{quizId}/results" description="Retrieves the final results for a completed quiz session." />
-            </CardContent>
-        </Card>
+        <div className="mt-6">
+          <h4 className="font-semibold text-lg mb-2">Example: Starting a New Quiz</h4>
+          <p>This command starts a new random quiz session with 5 questions.</p>
+          <pre className="bg-gray-800 text-white p-3 rounded-md my-2 text-sm overflow-x-auto"><code>
+{`curl -X POST https://<YOUR_APP_URL>/api/quizzes \\
+  -H "Content-Type: application/json" \\
+  -d '{"random": true, "questionCount": 5}'`}
+          </code></pre>
+        </div>
       </section>
 
+      <section id="endpoints">
+        <h2 className="font-headline text-2xl border-b pb-2 mb-4 flex items-center"><Server className="mr-2"/> API Endpoints</h2>
+        
+        <Endpoint
+          method="GET"
+          path="/api/categories"
+          description="Retrieves a list of all question categories. Use ?format=tree to get a nested structure."
+        />
+
+        <Endpoint
+          method="GET"
+          path="/api/categories/{categoryId}"
+          description="Retrieves a single category by its ID."
+        />
+
+        <Endpoint
+          method="POST"
+          path="/api/categories"
+          description="Creates a new category. The body must be a JSON object with a 'name' property and an optional 'parentId'."
+        >
+          <p>The <code>name</code> is required. The <code>parentId</code> is optional and should be the ID of an existing category if you want to create a sub-category.</p>
+          <h4 className="font-semibold mt-4">Example Request:</h4>
+          <pre className="bg-gray-800 text-white p-3 rounded-md my-2 text-sm overflow-x-auto"><code>
+{`curl -X POST https://<YOUR_APP_URL>/api/categories \\
+  -H "Content-Type: application/json" \\
+  -d '{"name": "My New Root Category", "parentId": null}'`}
+          </code></pre>
+          <h4 className="font-semibold mt-4">Response (Success 201)</h4>
+          <pre className="bg-gray-800 text-white p-3 rounded-md my-2 text-sm overflow-x-auto"><code>
+{`{
+  "success": true,
+  "data": {
+    "id": "newly_created_category_id"
+  }
+}`}
+          </code></pre>
+        </Endpoint>
+        
+        <Endpoint
+          method="GET"
+          path="/api/categories/{categoryId}/questions"
+          description="Retrieves all questions for a specific category. Use ?includeSubcategories=true to include questions from all nested sub-categories."
+        />
+
+        <Endpoint
+          method="POST"
+          path="/api/categories/{categoryId}/questions"
+          description="Adds a new question to a specific category."
+        />
+
+        <Endpoint
+          method="POST"
+          path="/api/quizzes"
+          description="Starts a new quiz session. The body can specify a categoryId or request a random quiz."
+        />
+
+        <Endpoint
+          method="GET"
+          path="/api/quizzes/{quizId}"
+          description="Gets the current state of an active or paused quiz session."
+        />
+        
+        <Endpoint
+          method="POST"
+          path="/api/quizzes/{quizId}/answer"
+          description="Submits an answer for the current question in a quiz session."
+        />
+
+        <Endpoint
+          method="GET"
+          path="/api/quizzes/{quizId}/results"
+          description="Retrieves the final results of a completed quiz session."
+        />
+
+      </section>
     </div>
   );
 }
