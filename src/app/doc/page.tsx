@@ -66,31 +66,38 @@ export default function ApiDocumentationPage() {
       <section>
         <h2 id="testing">Testing the API</h2>
         <p>
-          You can test the API endpoints without an MCP server using tools like <code className="font-code">curl</code> or Postman. The main prerequisite is obtaining a valid Firebase ID token for an authenticated user.
+          You can test the API endpoints without an MCP server using tools like <code className="font-code">curl</code> or Postman. The main prerequisite is obtaining a valid Firebase ID token for an authenticated user. The easiest way to get a temporary token for testing is by using your browser's developer tools.
         </p>
-        <h3 className="text-xl">1. Get the Firebase ID Token</h3>
+        <h3 className="text-xl">1. Log In and Open Developer Tools</h3>
         <p>
-          First, log in to the QuizCraft application in your browser. Once logged in, open the browser's developer console and run the following JavaScript snippet. This snippet accesses the currently initialized Firebase app to get the auth instance.
-        </p>
-        <CodeBlock>
-{`firebase.auth().currentUser.getIdToken().then(token => console.log(token));`}
-        </CodeBlock>
-        <p>
-          This will print a very long string to the console. This is your temporary ID token. Copy it.
+          First, log in to the QuizCraft application in your browser. Once logged in, open your browser's developer tools (usually by pressing F12 or right-clicking the page and selecting "Inspect") and go to the "Network" tab.
         </p>
 
-        <h3 className="text-xl">2. Make an API Request with cURL</h3>
+        <h3 className="text-xl">2. Find an API Request</h3>
         <p>
-          Now, you can use the copied token in a <code className="font-code">curl</code> command. Replace <code className="font-code">YOUR_TOKEN_HERE</code> with the token you copied and <code className="font-code">http://localhost:3000</code> with your application's URL.
+          With the Network tab open, perform an action in the app that triggers an API call, such as refreshing the page to load the quiz categories. Look for a request to a URL that starts with <code className="font-code">/api/</code>, for example, <code className="font-code">/api/categories?format=tree</code>. Click on this request in the list.
+        </p>
+
+        <h3 className="text-xl">3. Copy the Request as cURL</h3>
+        <p>
+          With the request selected, right-click on it. In the context menu, find an option like "Copy" → "Copy as cURL". The exact wording might differ slightly between browsers (e.g., Chrome, Firefox).
         </p>
         <p>
-          Here's an example to test the endpoint that retrieves all categories:
+          This will copy the entire command-line request to your clipboard, including the correct method, URL, and most importantly, the `Authorization: Bearer ...` header with a valid, temporary token.
+        </p>
+        
+        <h3 className="text-xl">4. Paste and Run the Command</h3>
+        <p>
+          Paste the copied command into your terminal. You can now execute it to test the endpoint directly, or modify it to test other endpoints.
         </p>
         <CodeBlock>
-{`curl -X GET "http://localhost:3000/api/categories" -H "Authorization: Bearer YOUR_TOKEN_HERE"`}
+{`# Your pasted command will look something like this:
+curl 'http://localhost:3000/api/categories?format=tree' \\
+  -H 'Authorization: Bearer eyJhbGciOiJSUzI1NiIsI...' \\
+  --compressed`}
         </CodeBlock>
         <p>
-          If it works, you will receive a JSON response containing a list of your categories. You can use this same method to test all other <code className="font-code">GET</code>, <code className="font-code">POST</code>, <code className="font-code">PUT</code>, and <code className="font-code">DELETE</code> endpoints, making sure to adjust the method, URL, and request body as needed.
+          This method is the most reliable way to get a valid request for testing, as it's copied directly from a working request made by the application itself.
         </p>
       </section>
 
@@ -107,7 +114,7 @@ export default function ApiDocumentationPage() {
             <CardContent>
                 <Endpoint method="GET" path="/api/categories" description="Retrieves a list of all categories. Use ?format=tree for a hierarchical view." />
                 <Endpoint method="POST" path="/api/categories" description="Creates a new category. Body: { name: string, parentId?: string | null }" />
-                <Endpoint method="GET" path="/api/categories/{categoryId}" description="Retrieves a single category by its ID." />
+                <Endpoint method="GET" path="/api/categories/{categoryId}" description="Retrierives a single category by its ID." />
                 <Endpoint method="PUT" path="/api/categories/{categoryId}" description="Updates a category's name. Body: { name: string }" />
                 <Endpoint method="DELETE" path="/api/categories/{categoryId}" description="Deletes a category, its sub-categories, and all associated questions." />
             </CardContent>
