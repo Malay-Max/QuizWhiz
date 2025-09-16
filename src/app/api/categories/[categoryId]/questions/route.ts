@@ -21,16 +21,16 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     const { searchParams } = new URL(request.url);
     const includeSubcategories = searchParams.get('includeSubcategories') === 'true';
 
+    const allCategories = await getAllCategories();
+
     if (!includeSubcategories) {
         // This is not the most efficient way as it gets all questions from descendants,
         // but our storage functions are structured this way. We can refine later if needed.
-        const allCategories = await getAllCategories();
         const questions = await getQuestionsByCategoryIdAndDescendants(categoryId, allCategories);
         const directQuestions = questions.filter(q => q.categoryId === categoryId);
         return NextResponse.json({ success: true, data: directQuestions });
     }
 
-    const allCategories = await getAllCategories();
     const questions = await getQuestionsByCategoryIdAndDescendants(categoryId, allCategories);
 
     return NextResponse.json({ success: true, data: questions });
@@ -69,6 +69,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         correctAnswerId: correctOption.id,
         categoryId: categoryId,
     };
+    
+    // As with POST /api/categories, this shouldn't call a client function.
+    // Returning an error for now. A proper fix involves server-side logic (e.g. Admin SDK).
+    if (process.env.NODE_ENV !== 'development') {
+        return NextResponse.json({ success: false, error: 'This action is not available on the server currently.' }, { status: 501 });
+    }
 
     const result = await addQuestion(newQuestionData);
 

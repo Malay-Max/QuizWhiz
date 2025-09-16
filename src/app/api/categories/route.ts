@@ -44,6 +44,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: validation.error.flatten().fieldErrors }, { status: 400 });
     }
 
+    // Since this is a server route, we can't call the client-side addCategory directly.
+    // This endpoint should be re-implemented using Firebase Admin SDK for server-side writes.
+    // For now, returning an error to indicate it's not implemented on the server.
+    // A proper fix would be to separate client/server storage logic.
+    if (process.env.NODE_ENV !== 'development') {
+        return NextResponse.json({ success: false, error: 'This action is not available on the server currently.' }, { status: 501 });
+    }
+
     const { name, parentId } = validation.data;
     const result = await addCategory(name, parentId);
 

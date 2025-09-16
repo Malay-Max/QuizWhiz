@@ -1,6 +1,4 @@
 
-"use client";
-
 import type { Question, QuizSession, StorableQuizSession, Category, AnswerOption } from '@/types';
 import { db, auth } from './firebase';
 import { 
@@ -58,7 +56,7 @@ export async function getCategoryById(id: string): Promise<Category | undefined>
 }
 
 export async function getAllCategories(): Promise<Category[]> {
-  if (typeof window === 'undefined') return [];
+  // This function can run on both server and client.
   try {
     const q = query(collection(db, CATEGORIES_COLLECTION), orderBy("name"));
     const querySnapshot = await getDocs(q);
@@ -347,7 +345,7 @@ export async function deleteQuestionsByCategoryId(categoryId: string, allCategor
 }
 
 export async function getQuestionsByCategoryIdAndDescendants(categoryId: string, allCategories: Category[]): Promise<Question[]> {
-  if (typeof window === 'undefined') return [];
+  // This function can run on both server and client.
   try {
     const relevantCategoryIds = [categoryId, ...getDescendantCategoryIds(categoryId, allCategories)];
     if (relevantCategoryIds.length === 0) return [];
