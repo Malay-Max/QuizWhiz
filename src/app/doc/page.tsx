@@ -64,6 +64,39 @@ export default function ApiDocumentationPage() {
       <Separator className="my-8" />
 
       <section>
+        <h2 id="testing">Testing the API</h2>
+        <p>
+          You can test the API endpoints without an MCP server using tools like <code className="font-code">curl</code> or Postman. The main prerequisite is obtaining a valid Firebase ID token for an authenticated user.
+        </p>
+        <h3 className="text-xl">1. Get the Firebase ID Token</h3>
+        <p>
+          First, log in to the QuizCraft application in your browser. Once logged in, open the browser's developer console and run the following JavaScript snippet. The Firebase Auth instance is available globally.
+        </p>
+        <CodeBlock>
+{`auth.currentUser.getIdToken().then(token => console.log(token));`}
+        </CodeBlock>
+        <p>
+          This will print a very long string to the console. This is your temporary ID token. Copy it.
+        </p>
+
+        <h3 className="text-xl">2. Make an API Request with cURL</h3>
+        <p>
+          Now, you can use the copied token in a <code className="font-code">curl</code> command. Replace <code className="font-code">YOUR_TOKEN_HERE</code> with the token you copied and <code className="font-code">http://localhost:3000</code> with your application's URL.
+        </p>
+        <p>
+          Here's an example to test the endpoint that retrieves all categories:
+        </p>
+        <CodeBlock>
+{`curl -X GET "http://localhost:3000/api/categories" -H "Authorization: Bearer YOUR_TOKEN_HERE"`}
+        </CodeBlock>
+        <p>
+          If it works, you will receive a JSON response containing a list of your categories. You can use this same method to test all other <code className="font-code">GET</code>, <code className="font-code">POST</code>, <code className="font-code">PUT</code>, and <code className="font-code">DELETE</code> endpoints, making sure to adjust the method, URL, and request body as needed.
+        </p>
+      </section>
+
+      <Separator className="my-8" />
+
+      <section>
         <h2 id="endpoints">API Endpoints</h2>
         <p>The base URL for all API endpoints is the root of this application.</p>
         
