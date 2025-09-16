@@ -19,11 +19,6 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: 'Quiz session not found.' }, { status: 404 });
     }
 
-    const userId = request.headers.get('X-User-ID');
-    if (session.userId && session.userId !== userId) {
-        return NextResponse.json({ success: false, error: 'Forbidden: You do not have access to this quiz session.' }, { status: 403 });
-    }
-
     if (session.status !== 'completed') {
       return NextResponse.json({ success: false, error: `Quiz is not completed. Current status: ${session.status}` }, { status: 400 });
     }

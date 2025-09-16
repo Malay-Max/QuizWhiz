@@ -40,66 +40,8 @@ export default function ApiDocumentationPage() {
 
       <p className="text-muted-foreground">
         This document provides instructions on how to integrate an external server (like an MCP server)
-        with the QuizCraft API. It covers authentication, available endpoints, and data formats.
+        with the QuizCraft API. All endpoints are public and do not require authentication.
       </p>
-
-      <Separator className="my-8" />
-
-      <section>
-        <h2 id="authentication">Authentication</h2>
-        <p>
-          All API endpoints under the <code className="font-code">/api/</code> path are protected. To access them, the client must include a valid Firebase Authentication ID token in the `Authorization` header of every request.
-        </p>
-        <p>
-          The header must be in the following format:
-        </p>
-        <CodeBlock>
-          Authorization: Bearer &lt;FIREBASE_ID_TOKEN&gt;
-        </CodeBlock>
-        <p>
-          Your MCP server will need to authenticate a user with Firebase (e.g., using a service account or custom token) to obtain a valid ID token. This token is then used to make secure calls on behalf of that user.
-        </p>
-      </section>
-
-      <Separator className="my-8" />
-
-      <section>
-        <h2 id="testing">Testing the API</h2>
-        <p>
-          You can test the API endpoints without an MCP server using tools like <code className="font-code">curl</code> or Postman. The main prerequisite is obtaining a valid Firebase ID token for an authenticated user. The easiest way to get a temporary token for testing is by using your browser's developer tools.
-        </p>
-        <h3 className="text-xl">1. Log In and Open Developer Tools</h3>
-        <p>
-          First, log in to the QuizCraft application in your browser. Once logged in, open your browser's developer tools (usually by pressing F12 or right-clicking the page and selecting "Inspect") and go to the "Network" tab.
-        </p>
-
-        <h3 className="text-xl">2. Find an API Request</h3>
-        <p>
-          With the Network tab open, perform an action in the app that triggers an API call, such as refreshing the page to load the quiz categories. Look for a request to a URL that starts with <code className="font-code">/api/</code>, for example, <code className="font-code">/api/categories?format=tree</code>. Click on this request in the list.
-        </p>
-
-        <h3 className="text-xl">3. Copy the Request as cURL</h3>
-        <p>
-          With the request selected, right-click on it. In the context menu, find an option like "Copy" → "Copy as cURL". The exact wording might differ slightly between browsers (e.g., Chrome, Firefox).
-        </p>
-        <p>
-          This will copy the entire command-line request to your clipboard, including the correct method, URL, and most importantly, the `Authorization: Bearer ...` header with a valid, temporary token.
-        </p>
-        
-        <h3 className="text-xl">4. Paste and Run the Command</h3>
-        <p>
-          Paste the copied command into your terminal. You can now execute it to test the endpoint directly, or modify it to test other endpoints.
-        </p>
-        <CodeBlock>
-{`# Your pasted command will look something like this:
-curl 'http://localhost:3000/api/categories?format=tree' \\
-  -H 'Authorization: Bearer eyJhbGciOiJSUzI1NiIsI...' \\
-  --compressed`}
-        </CodeBlock>
-        <p>
-          This method is the most reliable way to get a valid request for testing, as it's copied directly from a working request made by the application itself.
-        </p>
-      </section>
 
       <Separator className="my-8" />
 

@@ -22,7 +22,6 @@ export async function POST(request: NextRequest) {
     }
     
     const { categoryId, random, questionCount } = validation.data;
-    const userId = request.headers.get('X-User-ID');
 
     let questionsForSession: Question[] = [];
     let finalQuizCategoryName = "Quiz";
@@ -86,7 +85,6 @@ export async function POST(request: NextRequest) {
       answers: [],
       startTime: Timestamp.now(),
       status: 'active',
-      userId: userId || undefined,
       totalPausedTime: 0,
     };
 

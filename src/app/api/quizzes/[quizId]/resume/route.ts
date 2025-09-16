@@ -20,11 +20,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     if (!session) {
       return NextResponse.json({ success: false, error: 'Quiz session not found.' }, { status: 404 });
     }
-
-    const userId = request.headers.get('X-User-ID');
-    if (session.userId && session.userId !== userId) {
-        return NextResponse.json({ success: false, error: 'Forbidden: You do not have access to this quiz session.' }, { status: 403 });
-    }
     
     if (session.status !== 'paused') {
       return NextResponse.json({ success: false, error: `Cannot resume a quiz that is not paused. Current status: ${session.status}` }, { status: 400 });
