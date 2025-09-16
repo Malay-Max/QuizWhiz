@@ -359,7 +359,11 @@ export async function getQuestionsByCategoryIdAndDescendants(categoryId: string,
 
 // --- Quiz Session Functions ---
 export async function saveQuizSession(session: QuizSession): Promise<{ success: boolean; error?: string }> {
-  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
+  if (typeof window === 'undefined') {
+    // This is a client-side function, but let's not error out on the server, just log and return.
+    console.warn("Attempted to call saveQuizSession on the server. This is a client-side only function.");
+    return { success: false, error: "Operation not supported on server." };
+  }
   try {
     const sessionRef = doc(db, QUIZ_SESSIONS_COLLECTION, session.id);
     const user = auth.currentUser;
@@ -481,3 +485,5 @@ export async function seedSampleData(): Promise<{ success: boolean; categoriesAd
     return { success: false, error: handleFirestoreError(error, "Could not seed sample data.") };
   }
 }
+
+    
