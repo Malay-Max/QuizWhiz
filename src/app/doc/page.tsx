@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +45,43 @@ export default function ApiDocumentationPage() {
       </p>
 
       <Separator className="my-8" />
+      
+      <section>
+        <h2 id="testing">Testing the API</h2>
+        <p>
+          Since authentication has been removed, all API endpoints are public and can be tested directly without needing an authentication token. You can use tools like <code>curl</code> or any API client like Postman or Insomnia.
+        </p>
+
+        <Card className="my-6">
+            <CardHeader>
+                <CardTitle id="testing-examples">Testing Examples (using curl)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div>
+                    <h4 className="font-semibold">1. List All Categories</h4>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      This command makes a GET request to retrieve all existing quiz categories.
+                    </p>
+                    <CodeBlock>
+                      {`curl http://localhost:3000/api/categories`}
+                    </CodeBlock>
+                </div>
+
+                <div>
+                    <h4 className="font-semibold">2. Start a New Random Quiz</h4>
+                     <p className="text-sm text-muted-foreground mb-2">
+                      This command sends a POST request to start a new quiz session with 5 random questions.
+                    </p>
+                    <CodeBlock>
+                      {`curl -X POST -H "Content-Type: application/json" -d '{"random": true, "questionCount": 5}' http://localhost:3000/api/quizzes`}
+                    </CodeBlock>
+                </div>
+            </CardContent>
+        </Card>
+      </section>
+
+      <Separator className="my-8" />
+
 
       <section>
         <h2 id="endpoints">API Endpoints</h2>
