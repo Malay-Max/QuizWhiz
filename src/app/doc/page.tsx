@@ -52,7 +52,7 @@ export default function ApiDocumentationPage() {
           Since authentication has been removed, all API endpoints are public and can be tested directly without needing an authentication token. You can use tools like <code>curl</code> or any API client like Postman or Insomnia.
         </p>
         <p className="text-sm">
-          <strong>Note on `localhost:3000`:</strong> The examples below use `http://localhost:3000`, which is the default address for the local development server. When your application is deployed to production, you will need to replace `http://localhost:3000` with your public application URL.
+          <strong>Important:</strong> The examples below use a placeholder `https://<YOUR_APP_URL>`. You must replace this with your application's public URL (e.g., your Vercel deployment URL). For local testing, this would be `http://localhost:3000`.
         </p>
 
         <Card className="my-6">
@@ -66,7 +66,7 @@ export default function ApiDocumentationPage() {
                       This command makes a GET request to retrieve all existing quiz categories.
                     </p>
                     <CodeBlock>
-                      {`curl http://localhost:3000/api/categories`}
+                      {`curl https://<YOUR_APP_URL>/api/categories`}
                     </CodeBlock>
                 </div>
 
@@ -76,7 +76,7 @@ export default function ApiDocumentationPage() {
                       This command sends a POST request to start a new quiz session with 5 random questions.
                     </p>
                     <CodeBlock>
-                      {`curl -X POST -H "Content-Type: application/json" -d '{"random": true, "questionCount": 5}' http://localhost:3000/api/quizzes`}
+                      {`curl -X POST -H "Content-Type: application/json" -d '{"random": true, "questionCount": 5}' https://<YOUR_APP_URL>/api/quizzes`}
                     </CodeBlock>
                 </div>
             </CardContent>
@@ -88,7 +88,7 @@ export default function ApiDocumentationPage() {
 
       <section>
         <h2 id="endpoints">API Endpoints</h2>
-        <p>The base URL for all API endpoints is the root of this application.</p>
+        <p>The base URL for all API endpoints is your application's root URL.</p>
         
         <Card className="my-6">
             <CardHeader>
