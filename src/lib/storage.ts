@@ -5,6 +5,7 @@ import {
   collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, writeBatch, Timestamp, orderBy, updateDoc
 } from 'firebase/firestore';
 import { FirebaseError } from 'firebase/app';
+import { sampleData } from './sample-data';
 
 const QUESTIONS_COLLECTION = 'allQuestions';
 const CATEGORIES_COLLECTION = 'categories';
@@ -442,4 +443,57 @@ export async function getQuizSession(): Promise<QuizSession | null> {
 export function clearQuizSession(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(ACTIVE_QUIZ_SESSION_ID_KEY);
+}
+
+// --- Sample Data Seeding ---
+
+export async function seedSampleData(): Promise<{ success: boolean; categoriesAdded?: number; questionsAdded?: number; error?: string }> {
+  if (typeof window === 'undefined') {
+    return { success: false, error: "Operation not supported on server." };
+  }
+  
+  try {
+    const batch = writeBatch(db);
+    let categoriesAdded = 0;
+    let questionsAdded = 0;
+
+    const processCategory = (category: (typeof sampleData)[0], parentId: string | null) => {
+      // Add category
+      const categoryRef = doc(db, CATEGORIES_COLLECTION, category.id);
+      batch.set(categoryRef, { id: category.id, name: category.name, parentId: parentId });
+      categoriesAdded++;
+      
+      // Add questions for this category
+      category.questions.forEach(q => {
+        const questionRef = doc(collection(db, QUESTIONS_COLLECTION));
+        const answerOptions: AnswerOption[] = q.options.map(optText => ({ id: crypto.randomUUID(), text: optText }));
+        const correctOption = answerOptions.find(opt => opt.text === q.correctAnswer);
+        
+        if (correctOption) {
+          const newQuestion: Question = {
+            id: questionRef.id,
+            text: q.text,
+            options: answerOptions,
+            correctAnswerId: correctOption.id,
+            categoryId: category.id,
+          };
+          batch.set(questionRef, newQuestion);
+          questionsAdded++;
+        }
+      });
+      
+      // Process children
+      if (category.children) {
+        category.children.forEach(child => processCategory(child, category.id));
+      }
+    };
+    
+    sampleData.forEach(category => processCategory(category, null));
+
+    await batch.commit();
+    return { success: true, categoriesAdded, questionsAdded };
+  } catch (error) {
+    console.error("Error seeding sample data:", error);
+    return { success: false, error: handleFirestoreError(error, "Could not seed sample data.") };
+  }
 }
