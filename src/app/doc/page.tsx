@@ -70,10 +70,10 @@ export default function ApiDocumentationPage() {
         </p>
         <h3 className="text-xl">1. Get the Firebase ID Token</h3>
         <p>
-          First, log in to the QuizCraft application in your browser. Once logged in, open the browser's developer console and run the following JavaScript snippet. The Firebase Auth instance is available globally.
+          First, log in to the QuizCraft application in your browser. Once logged in, open the browser's developer console and run the following JavaScript snippet. This snippet accesses the currently initialized Firebase app to get the auth instance.
         </p>
         <CodeBlock>
-{`auth.currentUser.getIdToken().then(token => console.log(token));`}
+{`firebase.auth().currentUser.getIdToken().then(token => console.log(token));`}
         </CodeBlock>
         <p>
           This will print a very long string to the console. This is your temporary ID token. Copy it.
