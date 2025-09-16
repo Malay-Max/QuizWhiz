@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { PlusSquare, Puzzle } from 'lucide-react';
+import { PlusSquare, Puzzle, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ export function Navbar() {
   const navItems = [
     { href: '/add-question', label: 'Add Question', icon: PlusSquare },
     { href: '/', label: 'Take Quiz', icon: Puzzle },
+    { href: '/api/doc', label: 'API Docs', icon: BookOpen },
   ];
 
   return (
@@ -27,12 +28,12 @@ export function Navbar() {
           {navItems.map((item) => (
             <Button
               key={item.href}
-              variant={pathname === item.href ? 'default' : 'ghost'}
+              variant={pathname.startsWith(item.href) && item.href !== '/' || pathname === item.href ? 'default' : 'ghost'}
               asChild
               size="sm" 
               className={cn(
                 "hidden sm:flex", // Hide on small screens, show on sm and up
-                pathname === item.href && "shadow-md"
+                (pathname.startsWith(item.href) && item.href !== '/' || pathname === item.href) && "shadow-md"
               )}
             >
               <Link href={item.href} className="flex items-center gap-2">
