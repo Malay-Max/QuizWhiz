@@ -6,19 +6,23 @@ import * as admin from 'firebase-admin';
 // This line forces the middleware to run on the Node.js runtime.
 export const runtime = 'nodejs';
 
-// Initialize Firebase Admin SDK
-// Make sure to set the GOOGLE_APPLICATION_CREDENTIALS environment variable
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
-    });
-  } catch (error) {
-    console.error('Firebase admin initialization error', error);
-  }
-}
-
 export async function middleware(request: NextRequest) {
+  // Initialize Firebase Admin SDK only once when the middleware is first run.
+  if (!admin.apps.length) {
+    try {
+      admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+      });
+    } catch (error) {
+      console.error('Firebase admin initialization error', error);
+      // If initialization fails, block API access.
+      return new Response(JSON.stringify({ success: false, error: 'Internal Server Error: Could not initialize admin services.' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
   // We only want to protect routes under /api/
   if (!request.nextUrl.pathname.startsWith('/api/')) {
     return NextResponse.next();
