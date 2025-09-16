@@ -59,19 +59,27 @@ export interface StorableQuizSession {
 }
 
 
-// Schemas for explainAnswerFlow
-export const ExplainAnswerInputSchema = z.object({
-  questionText: z.string().describe("The text of the quiz question."),
-  options: z.array(z.object({ id: z.string(), text: z.string() })).describe("All answer options with their IDs and text."),
-  correctAnswerId: z.string().describe("The ID of the correct answer."),
-  selectedAnswerId: z.string().nullable().describe("The ID of the answer selected by the user, or null if skipped/timed out."),
-});
-export type ExplainAnswerInput = z.infer<typeof ExplainAnswerInputSchema>;
+// --- API Schemas ---
 
-export const ExplainAnswerOutputSchema = z.object({
-  explanation: z.string().describe("The AI-generated explanation for the answer."),
+// Schema for the API to create a new question (POST /api/categories/:id/questions)
+export const CreateQuestionInputSchema = z.object({
+  text: z.string().min(5, 'Question text must be at least 5 characters.'),
+  options: z.array(z.string().min(1, 'Option text cannot be empty.')).min(2, 'At least 2 options are required.'),
+  correctAnswerText: z.string().min(1, 'Correct answer text cannot be empty.'),
 });
-export type ExplainAnswerOutput = z.infer<typeof ExplainAnswerOutputSchema>;
+
+// Schema for the API to update an existing question (PUT /api/questions/:id)
+const ApiAnswerOptionSchema = z.object({
+  id: z.string(),
+  text: z.string().min(1, 'Option text cannot be empty.'),
+});
+export const UpdateQuestionInputSchema = z.object({
+  text: z.string().min(5, 'Question text must be at least 5 characters.').optional(),
+  options: z.array(ApiAnswerOptionSchema).min(2, 'At least 2 options are required.').optional(),
+  correctAnswerId: z.string().optional(),
+  categoryId: z.string().optional(),
+});
+
 
 // Schemas for generateDistractorsFlow
 export const GenerateDistractorsInputSchema = z.object({
@@ -87,10 +95,3 @@ export const GenerateDistractorsOutputSchema = z.object({
   ).describe('An array of distractors for the question.')
 });
 export type GenerateDistractorsOutput = z.infer<typeof GenerateDistractorsOutputSchema>;
-
-// CategoryTreeNode is deprecated, use Category interface with populated children/fullPath
-// export interface CategoryTreeNode {
-//   name: string; 
-//   path: string; 
-//   children: CategoryTreeNode[];
-// }
