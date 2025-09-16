@@ -1,13 +1,26 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import * as admin from 'firebase-admin';
+
+// Initialize Firebase Admin SDK
+// Make sure to set the GOOGLE_APPLICATION_CREDENTIALS environment variable
+if (!admin.apps.length) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+    });
+  } catch (error) {
+    console.error('Firebase admin initialization error', error);
+  }
+}
 
 export async function middleware(request: NextRequest) {
   // We only want to protect routes under /api/
   if (!request.nextUrl.pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
-
+  
   // The 'openapi.json' and '/api/doc' page are public.
   if (request.nextUrl.pathname.startsWith('/api/doc')) {
     return NextResponse.next();
@@ -29,15 +42,28 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  // Pass the token in the headers. Verification will happen in the API route.
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('X-Firebase-ID-Token', idToken);
+  try {
+    // Verify the token
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    
+    // Add user info to the request headers
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('X-User-ID', decodedToken.uid);
+    requestHeaders.set('X-User-Email', decodedToken.email || '');
 
-  return NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+
+  } catch (error) {
+    console.error('Error verifying auth token:', error);
+    return new Response(JSON.stringify({ success: false, error: 'Unauthorized: Invalid token.' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
 
 // See "Matching Paths" below to learn more
