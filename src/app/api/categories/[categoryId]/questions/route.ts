@@ -69,12 +69,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         correctAnswerId: correctOption.id,
         categoryId: categoryId,
     };
-    
-    // As with POST /api/categories, this shouldn't call a client function.
-    // Returning an error for now. A proper fix involves server-side logic (e.g. Admin SDK).
-    if (process.env.NODE_ENV !== 'development') {
-        return NextResponse.json({ success: false, error: 'This action is not available on the server currently.' }, { status: 501 });
-    }
 
     const result = await addQuestion(newQuestionData);
 

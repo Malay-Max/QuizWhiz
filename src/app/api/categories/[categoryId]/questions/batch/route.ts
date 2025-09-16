@@ -31,10 +31,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     if (!validation.success) {
       return NextResponse.json({ success: false, error: validation.error.flatten().fieldErrors }, { status: 400 });
     }
-
-    if (process.env.NODE_ENV !== 'development') {
-      return NextResponse.json({ success: false, error: 'This action is not available on the server currently.' }, { status: 501 });
-    }
     
     const { text: batchInput } = validation.data;
     const lines = batchInput.split('\n').filter(line => line.trim() !== '');
