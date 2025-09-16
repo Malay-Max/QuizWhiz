@@ -388,6 +388,8 @@ export async function saveQuizSession(session: QuizSession): Promise<{ success: 
       startTime: typeof session.startTime === 'number' ? Timestamp.fromMillis(session.startTime) : session.startTime as Timestamp,
       ...(session.endTime && { endTime: typeof session.endTime === 'number' ? Timestamp.fromMillis(session.endTime) : session.endTime as Timestamp }),
       ...(user && user.uid && { userId: user.uid }),
+      ...(session.pauseTime && { pauseTime: typeof session.pauseTime === 'number' ? Timestamp.fromMillis(session.pauseTime) : session.pauseTime as Timestamp }),
+      totalPausedTime: session.totalPausedTime,
     };
     
     await setDoc(sessionRef, dataToStore);
@@ -399,33 +401,40 @@ export async function saveQuizSession(session: QuizSession): Promise<{ success: 
   }
 }
 
+export async function getQuizSessionById(sessionId: string): Promise<QuizSession | null> {
+    if (!sessionId) return null;
+    try {
+        const docRef = doc(db, QUIZ_SESSIONS_COLLECTION, sessionId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data() as StorableQuizSession;
+            return {
+                ...data,
+                startTime: data.startTime.toMillis(),
+                endTime: data.endTime ? data.endTime.toMillis() : undefined,
+                pauseTime: data.pauseTime ? data.pauseTime.toMillis() : undefined,
+            };
+        }
+        return null;
+    } catch (error) {
+        console.error(`Error fetching quiz session by ID "${sessionId}":`, error);
+        return null;
+    }
+}
+
+
 export async function getQuizSession(): Promise<QuizSession | null> {
   if (typeof window === 'undefined') return null;
   const activeSessionId = localStorage.getItem(ACTIVE_QUIZ_SESSION_ID_KEY);
   if (!activeSessionId) return null;
 
   try {
-    const docRef = doc(db, QUIZ_SESSIONS_COLLECTION, activeSessionId);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      const data = docSnap.data() as StorableQuizSession; 
-      const quizSession: QuizSession = {
-        id: data.id,
-        categoryId: data.categoryId,
-        categoryName: data.categoryName,
-        questions: data.questions,
-        currentQuestionIndex: data.currentQuestionIndex,
-        answers: data.answers,
-        startTime: data.startTime.toMillis(), 
-        endTime: data.endTime ? data.endTime.toMillis() : undefined, 
-        status: data.status,
-        userId: data.userId,
-      };
-      return quizSession;
-    } else {
+    const session = await getQuizSessionById(activeSessionId);
+     if (!session) {
       localStorage.removeItem(ACTIVE_QUIZ_SESSION_ID_KEY);
       return null;
     }
+    return session;
   } catch (error) {
     console.error("Error fetching active quiz session from Firestore:", error);
     return null;
@@ -436,4 +445,3 @@ export function clearQuizSession(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(ACTIVE_QUIZ_SESSION_ID_KEY);
 }
-

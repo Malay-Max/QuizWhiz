@@ -41,8 +41,10 @@ export interface QuizSession {
   answers: QuizAnswer[];
   startTime: number; // timestamp
   endTime?: number; // timestamp
-  status: 'active' | 'completed';
+  status: 'active' | 'completed' | 'paused';
   userId?: string; 
+  pauseTime?: number; // Timestamp when quiz was paused
+  totalPausedTime: number; // in milliseconds
 }
 
 export interface StorableQuizSession {
@@ -54,8 +56,10 @@ export interface StorableQuizSession {
   answers: QuizAnswer[];
   startTime: Timestamp; 
   endTime?: Timestamp; 
-  status: 'active' | 'completed';
-  userId?: string; 
+  status: 'active' | 'completed' | 'paused';
+  userId?: string;
+  pauseTime?: Timestamp; // Timestamp when quiz was paused
+  totalPausedTime: number; // in milliseconds
 }
 
 
@@ -95,3 +99,17 @@ export const GenerateDistractorsOutputSchema = z.object({
   ).describe('An array of distractors for the question.')
 });
 export type GenerateDistractorsOutput = z.infer<typeof GenerateDistractorsOutputSchema>;
+
+
+// --- Quiz Session API Schemas ---
+
+export const StartQuizInputSchema = z.object({
+    categoryId: z.string().optional(),
+    random: z.boolean().default(false),
+    questionCount: z.number().int().positive().optional(),
+});
+
+export const AnswerQuestionInputSchema = z.object({
+    questionId: z.string(),
+    selectedAnswerId: z.string(),
+});
