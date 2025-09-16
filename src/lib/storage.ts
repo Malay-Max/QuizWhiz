@@ -25,7 +25,6 @@ function handleFirestoreError(error: unknown, defaultMessage: string): string {
 // --- Category Functions ---
 
 export async function addCategory(name: string, parentId: string | null = null): Promise<{ success: boolean; id?: string; error?: string }> {
-  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
     const newCategoryRef = doc(collection(db, CATEGORIES_COLLECTION));
     const categoryData: Category = {
@@ -42,7 +41,6 @@ export async function addCategory(name: string, parentId: string | null = null):
 }
 
 export async function getCategoryById(id: string): Promise<Category | undefined> {
-  if (typeof window === 'undefined') return undefined;
   try {
     const docRef = doc(db, CATEGORIES_COLLECTION, id);
     const docSnap = await getDoc(docRef);
@@ -73,7 +71,6 @@ export async function getAllCategories(): Promise<Category[]> {
 }
 
 export async function updateCategoryName(id: string, newName: string): Promise<{ success: boolean; error?: string }> {
-  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
     const categoryRef = doc(db, CATEGORIES_COLLECTION, id);
     await setDoc(categoryRef, { name: newName.trim() }, { merge: true });
@@ -85,8 +82,6 @@ export async function updateCategoryName(id: string, newName: string): Promise<{
 }
 
 export async function deleteCategory(id: string): Promise<{ success: boolean; error?: string }> {
-  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
-  
   try {
     const allCats = await getAllCategories();
     const targetCategory = allCats.find(c => c.id === id);
@@ -226,7 +221,6 @@ export function buildCategoryTree(allCategories: Category[]): Category[] {
 
 // --- Question Functions ---
 export async function getQuestions(): Promise<Question[]> {
-  if (typeof window === 'undefined') return [];
   try {
     const querySnapshot = await getDocs(collection(db, QUESTIONS_COLLECTION));
     const questions: Question[] = [];
@@ -241,7 +235,6 @@ export async function getQuestions(): Promise<Question[]> {
 }
 
 export async function addQuestion(question: Omit<Question, 'id'> & { id?: string }): Promise<{ success: boolean; id?: string; error?: string }> {
-  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
     const newQuestionRef = doc(collection(db, QUESTIONS_COLLECTION), question.id || crypto.randomUUID());
     const questionData: Question = {
@@ -260,7 +253,6 @@ export async function addQuestion(question: Omit<Question, 'id'> & { id?: string
 }
 
 export async function getQuestionById(id: string): Promise<Question | undefined> {
-  if (typeof window === 'undefined') return undefined;
   try {
     const docRef = doc(db, QUESTIONS_COLLECTION, id);
     const docSnap = await getDoc(docRef);
@@ -275,7 +267,6 @@ export async function getQuestionById(id: string): Promise<Question | undefined>
 }
 
 export async function updateQuestion(updatedQuestion: Question): Promise<{ success: boolean; error?: string }> {
-  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
     const questionRef = doc(db, QUESTIONS_COLLECTION, updatedQuestion.id);
     await setDoc(questionRef, updatedQuestion, { merge: true });
@@ -287,7 +278,6 @@ export async function updateQuestion(updatedQuestion: Question): Promise<{ succe
 }
 
 export async function updateQuestionCategory(questionId: string, newCategoryId: string): Promise<{ success: boolean; error?: string }> {
-  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
     const questionRef = doc(db, QUESTIONS_COLLECTION, questionId);
     await setDoc(questionRef, { categoryId: newCategoryId }, { merge: true });
@@ -299,7 +289,6 @@ export async function updateQuestionCategory(questionId: string, newCategoryId: 
 }
 
 export async function deleteQuestionById(questionId: string): Promise<{ success: boolean; error?: string }> {
-  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
     await deleteDoc(doc(db, QUESTIONS_COLLECTION, questionId));
     return { success: true };
@@ -310,7 +299,6 @@ export async function deleteQuestionById(questionId: string): Promise<{ success:
 }
 
 export async function deleteQuestionsByCategoryId(categoryId: string, allCategories: Category[]): Promise<{ success: boolean; count?: number; error?: string }> {
-  if (typeof window === 'undefined') return { success: false, error: "Operation not supported on server." };
   try {
     const categoryIdsToDeleteFrom = [categoryId, ...getDescendantCategoryIds(categoryId, allCategories)];
     
@@ -448,10 +436,6 @@ export function clearQuizSession(): void {
 // --- Sample Data Seeding ---
 
 export async function seedSampleData(): Promise<{ success: boolean; categoriesAdded?: number; questionsAdded?: number; error?: string }> {
-  if (typeof window === 'undefined') {
-    return { success: false, error: "Operation not supported on server." };
-  }
-  
   try {
     const batch = writeBatch(db);
     let categoriesAdded = 0;
