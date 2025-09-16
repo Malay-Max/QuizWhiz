@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as admin from 'firebase-admin';
 
+// This line forces the middleware to run on the Node.js runtime.
+export const runtime = 'nodejs';
+
 // Initialize Firebase Admin SDK
 // Make sure to set the GOOGLE_APPLICATION_CREDENTIALS environment variable
 if (!admin.apps.length) {
