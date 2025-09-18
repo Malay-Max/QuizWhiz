@@ -194,23 +194,30 @@ export default function ApiDocumentationPage() {
         <Endpoint
           method="POST"
           path="/api/categories/{categoryId}/questions/batch"
-          description="Batch-adds multiple questions to a category from a block of text. Each line should be formatted."
+          description="Batch-adds multiple questions to a category from a JSON array."
         >
-          <p>Format: <code>;;Question;; {'{OptionA - OptionB}'} [CorrectOption]</code></p>
-          <h4 className="font-semibold mt-4">Example Request:</h4>
+          <p>The body should be a JSON array where each object represents a question.</p>
+          <h4 className="font-semibold mt-4">Example Request Body:</h4>
             <pre className="bg-gray-800 text-white p-3 rounded-md my-2 text-sm overflow-x-auto"><code>
-  {`curl -X POST https://<YOUR_APP_URL>/api/categories/your_category_id/questions/batch \\
-    -H "Content-Type: application/json" \\
-    -d '{
-      "text": ";;What is 2+2?;; {Three - Four - Five} [Four]\\n;;What color is the sky?;; {Blue - Green} [Blue]"
-    }'`}
+  {`[
+    {
+      "question": "What is 2+2?",
+      "options": { "A": "Three", "B": "Four", "C": "Five" },
+      "correctAnswer": "B"
+    },
+    {
+      "question": "What color is the sky?",
+      "options": { "A": "Blue", "B": "Green" },
+      "correctAnswer": "A"
+    }
+]`}
             </code></pre>
         </Endpoint>
         
         <Endpoint
           method="GET"
           path="/api/categories/{categoryId}/questions/export"
-          description="Exports all questions from a category and its descendants in the batch import format."
+          description="Exports all questions from a category and its descendants in the batch import JSON format."
         />
 
         <Endpoint
@@ -297,5 +304,3 @@ export default function ApiDocumentationPage() {
     </div>
   );
 }
-
-    

@@ -4,7 +4,6 @@ import type { NextRequest } from 'next/server';
 import { 
   getQuestionsByCategoryIdAndDescendants,
   getAllCategories,
-  getCategoryById,
 } from '@/lib/storage';
 
 interface RouteContext {
@@ -13,7 +12,7 @@ interface RouteContext {
   }
 }
 
-// GET /api/categories/:categoryId/questions/export - Export questions to batch format
+// GET /api/categories/:categoryId/questions/export - Export questions to batch JSON format
 export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
     const { categoryId } = params;
@@ -27,18 +26,30 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     const questionsToExport = await getQuestionsByCategoryIdAndDescendants(categoryId, allCategories);
   
     if (questionsToExport.length === 0) {
-      return NextResponse.json({ success: true, data: { formattedText: "" }, message: "No questions found to export." });
+      return NextResponse.json({ success: true, data: [], message: "No questions found to export." });
     }
 
     const formattedQuestions = questionsToExport.map(q => {
-      const optionTexts = q.options.map(opt => opt.text.replace(/[\n\r]/g, ' ')).join(' - '); // Sanitize newlines in options
+      const optionsObject: { [key: string]: string } = {};
       const correctAnswerOption = q.options.find(opt => opt.id === q.correctAnswerId);
-      const correctAnswerText = correctAnswerOption ? correctAnswerOption.text.replace(/[\n\r]/g, ' ') : "CORRECT_ANSWER_NOT_FOUND";
-      const questionText = q.text.replace(/[\n\r]/g, ' '); // Sanitize newlines in question
-      return `;;${questionText};; {${optionTexts}} [${correctAnswerText}]`;
-    }).join('\n');
+      let correctKey = '';
+
+      q.options.forEach((opt, index) => {
+        const key = String.fromCharCode(65 + index); // A, B, C, D...
+        optionsObject[key] = opt.text;
+        if (opt.id === q.correctAnswerId) {
+          correctKey = key;
+        }
+      });
+      
+      return {
+        question: q.text,
+        options: optionsObject,
+        correctAnswer: correctKey || '?',
+      };
+    });
     
-    return NextResponse.json({ success: true, data: { formattedText: formattedQuestions } });
+    return NextResponse.json({ success: true, data: formattedQuestions });
 
   } catch (error) {
     console.error(`Error in GET /api/categories/${params.categoryId}/questions/export:`, error);

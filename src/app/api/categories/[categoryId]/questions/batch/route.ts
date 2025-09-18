@@ -11,11 +11,17 @@ interface RouteContext {
   }
 }
 
-const batchAddSchema = z.object({
-  text: z.string().min(1, 'Batch text input cannot be empty.'),
+const batchQuestionSchema = z.object({
+  question: z.string().min(1, 'Question text cannot be empty.'),
+  options: z.record(z.string().min(1), {
+    errorMap: () => ({ message: 'Options must be a key-value object of strings.' })
+  }),
+  correctAnswer: z.string().length(1, 'Correct answer key must be a single character (e.g., "A").'),
 });
 
-// POST /api/categories/:categoryId/questions/batch - Batch add questions from text
+const batchAddSchema = z.array(batchQuestionSchema).min(1, 'Batch input must be an array of at least one question.');
+
+// POST /api/categories/:categoryId/questions/batch - Batch add questions from JSON
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const { categoryId } = params;
@@ -32,36 +38,28 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: validation.error.flatten().fieldErrors }, { status: 400 });
     }
     
-    const { text: batchInput } = validation.data;
-    const lines = batchInput.split('\n').filter(line => line.trim() !== '');
-    
+    const questionsToAdd = validation.data;
     let questionsAddedCount = 0;
     let questionsFailedCount = 0;
     const errors: string[] = [];
 
-    for (const line of lines) {
+    for (const item of questionsToAdd) {
       try {
-        const questionMatch = line.match(/;;(.*?);;/);
-        const optionsMatch = line.match(/\{(.*?)\}/);
-        const correctMatch = line.match(/\[(.*?)\]/);
-
-        if (!questionMatch || !optionsMatch || !correctMatch) {
+        const optionKeys = Object.keys(item.options);
+        if (optionKeys.length < 2) {
           questionsFailedCount++;
-          errors.push(`Skipping malformed line: ${line.substring(0, 50)}...`);
+          errors.push(`Skipping question with less than 2 options: ${item.question.substring(0, 30)}...`);
           continue;
         }
 
-        const questionText = questionMatch[1].trim();
-        const optionTexts = optionsMatch[1].split('-').map(opt => opt.trim()).filter(opt => opt);
-        const correctAnswerText = correctMatch[1].trim();
-
-        if (!questionText || optionTexts.length < 2 || !correctAnswerText) {
+        const correctAnswerText = item.options[item.correctAnswer];
+        if (!correctAnswerText) {
           questionsFailedCount++;
-          errors.push(`Skipping invalid data in line: ${line.substring(0, 50)}...`);
+          errors.push(`Correct answer key "${item.correctAnswer}" not found in options for question: ${item.question.substring(0, 30)}...`);
           continue;
         }
 
-        const answerOptions: AnswerOption[] = optionTexts.map(text => ({
+        const answerOptions: AnswerOption[] = Object.values(item.options).map(text => ({
           id: crypto.randomUUID(),
           text: text,
         }));
@@ -69,12 +67,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         const correctOption = answerOptions.find(opt => opt.text === correctAnswerText);
         if (!correctOption) {
           questionsFailedCount++;
-          errors.push(`Correct answer text "${correctAnswerText}" not found in options for line: ${line.substring(0, 50)}...`);
+          errors.push(`Could not reconcile correct answer for question: ${item.question.substring(0, 30)}...`);
           continue;
         }
 
         const newQuestionData: Omit<Question, 'id'> = {
-          text: questionText,
+          text: item.question,
           options: answerOptions,
           correctAnswerId: correctOption.id,
           categoryId: categoryId,
@@ -85,12 +83,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
             questionsAddedCount++;
         } else {
             questionsFailedCount++;
-            errors.push(`Failed to add question from line: ${line.substring(0, 50)}... Error: ${result.error}`);
+            errors.push(`Failed to add question: ${item.question.substring(0, 30)}... Error: ${result.error}`);
         }
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : 'Unknown error';
         questionsFailedCount++;
-        errors.push(`Error processing line: ${line.substring(0, 50)}... (${errorMessage})`);
+        errors.push(`Error processing item: ${item.question.substring(0, 30)}... (${errorMessage})`);
       }
     }
     

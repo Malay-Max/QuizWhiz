@@ -13,14 +13,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle, Trash2, Wand2, Loader2, Folder, FileText, Copy } from 'lucide-react';
 import { 
-  addQuestion, 
   getQuestionById, 
   updateQuestion, 
   getAllCategories,
   getFullCategoryPath,
   Category as CategoryType,
   Question as QuestionType,
-  AnswerOption as QuestionAnswerOptionType,
   getQuestionsByCategoryIdAndDescendants
 } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
@@ -392,13 +390,23 @@ export function QuestionForm() {
             });
         }
     } else {
-        const newQuestionData: Omit<QuestionType, 'id'> = { 
+        const newQuestionData = { 
             text: data.text,
             options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
             correctAnswerId: data.correctAnswerId,
             categoryId: data.categoryId, 
         };
-        result = await addQuestion(newQuestionData);
+        const response = await fetch(`/api/categories/${data.categoryId}/questions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: data.text,
+            options: data.options.map(o => o.text),
+            correctAnswerText: data.options.find(o => o.id === data.correctAnswerId)?.text
+          })
+        });
+        const result = await response.json();
+
         if (result.success) {
             toast({
                 title: 'Question Added!',
@@ -443,108 +451,46 @@ export function QuestionForm() {
       });
       return;
     }
+    
+    let questionsData;
+    try {
+      questionsData = JSON.parse(batchInput);
+    } catch (e) {
+      toast({
+        title: 'Invalid JSON',
+        description: 'The batch input is not valid JSON. Please check the format.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsProcessingBatch(true);
-    const lines = batchInput.split('\n').filter(line => line.trim() !== '');
-    let questionsAddedCount = 0;
-    let questionsFailedCount = 0;
-    let permissionErrorOccurred = false;
-
-    for (const line of lines) { 
-      try {
-        const questionMatch = line.match(/;;(.*?);;/);
-        const optionsMatch = line.match(/\{(.*?)\}/);
-        const correctMatch = line.match(/\[(.*?)\]/);
-
-        if (!questionMatch || !optionsMatch || !correctMatch) {
-          console.warn("Skipping malformed line: " + line);
-          questionsFailedCount++;
-          continue;
-        }
-
-        const questionText = questionMatch[1].trim();
-        const optionTexts = optionsMatch[1].split('-').map(opt => opt.trim()).filter(opt => opt);
-        const correctAnswerText = correctMatch[1].trim();
-
-        if (!questionText || optionTexts.length < 2 || !correctAnswerText) {
-          console.warn("Skipping invalid data in line: " + line);
-          questionsFailedCount++;
-          continue;
-        }
-
-        const answerOptions: QuestionAnswerOptionType[] = optionTexts.map(text => ({
-          id: crypto.randomUUID(),
-          text: text,
-        }));
-
-        const correctOption = answerOptions.find(opt => opt.text === correctAnswerText);
-        if (!correctOption) {
-          console.warn("Correct answer text '" + correctAnswerText + "' not found in options for line: " + line);
-          questionsFailedCount++;
-          continue;
-        }
-
-        const newQuestionData: Omit<QuestionType, 'id'> = {
-          text: questionText,
-          options: answerOptions,
-          correctAnswerId: correctOption.id,
-          categoryId: currentCategoryId, 
-        };
-
-        const result = await addQuestion(newQuestionData);
-        if (result.success) {
-            questionsAddedCount++;
-        } else {
-            questionsFailedCount++;
-            console.error("Failed to add question from line: " + line + ". Error: " + result.error);
-            if (result.error?.toLowerCase().includes('permission denied') || result.error?.toLowerCase().includes('insufficient permissions')) {
-                permissionErrorOccurred = true;
-            }
-        }
-      } catch (e) { 
-        console.error("Error processing line: " + line, e);
-        questionsFailedCount++;
-      }
-    }
-
-    setIsProcessingBatch(false);
-    let finalToastTitle = 'Batch Processing Complete';
-    let finalToastVariant: "default" | "destructive" = 'default';
-    let finalToastClassName = 'bg-accent text-accent-foreground';
-    let finalToastDescription = `${questionsAddedCount} questions added.`;
-    if (questionsFailedCount > 0) {
-        finalToastDescription += ` ${questionsFailedCount} failed.`;
-        finalToastVariant = 'destructive';
-        finalToastClassName = ''; 
-    }
-    if (permissionErrorOccurred) {
-        finalToastDescription += ' Some operations failed due to insufficient permissions.';
-        finalToastVariant = 'destructive';
-    }
-    if (questionsAddedCount === 0 && questionsFailedCount > 0) {
-        finalToastTitle = 'Batch Processing Failed';
-    }
-     if (questionsAddedCount === 0 && questionsFailedCount === 0 && lines.length > 0) {
-        finalToastTitle = 'No Valid Questions Processed';
-        finalToastDescription = 'The batch input did not contain any valid questions or all lines had errors.';
-        finalToastVariant = 'default'; 
-        finalToastClassName = '';
-    } else if (lines.length === 0) {
-        finalToastTitle = 'No Questions Processed';
-        finalToastDescription = 'The batch input was empty.';
-        finalToastVariant = 'default';
-        finalToastClassName = '';
-    }
-
-    toast({
-        title: finalToastTitle,
-        description: finalToastDescription,
-        variant: finalToastVariant,
-        className: finalToastClassName
+    
+    const response = await fetch(`/api/categories/${currentCategoryId}/questions/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(questionsData),
     });
 
-    if (questionsAddedCount > 0) {
-      setBatchInput(''); 
+    const result = await response.json();
+    setIsProcessingBatch(false);
+
+    if (response.ok) {
+        toast({
+            title: result.message || 'Batch Processing Complete',
+            description: `${result.data.added} questions added. ${result.data.failed} failed.`,
+            variant: result.data.failed > 0 ? 'default' : 'default',
+            className: result.data.failed === 0 ? 'bg-accent text-accent-foreground' : ''
+        });
+        if (result.data.added > 0) {
+            setBatchInput('');
+        }
+    } else {
+        toast({
+            title: 'Batch Processing Failed',
+            description: result.error || 'An unknown error occurred.',
+            variant: 'destructive',
+        });
     }
   };
 
@@ -556,22 +502,23 @@ export function QuestionForm() {
     setIsExporting(true);
     setExportedQuestionsText(''); 
     try {
-      const questionsToExport = await getQuestionsByCategoryIdAndDescendants(categoryForExport.id, allCategories);
+      const response = await fetch(`/api/categories/${categoryForExport.id}/questions/export`);
+      const result = await response.json();
   
-      if (questionsToExport.length === 0) {
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch questions for export.');
+      }
+      
+      const questionsToExport = result.data;
+      if (!questionsToExport || questionsToExport.length === 0) {
         toast({ title: "No Questions", description: `No questions found in category "${categoryForExport.name}" or its sub-categories to display.`, variant: "default" });
         setIsExporting(false);
         return;
       }
-  
-      const formattedQuestions = questionsToExport.map(q => {
-        const optionTexts = q.options.map(opt => opt.text).join(' - ');
-        const correctAnswerOption = q.options.find(opt => opt.id === q.correctAnswerId);
-        const correctAnswerText = correctAnswerOption ? correctAnswerOption.text : "ERROR_CORRECT_ANSWER_NOT_FOUND";
-        return `;;${q.text};; {${optionTexts}} [${correctAnswerText}]`;
-      }).join('\n');
       
-      setExportedQuestionsText(formattedQuestions);
+      const formattedJson = JSON.stringify(questionsToExport, null, 2);
+      
+      setExportedQuestionsText(formattedJson);
       toast({ title: "Display Ready", description: `${questionsToExport.length} questions from "${categoryForExport.name}" and its sub-categories are displayed below for copying.`, className: 'bg-accent text-accent-foreground' });
   
     } catch (error) {
@@ -733,24 +680,18 @@ export function QuestionForm() {
             <div className="mt-10 pt-6 border-t">
             <div className="flex items-center mb-3">
                 <FileText className="h-6 w-6 mr-2 text-primary" />
-                <h3 className="text-lg sm:text-xl font-semibold">Batch Add Questions</h3>
+                <h3 className="text-lg sm:text-xl font-semibold">Batch Add Questions (JSON)</h3>
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-                Format: <code className="font-code bg-muted px-1 py-0.5 rounded text-xs">;;Question Text;; {'{OptionA - OptionB - OptionC}'} [Correct Option Text]</code>
-            </p>
-            <p className="text-xs sm:text-sm text-muted-foreground mb-1">
-                Enter one question per line. Uses the category selected above.
-            </p>
-            <p className="text-xs text-muted-foreground mb-4">
-                Example: <code className="font-code bg-muted px-1 py-0.5 rounded">;;What is 2+2?;; {'{Three - Four - Five}'} [Four]</code>
+            <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+                Paste an array of questions in JSON format. Uses the category selected above.
             </p>
             <Textarea
                 value={batchInput}
                 onChange={handleBatchInputChange}
-                placeholder=";;What is the capital of France?;; {Paris - London - Rome} [Paris]\n;;Which planet is known as the Red Planet?;; {Earth - Mars - Jupiter} [Mars]"
+                placeholder={`[\n  {\n    "question": "What is the capital of France?",\n    "options": {\n      "A": "Paris",\n      "B": "London",\n      "C": "Rome"\n    },\n    "correctAnswer": "A"\n  }\n]`}
                 className="min-h-[150px] text-xs sm:text-sm font-code"
                 disabled={isProcessingBatch}
-                aria-label="Batch question input"
+                aria-label="Batch question JSON input"
             />
             <Button 
                 onClick={handleProcessBatch} 
@@ -766,10 +707,10 @@ export function QuestionForm() {
         <div className="mt-10 pt-6 border-t">
           <div className="flex items-center mb-3">
             <Folder className="h-6 w-6 mr-2 text-primary" />
-            <h3 className="text-lg sm:text-xl font-semibold">Display Questions for Category</h3>
+            <h3 className="text-lg sm:text-xl font-semibold">Export Questions for Category</h3>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-            Type to search for a category, select it, then click "Display Questions" to see its questions (and sub-category questions) in the batch import format for easy copying.
+            Search for a category, select it, then click "Export Questions" to generate a JSON array of its questions (including sub-categories) for easy copying.
           </p>
           <div className="space-y-4">
             <div>
@@ -810,12 +751,12 @@ export function QuestionForm() {
               disabled={isExporting || !categoryForExport}
             >
               {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-              Display Questions
+              Export Questions
             </Button>
 
             {exportedQuestionsText && (
               <div className="mt-4 space-y-2">
-                <Label htmlFor="exported-questions-display" className="text-base sm:text-lg">Formatted Questions for Copying:</Label>
+                <Label htmlFor="exported-questions-display" className="text-base sm:text-lg">Formatted Questions (JSON):</Label>
                 <Textarea
                   id="exported-questions-display"
                   value={exportedQuestionsText}
