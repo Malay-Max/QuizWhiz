@@ -113,3 +113,28 @@ export const AnswerQuestionInputSchema = z.object({
     questionId: z.string(),
     selectedAnswerId: z.string(),
 });
+
+
+// --- Explanation Flow Schemas ---
+
+// Represents a single answer option for the explanation flow input.
+const ExplainAnswerOptionSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+});
+
+// Schema for the input to the explainAnswer function/flow.
+export const ExplainAnswerInputSchema = z.object({
+  questionText: z.string().describe("The text of the quiz question."),
+  options: z.array(ExplainAnswerOptionSchema).describe("All possible answer options for the question."),
+  correctAnswerId: z.string().describe("The ID of the correct answer option."),
+  selectedAnswerId: z.string().nullable().describe("The ID of the answer selected by the user. Null if skipped."),
+});
+export type ExplainAnswerInput = z.infer<typeof ExplainAnswerInputSchema>;
+
+
+// Schema for the output from the explainAnswer function/flow.
+export const ExplainAnswerOutputSchema = z.object({
+  explanation: z.string().describe('A detailed, well-structured explanation in Markdown format about why the correct answer is right, why the selected answer might be wrong, and enriched with additional context about relevant topics, books, or authors mentioned.'),
+});
+export type ExplainAnswerOutput = z.infer<typeof ExplainAnswerOutputSchema>;
