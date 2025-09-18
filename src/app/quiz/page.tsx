@@ -1,4 +1,5 @@
 
+
 "use client";
 
 // This file should be identical to src/app/page.tsx for now.
@@ -126,6 +127,7 @@ function QuizPlayPageContent() {
       answers: [],
       startTime: Date.now(),
       status: 'active',
+      totalPausedTime: 0,
     };
     const saveResult = await saveQuizSession(newSession);
     if (!saveResult.success) {
@@ -528,3 +530,5 @@ export default function QuizPlayPage() {
     </Suspense>
   );
 }
+
+    

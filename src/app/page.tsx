@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
@@ -122,6 +123,7 @@ function QuizPageContent() {
       answers: [],
       startTime: Date.now(),
       status: 'active',
+      totalPausedTime: 0,
     };
     const saveResult = await saveQuizSession(newSession);
     if (!saveResult.success) {
@@ -521,3 +523,5 @@ export default function QuizPage() {
     </Suspense>
   );
 }
+
+    
