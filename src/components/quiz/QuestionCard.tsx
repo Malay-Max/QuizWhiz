@@ -6,9 +6,11 @@ import type { Question } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Timer } from '@/components/quiz/Timer';
-import { CheckCircle2, XCircle, ArrowRight, AlertTriangle, SkipForwardIcon, Pause, Play } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowRight, AlertTriangle, SkipForwardIcon, Pause, Play, MessageSquareQuote, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import { explainAnswerAction } from '@/app/actions';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface QuestionCardProps {
@@ -24,6 +26,7 @@ const QUESTION_DURATION = 30;
 const AUTO_ADVANCE_DELAY = 5000; 
 
 export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNumber, totalQuestions }: QuestionCardProps) {
+  const { toast } = useToast();
   const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const isAnsweredRef = useRef(false);
@@ -31,6 +34,11 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const [showFeedback, setShowFeedback] = useState(false);
   const [autoAdvanceMessage, setAutoAdvanceMessage] = useState<string | null>(null);
   const [isQuizPaused, setIsQuizPaused] = useState(false);
+
+  // State for AI Explanation
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [isExplaining, setIsExplaining] = useState(false);
+  const [explanationError, setExplanationError] = useState<string | null>(null);
 
   const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -92,6 +100,12 @@ const optionMarkdownComponents = {
     setShowFeedback(false);
     setAutoAdvanceMessage(null);
     setIsQuizPaused(false);
+    
+    // Reset explanation state for new question
+    setExplanation(null);
+    setIsExplaining(false);
+    setExplanationError(null);
+
 
     if (autoAdvanceTimerRef.current) {
       clearTimeout(autoAdvanceTimerRef.current);
@@ -185,6 +199,44 @@ const optionMarkdownComponents = {
 
   const handleTimerTimeout = () => {
     triggerSkipOrTimeout(0);
+  };
+
+  const handleExplainAnswer = async () => {
+    if (explanation || isExplaining) return;
+
+    setIsExplaining(true);
+    setExplanationError(null);
+
+    try {
+        const result = await explainAnswerAction({
+            questionText: question.text,
+            options: question.options,
+            correctAnswerId: question.correctAnswerId,
+            selectedAnswerId: selectedAnswerId,
+        });
+
+        if (result.success && result.data?.explanation) {
+            setExplanation(result.data.explanation);
+        } else {
+            const errorMsg = result.error || "Failed to get an explanation from the AI.";
+            setExplanationError(errorMsg);
+            toast({
+                title: "Explanation Failed",
+                description: errorMsg,
+                variant: "destructive",
+            });
+        }
+    } catch (e) {
+        const errorMsg = "An unexpected error occurred while fetching the explanation.";
+        setExplanationError(errorMsg);
+        toast({
+            title: "Error",
+            description: errorMsg,
+            variant: "destructive",
+        });
+    } finally {
+        setIsExplaining(false);
+    }
   };
 
   const getButtonVariant = (optionId: string) => {
@@ -325,7 +377,30 @@ const optionMarkdownComponents = {
                     </Button>
                 </>
             )}
+             {isAnswered && (
+                <Button
+                    onClick={handleExplainAnswer}
+                    variant="secondary"
+                    className="w-full sm:w-auto text-xs sm:text-sm"
+                    disabled={isExplaining}
+                >
+                    {isExplaining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}
+                    {isExplaining ? "Thinking..." : "Explain Answer"}
+                </Button>
+            )}
           </div>
+          
+          {explanation && (
+            <div className="w-full p-4 mt-4 border rounded-md bg-secondary/30 prose dark:prose-invert max-w-none prose-sm sm:prose-base">
+                <ReactMarkdown components={markdownComponents}>{explanation}</ReactMarkdown>
+            </div>
+          )}
+          {explanationError && (
+             <div className="w-full p-4 mt-4 border rounded-md bg-destructive/10 text-destructive text-center">
+                <p className="font-semibold">Error</p>
+                <p className="text-sm">{explanationError}</p>
+            </div>
+          )}
 
           {isAnswered && (
             <Button onClick={() => {
@@ -341,7 +416,7 @@ const optionMarkdownComponents = {
               onNext();
             }}
             size="lg"
-            className="w-full md:w-auto shadow-md transition-transform hover:scale-105 text-sm sm:text-base"
+            className="w-full md:w-auto shadow-md transition-transform hover:scale-105 text-sm sm:text-base mt-4"
             >
               {questionNumber === totalQuestions ? 'Finish Quiz' : 'Next Question'} <ArrowRight className="ml-1.5 h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
@@ -352,10 +427,5 @@ const optionMarkdownComponents = {
   );
 }
     
-
-    
-
-
-
 
     
