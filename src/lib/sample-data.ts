@@ -7,6 +7,7 @@ type SampleCategory = Omit<Category, 'id' | 'children'> & {
   questions: Omit<Question, 'id' | 'categoryId' | 'options' | 'correctAnswerId'> & {
     options: string[];
     correctAnswer: string;
+    explanation?: string;
   }[];
   children?: SampleCategory[];
 };
@@ -27,6 +28,7 @@ export const sampleData: SampleCategory[] = [
             text: 'In "Moby-Dick", what is the name of the whaling ship?',
             options: ['Pequod', 'Essex', 'Nautilus', 'Beagle'],
             correctAnswer: 'Pequod',
+            explanation: 'The Pequod is the whaling ship that serves as the main setting of Herman Melville\'s 1851 novel Moby-Dick. Captain Ahab commands the ship on his obsessive quest to hunt the white whale.'
           },
           {
             text: 'Who wrote the novel "The Great Gatsby"?',
@@ -64,6 +66,7 @@ export const sampleData: SampleCategory[] = [
             text: 'The Magna Carta was a document signed in which country?',
             options: ['England', 'France', 'Spain', 'Italy'],
             correctAnswer: 'England',
+            explanation: 'The Magna Carta was a royal charter of rights agreed to by King John of England at Runnymede, near Windsor, on 15 June 1215. It promised the protection of church rights, protection for the barons from illegal imprisonment, access to swift justice, and limitations on feudal payments to the Crown.'
           },
           {
             text: 'The ancient city of Rome was built on how many hills?',

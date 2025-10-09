@@ -31,7 +31,6 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
     const formattedQuestions = questionsToExport.map(q => {
       const optionsObject: { [key: string]: string } = {};
-      const correctAnswerOption = q.options.find(opt => opt.id === q.correctAnswerId);
       let correctKey = '';
 
       q.options.forEach((opt, index) => {
@@ -42,11 +41,22 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         }
       });
       
-      return {
+      const exportedQuestion: {
+        question: string;
+        options: { [key: string]: string };
+        correctAnswer: string;
+        explanation?: string | null;
+      } = {
         question: q.text,
         options: optionsObject,
         correctAnswer: correctKey || '?',
       };
+
+      if (q.explanation) {
+        exportedQuestion.explanation = q.explanation;
+      }
+
+      return exportedQuestion;
     });
     
     return NextResponse.json({ success: true, data: formattedQuestions });

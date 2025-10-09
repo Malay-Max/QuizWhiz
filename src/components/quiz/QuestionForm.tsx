@@ -37,6 +37,7 @@ const questionFormSchema = z.object({
   options: z.array(answerOptionSchema).min(2, 'At least 2 answer options are required').max(6, 'Maximum 6 answer options allowed'),
   correctAnswerId: z.string().min(1,'Please select a correct answer'),
   categoryId: z.string().min(1, 'Category is required.'),
+  explanation: z.string().optional(),
 });
 
 type QuestionFormData = z.infer<typeof questionFormSchema>;
@@ -129,6 +130,7 @@ export function QuestionForm() {
       options: defaultAnswerOptions.map(opt => ({...opt})),
       correctAnswerId: '',
       categoryId: '',
+      explanation: '',
     },
   });
 
@@ -217,6 +219,7 @@ export function QuestionForm() {
               options: optionsWithFreshIds,
               correctAnswerId: questionToEdit.correctAnswerId,
               categoryId: questionToEdit.categoryId,
+              explanation: questionToEdit.explanation || '',
             });
             setPageTitle('Edit Question');
             setSubmitButtonText('Update Question');
@@ -235,6 +238,7 @@ export function QuestionForm() {
                 options: defaultAnswerOptions.map(opt => ({...opt})),
                 correctAnswerId: '',
                 categoryId: '',
+                explanation: '',
             });
         }
         setEditingQuestionId(null);
@@ -371,6 +375,7 @@ export function QuestionForm() {
             options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
             correctAnswerId: data.correctAnswerId,
             categoryId: data.categoryId,
+            explanation: data.explanation,
         };
         result = await updateQuestion(updatedQuestionData);
         if (result.success) {
@@ -390,19 +395,14 @@ export function QuestionForm() {
             });
         }
     } else {
-        const newQuestionData = { 
-            text: data.text,
-            options: data.options.map(opt => ({ id: opt.id, text: opt.text })),
-            correctAnswerId: data.correctAnswerId,
-            categoryId: data.categoryId, 
-        };
         const response = await fetch(`/api/categories/${data.categoryId}/questions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             text: data.text,
             options: data.options.map(o => o.text),
-            correctAnswerText: data.options.find(o => o.id === data.correctAnswerId)?.text
+            correctAnswerText: data.options.find(o => o.id === data.correctAnswerId)?.text,
+            explanation: data.explanation,
           })
         });
         const result = await response.json();
@@ -418,7 +418,8 @@ export function QuestionForm() {
                 text: '',
                 options: defaultAnswerOptions.map(opt => ({...opt})),
                 correctAnswerId: '',
-                categoryId: data.categoryId 
+                categoryId: data.categoryId,
+                explanation: ''
             });
         } else {
             toast({
@@ -627,6 +628,16 @@ export function QuestionForm() {
           </div>
 
           <div>
+            <Label htmlFor="explanation" className="text-base sm:text-lg">Explanation (Optional)</Label>
+            <Textarea
+              id="explanation"
+              {...form.register('explanation')}
+              className="mt-1 min-h-[100px] text-sm md:text-base"
+              placeholder="Provide a static explanation for why the answer is correct."
+            />
+          </div>
+
+          <div>
             <Label htmlFor="category-search" className="text-base sm:text-lg">Category (for single & batch)</Label>
             <Input
               id="category-search"
@@ -688,7 +699,7 @@ export function QuestionForm() {
             <Textarea
                 value={batchInput}
                 onChange={handleBatchInputChange}
-                placeholder={`[\n  {\n    "question": "What is the capital of France?",\n    "options": {\n      "A": "Paris",\n      "B": "London",\n      "C": "Rome"\n    },\n    "correctAnswer": "A"\n  }\n]`}
+                placeholder={`[\n  {\n    "question": "What is the capital of France?",\n    "options": {\n      "A": "Paris",\n      "B": "London",\n      "C": "Rome"\n    },\n    "correctAnswer": "A",\n    "explanation": "Paris is the capital of France."\n  }\n]`}
                 className="min-h-[150px] text-xs sm:text-sm font-code"
                 disabled={isProcessingBatch}
                 aria-label="Batch question JSON input"

@@ -6,7 +6,7 @@ import type { Question } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Timer } from '@/components/quiz/Timer';
-import { CheckCircle2, XCircle, ArrowRight, AlertTriangle, SkipForwardIcon, Pause, Play, MessageSquareQuote, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowRight, AlertTriangle, SkipForwardIcon, Pause, Play, MessageSquareQuote, Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { explainAnswerAction } from '@/app/actions';
@@ -36,9 +36,13 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   const [isQuizPaused, setIsQuizPaused] = useState(false);
 
   // State for AI Explanation
-  const [explanation, setExplanation] = useState<string | null>(null);
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
   const [isExplaining, setIsExplaining] = useState(false);
   const [explanationError, setExplanationError] = useState<string | null>(null);
+  
+  // State for Static Explanation
+  const [showStaticExplanation, setShowStaticExplanation] = useState(false);
+
 
   const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const visualCountdownTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -101,11 +105,11 @@ const optionMarkdownComponents = {
     setAutoAdvanceMessage(null);
     setIsQuizPaused(false);
     
-    // Reset explanation state for new question
-    setExplanation(null);
+    // Reset explanations for new question
+    setAiExplanation(null);
     setIsExplaining(false);
     setExplanationError(null);
-
+    setShowStaticExplanation(false);
 
     if (autoAdvanceTimerRef.current) {
       clearTimeout(autoAdvanceTimerRef.current);
@@ -202,7 +206,7 @@ const optionMarkdownComponents = {
   };
 
   const handleExplainAnswer = async () => {
-    if (explanation || isExplaining) return;
+    if (aiExplanation || isExplaining) return;
 
     setIsExplaining(true);
     setExplanationError(null);
@@ -216,7 +220,7 @@ const optionMarkdownComponents = {
         });
 
         if (result.success && result.data?.explanation) {
-            setExplanation(result.data.explanation);
+            setAiExplanation(result.data.explanation);
         } else {
             const errorMsg = result.error || "Failed to get an explanation from the AI.";
             setExplanationError(errorMsg);
@@ -377,6 +381,15 @@ const optionMarkdownComponents = {
                     </Button>
                 </>
             )}
+             {isAnswered && question.explanation && (
+                <Button
+                    onClick={() => setShowStaticExplanation(!showStaticExplanation)}
+                    variant="secondary"
+                    className="w-full sm:w-auto text-xs sm:text-sm"
+                >
+                    <Info className="mr-2 h-4 w-4" /> {showStaticExplanation ? 'Hide' : 'Show'} Explanation
+                </Button>
+            )}
              {isAnswered && (
                 <Button
                     onClick={handleExplainAnswer}
@@ -385,14 +398,21 @@ const optionMarkdownComponents = {
                     disabled={isExplaining}
                 >
                     {isExplaining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}
-                    {isExplaining ? "Thinking..." : "Explain Answer"}
+                    {isExplaining ? "Thinking..." : "AI Explain"}
                 </Button>
             )}
           </div>
           
-          {explanation && (
+           {showStaticExplanation && question.explanation && (
             <div className="w-full p-4 mt-4 border rounded-md bg-secondary/30 prose dark:prose-invert max-w-none prose-sm sm:prose-base">
-                <ReactMarkdown components={markdownComponents}>{explanation}</ReactMarkdown>
+              <h3 className="font-headline text-lg font-semibold -mt-1 mb-2">Explanation</h3>
+              <ReactMarkdown components={markdownComponents}>{question.explanation}</ReactMarkdown>
+            </div>
+          )}
+
+          {aiExplanation && (
+            <div className="w-full p-4 mt-4 border rounded-md bg-secondary/30 prose dark:prose-invert max-w-none prose-sm sm:prose-base">
+                <ReactMarkdown components={markdownComponents}>{aiExplanation}</ReactMarkdown>
             </div>
           )}
           {explanationError && (

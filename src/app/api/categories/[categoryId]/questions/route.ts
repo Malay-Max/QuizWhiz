@@ -54,7 +54,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: validation.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    const { text, options, correctAnswerText } = validation.data;
+    const { text, options, correctAnswerText, explanation } = validation.data;
     
     const answerOptions = options.map(opt => ({ id: crypto.randomUUID(), text: opt }));
     
@@ -68,6 +68,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         options: answerOptions,
         correctAnswerId: correctOption.id,
         categoryId: categoryId,
+        explanation: explanation,
     };
 
     const result = await addQuestion(newQuestionData);

@@ -55,7 +55,6 @@ export async function getCategoryById(id: string): Promise<Category | undefined>
 }
 
 export async function getAllCategories(): Promise<Category[]> {
-  // This function can run on both server and client.
   try {
     const q = query(collection(db, CATEGORIES_COLLECTION), orderBy("name"));
     const querySnapshot = await getDocs(q);
@@ -243,6 +242,7 @@ export async function addQuestion(question: Omit<Question, 'id'> & { id?: string
       options: question.options,
       correctAnswerId: question.correctAnswerId,
       categoryId: question.categoryId,
+      explanation: question.explanation,
     };
     await setDoc(newQuestionRef, questionData);
     return { success: true, id: newQuestionRef.id };
@@ -334,7 +334,6 @@ export async function deleteQuestionsByCategoryId(categoryId: string, allCategor
 }
 
 export async function getQuestionsByCategoryIdAndDescendants(categoryId: string, allCategories: Category[]): Promise<Question[]> {
-  // This function can run on both server and client.
   try {
     const relevantCategoryIds = [categoryId, ...getDescendantCategoryIds(categoryId, allCategories)];
     if (relevantCategoryIds.length === 0) return [];
@@ -464,6 +463,7 @@ export async function seedSampleData(): Promise<{ success: boolean; categoriesAd
             options: answerOptions,
             correctAnswerId: correctOption.id,
             categoryId: category.id,
+            explanation: q.explanation,
           };
           batch.set(questionRef, newQuestion);
           questionsAdded++;

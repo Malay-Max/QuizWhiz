@@ -49,7 +49,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: validation.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    const { text, options, correctAnswerId, categoryId } = validation.data;
+    const { text, options, correctAnswerId, categoryId, explanation } = validation.data;
 
     // Construct the updated question object, only including fields that were provided
     const updatedQuestionData: Question = {
@@ -59,6 +59,11 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         ...(correctAnswerId && { correctAnswerId }),
         ...(categoryId && { categoryId }),
     };
+
+    if (explanation !== undefined) {
+        updatedQuestionData.explanation = explanation;
+    }
+
 
     // If options are being updated, we must ensure the correct answer ID is still valid.
     if (options && correctAnswerId) {

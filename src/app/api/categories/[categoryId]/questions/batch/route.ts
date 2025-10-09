@@ -17,6 +17,7 @@ const batchQuestionSchema = z.object({
     errorMap: () => ({ message: 'Options must be a key-value object of strings.' })
   }),
   correctAnswer: z.string().length(1, 'Correct answer key must be a single character (e.g., "A").'),
+  explanation: z.string().optional(),
 });
 
 const batchAddSchema = z.array(batchQuestionSchema).min(1, 'Batch input must be an array of at least one question.');
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
           options: answerOptions,
           correctAnswerId: correctOption.id,
           categoryId: categoryId,
+          explanation: item.explanation,
         };
 
         const result = await addQuestion(newQuestionData);

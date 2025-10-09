@@ -22,6 +22,7 @@ export interface Question {
   options: AnswerOption[];
   correctAnswerId: string;
   categoryId: string; // Changed from category: string (path)
+  explanation?: string | null; // Optional static explanation
 }
 
 export interface QuizAnswer {
@@ -70,6 +71,7 @@ export const CreateQuestionInputSchema = z.object({
   text: z.string().min(5, 'Question text must be at least 5 characters.'),
   options: z.array(z.string().min(1, 'Option text cannot be empty.')).min(2, 'At least 2 options are required.'),
   correctAnswerText: z.string().min(1, 'Correct answer text cannot be empty.'),
+  explanation: z.string().optional(),
 });
 
 // Schema for the API to update an existing question (PUT /api/questions/:id)
@@ -82,6 +84,7 @@ export const UpdateQuestionInputSchema = z.object({
   options: z.array(ApiAnswerOptionSchema).min(2, 'At least 2 options are required.').optional(),
   correctAnswerId: z.string().optional(),
   categoryId: z.string().optional(),
+  explanation: z.string().nullable().optional(),
 });
 
 
