@@ -78,6 +78,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
           options: answerOptions,
           correctAnswerId: correctOption.id,
           categoryId: categoryId,
+          // Conditionally add optional fields only if they exist in the input
           ...(item.explanation && { explanation: item.explanation }),
           ...(item.source && { source: item.source }),
         };
