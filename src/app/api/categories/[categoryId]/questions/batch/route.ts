@@ -78,8 +78,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
           options: answerOptions,
           correctAnswerId: correctOption.id,
           categoryId: categoryId,
-          explanation: item.explanation,
-          source: item.source,
+          ...(item.explanation && { explanation: item.explanation }),
+          ...(item.source && { source: item.source }),
         };
 
         const result = await addQuestion(newQuestionData);
