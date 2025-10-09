@@ -279,8 +279,8 @@ export async function addQuestionsBatch(questions: BatchQuestion[], categoryId: 
                 options: options,
                 correctAnswerId: correctOption.id,
                 categoryId: categoryId,
-                explanation: q.explanation,
-                source: q.source,
+                ...(q.explanation && { explanation: q.explanation }),
+                ...(q.source && { source: q.source }),
             };
             batch.set(newQuestionRef, newQuestion);
             added++;
