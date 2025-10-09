@@ -10,7 +10,7 @@ import {
     getFullCategoryPath 
 } from '@/lib/storage';
 import { StartQuizInputSchema } from '@/types';
-import type { Question, StorableQuizSession } from '@/types';
+import type { Question, StorableQuizSession, Category } from '@/types';
 
 // POST /api/quizzes - Start a new quiz
 export async function POST(request: NextRequest) {
@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     let finalQuizCategoryId = categoryId || 'random';
 
     const allCategories = await getAllCategories();
+    const categoryMap = new Map<string, Category>(allCategories.map(c => [c.id, c]));
 
     if (random) {
         const allQuestionsFromAllCats: Question[] = [];
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
 
     const questionsWithShuffledOptions = finalQuestions.map(question => ({
       ...question,
+      categoryName: categoryMap.get(question.categoryId)?.name, // Add category name
       options: shuffleArray([...question.options]),
     }));
 
@@ -102,7 +104,9 @@ export async function POST(request: NextRequest) {
             firstQuestion: firstQuestion ? {
                 id: firstQuestion.id,
                 text: firstQuestion.text,
-                options: firstQuestion.options
+                options: firstQuestion.options,
+                source: firstQuestion.source,
+                categoryName: firstQuestion.categoryName,
             } : null
         } 
     });
@@ -113,5 +117,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }
-
-    

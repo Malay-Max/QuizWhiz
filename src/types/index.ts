@@ -21,9 +21,12 @@ export interface Question {
   text: string;
   options: AnswerOption[];
   correctAnswerId: string;
-  categoryId: string; // Changed from category: string (path)
-  explanation?: string | null; // Optional static explanation
+  categoryId: string;
+  categoryName?: string; // Will be populated when starting a quiz
+  explanation?: string | null;
+  source?: string | null; // New optional source field
 }
+
 
 export interface QuizAnswer {
   questionId: string;
@@ -34,9 +37,9 @@ export interface QuizAnswer {
 }
 
 export interface QuizSession {
-  id: string;
-  categoryId: string; // Changed from category: string (path)
-  categoryName?: string; // Optional: For storing resolved path at session start
+  id:string;
+  categoryId: string;
+  categoryName?: string; 
   questions: Question[];
   currentQuestionIndex: number;
   answers: QuizAnswer[];
@@ -50,7 +53,7 @@ export interface QuizSession {
 
 export interface StorableQuizSession {
   id: string;
-  categoryId: string; // Changed from category: string (path)
+  categoryId: string; 
   categoryName?: string; 
   questions: Question[];
   currentQuestionIndex: number;
@@ -72,6 +75,7 @@ export const CreateQuestionInputSchema = z.object({
   options: z.array(z.string().min(1, 'Option text cannot be empty.')).min(2, 'At least 2 options are required.'),
   correctAnswerText: z.string().min(1, 'Correct answer text cannot be empty.'),
   explanation: z.string().optional(),
+  source: z.string().optional(), // New source field
 });
 
 // Schema for the API to update an existing question (PUT /api/questions/:id)
@@ -85,6 +89,7 @@ export const UpdateQuestionInputSchema = z.object({
   correctAnswerId: z.string().optional(),
   categoryId: z.string().optional(),
   explanation: z.string().nullable().optional(),
+  source: z.string().nullable().optional(), // New source field
 });
 
 

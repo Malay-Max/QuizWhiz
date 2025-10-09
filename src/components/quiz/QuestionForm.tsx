@@ -38,6 +38,7 @@ const questionFormSchema = z.object({
   correctAnswerId: z.string().min(1,'Please select a correct answer'),
   categoryId: z.string().min(1, 'Category is required.'),
   explanation: z.string().optional(),
+  source: z.string().optional(),
 });
 
 type QuestionFormData = z.infer<typeof questionFormSchema>;
@@ -131,6 +132,7 @@ export function QuestionForm() {
       correctAnswerId: '',
       categoryId: '',
       explanation: '',
+      source: '',
     },
   });
 
@@ -220,6 +222,7 @@ export function QuestionForm() {
               correctAnswerId: questionToEdit.correctAnswerId,
               categoryId: questionToEdit.categoryId,
               explanation: questionToEdit.explanation || '',
+              source: questionToEdit.source || '',
             });
             setPageTitle('Edit Question');
             setSubmitButtonText('Update Question');
@@ -239,6 +242,7 @@ export function QuestionForm() {
                 correctAnswerId: '',
                 categoryId: '',
                 explanation: '',
+                source: '',
             });
         }
         setEditingQuestionId(null);
@@ -376,6 +380,7 @@ export function QuestionForm() {
             correctAnswerId: data.correctAnswerId,
             categoryId: data.categoryId,
             explanation: data.explanation,
+            source: data.source,
         };
         result = await updateQuestion(updatedQuestionData);
         if (result.success) {
@@ -403,6 +408,7 @@ export function QuestionForm() {
             options: data.options.map(o => o.text),
             correctAnswerText: data.options.find(o => o.id === data.correctAnswerId)?.text,
             explanation: data.explanation,
+            source: data.source,
           })
         });
         const result = await response.json();
@@ -419,7 +425,8 @@ export function QuestionForm() {
                 options: defaultAnswerOptions.map(opt => ({...opt})),
                 correctAnswerId: '',
                 categoryId: data.categoryId,
-                explanation: ''
+                explanation: '',
+                source: '',
             });
         } else {
             toast({
@@ -638,6 +645,16 @@ export function QuestionForm() {
           </div>
 
           <div>
+            <Label htmlFor="source" className="text-base sm:text-lg">Source (Optional)</Label>
+            <Input
+              id="source"
+              {...form.register('source')}
+              className="mt-1 text-sm md:text-base"
+              placeholder="e.g., 'Moby-Dick', Chapter 16"
+            />
+          </div>
+
+          <div>
             <Label htmlFor="category-search" className="text-base sm:text-lg">Category (for single & batch)</Label>
             <Input
               id="category-search"
@@ -699,7 +716,7 @@ export function QuestionForm() {
             <Textarea
                 value={batchInput}
                 onChange={handleBatchInputChange}
-                placeholder={`[\n  {\n    "question": "What is the capital of France?",\n    "options": {\n      "A": "Paris",\n      "B": "London",\n      "C": "Rome"\n    },\n    "correctAnswer": "A",\n    "explanation": "Paris is the capital of France."\n  }\n]`}
+                placeholder={`[\n  {\n    "question": "What is the capital of France?",\n    "options": {\n      "A": "Paris",\n      "B": "London",\n      "C": "Rome"\n    },\n    "correctAnswer": "A",\n    "explanation": "Paris is the capital of France.",\n    "source": "Geography 101"\n  }\n]`}
                 className="min-h-[150px] text-xs sm:text-sm font-code"
                 disabled={isProcessingBatch}
                 aria-label="Batch question JSON input"

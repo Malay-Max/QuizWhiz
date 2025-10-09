@@ -6,7 +6,7 @@ import type { Question } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Timer } from '@/components/quiz/Timer';
-import { CheckCircle2, XCircle, ArrowRight, AlertTriangle, SkipForwardIcon, Pause, Play, MessageSquareQuote, Loader2, Info } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowRight, AlertTriangle, SkipForwardIcon, Pause, Play, MessageSquareQuote, Loader2, Info, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { explainAnswerAction } from '@/app/actions';
@@ -284,6 +284,12 @@ const optionMarkdownComponents = {
               />
             </div>
           </div>
+          {(question.source || question.categoryName) && (
+            <div className="flex items-center text-xs sm:text-sm text-muted-foreground mt-2">
+              <BookOpen className="mr-2 h-4 w-4" />
+              Source: {question.source || question.categoryName}
+            </div>
+          )}
           <CardDescription asChild className="pt-1 prose prose-base sm:prose-lg dark:prose-invert max-w-none">
              <div className={cn("relative", isQuizPaused && "blur-sm pointer-events-none")}>
                 <ReactMarkdown components={markdownComponents}>
@@ -446,6 +452,3 @@ const optionMarkdownComponents = {
     </>
   );
 }
-    
-
-    

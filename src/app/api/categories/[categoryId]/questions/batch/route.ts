@@ -18,6 +18,7 @@ const batchQuestionSchema = z.object({
   }),
   correctAnswer: z.string().length(1, 'Correct answer key must be a single character (e.g., "A").'),
   explanation: z.string().optional(),
+  source: z.string().optional(),
 });
 
 const batchAddSchema = z.array(batchQuestionSchema).min(1, 'Batch input must be an array of at least one question.');
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
           correctAnswerId: correctOption.id,
           categoryId: categoryId,
           explanation: item.explanation,
+          source: item.source,
         };
 
         const result = await addQuestion(newQuestionData);

@@ -46,6 +46,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         options: { [key: string]: string };
         correctAnswer: string;
         explanation?: string | null;
+        source?: string | null;
       } = {
         question: q.text,
         options: optionsObject,
@@ -54,6 +55,9 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
       if (q.explanation) {
         exportedQuestion.explanation = q.explanation;
+      }
+      if (q.source) {
+        exportedQuestion.source = q.source;
       }
 
       return exportedQuestion;

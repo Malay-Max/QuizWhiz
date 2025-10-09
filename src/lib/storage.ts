@@ -243,6 +243,7 @@ export async function addQuestion(question: Omit<Question, 'id'> & { id?: string
       correctAnswerId: question.correctAnswerId,
       categoryId: question.categoryId,
       explanation: question.explanation,
+      source: question.source,
     };
     await setDoc(newQuestionRef, questionData);
     return { success: true, id: newQuestionRef.id };
@@ -464,6 +465,7 @@ export async function seedSampleData(): Promise<{ success: boolean; categoriesAd
             correctAnswerId: correctOption.id,
             categoryId: category.id,
             explanation: q.explanation,
+            source: q.source,
           };
           batch.set(questionRef, newQuestion);
           questionsAdded++;
@@ -485,5 +487,3 @@ export async function seedSampleData(): Promise<{ success: boolean; categoriesAd
     return { success: false, error: handleFirestoreError(error, "Could not seed sample data.") };
   }
 }
-
-    
