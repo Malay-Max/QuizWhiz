@@ -27,6 +27,14 @@ export interface Question {
   source?: string | null; // New optional source field
 }
 
+export interface BatchQuestion {
+    question: string;
+    options: Record<string, string>;
+    correctAnswer: string;
+    explanation?: string;
+    source?: string;
+}
+
 
 export interface QuizAnswer {
   questionId: string;
@@ -146,3 +154,5 @@ export const ExplainAnswerOutputSchema = z.object({
   explanation: z.string().describe('A detailed, well-structured explanation in Markdown format about why the correct answer is right, why the selected answer might be wrong, and enriched with additional context about relevant topics, books, or authors mentioned.'),
 });
 export type ExplainAnswerOutput = z.infer<typeof ExplainAnswerOutputSchema>;
+
+    

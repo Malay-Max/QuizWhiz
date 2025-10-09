@@ -152,3 +152,5 @@ export default function ManageCategoriesPage() {
     </div>
   );
 }
+
+    

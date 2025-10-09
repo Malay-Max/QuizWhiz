@@ -1,5 +1,5 @@
 
-import type { Question, QuizSession, StorableQuizSession, Category, AnswerOption } from '@/types';
+import type { Question, QuizSession, StorableQuizSession, Category, AnswerOption, BatchQuestion } from '@/types';
 import { db, auth } from './firebase';
 import { 
   collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, writeBatch, Timestamp, orderBy, updateDoc
@@ -253,6 +253,53 @@ export async function addQuestion(question: Omit<Question, 'id'> & { id?: string
   }
 }
 
+export async function addQuestionsBatch(questions: BatchQuestion[], categoryId: string): Promise<{ success: boolean; added: number; failed: number, error?: string }> {
+    const batch = writeBatch(db);
+    let added = 0;
+    let failed = 0;
+
+    for (const q of questions) {
+        try {
+            const options: AnswerOption[] = Object.values(q.options).map(optText => ({ id: crypto.randomUUID(), text: optText }));
+            
+            const correctOptionKey = q.correctAnswer;
+            const correctOptionText = q.options[correctOptionKey];
+            const correctOption = options.find(opt => opt.text === correctOptionText);
+
+            if (!correctOption) {
+                failed++;
+                console.warn(`Could not find correct answer for question: ${q.question}`);
+                continue;
+            }
+
+            const newQuestionRef = doc(collection(db, QUESTIONS_COLLECTION));
+            const newQuestion: Question = {
+                id: newQuestionRef.id,
+                text: q.question,
+                options: options,
+                correctAnswerId: correctOption.id,
+                categoryId: categoryId,
+                explanation: q.explanation,
+                source: q.source,
+            };
+            batch.set(newQuestionRef, newQuestion);
+            added++;
+        } catch (e) {
+            failed++;
+            console.error(`Failed to process a question in batch: ${q.question}`, e);
+        }
+    }
+
+    try {
+        await batch.commit();
+        return { success: true, added, failed };
+    } catch (error) {
+        console.error("Error committing batch of questions:", error);
+        return { success: false, added: 0, failed: questions.length, error: handleFirestoreError(error, "Failed to save questions.") };
+    }
+}
+
+
 export async function getQuestionById(id: string): Promise<Question | undefined> {
   try {
     const docRef = doc(db, QUESTIONS_COLLECTION, id);
@@ -487,3 +534,5 @@ export async function seedSampleData(): Promise<{ success: boolean; categoriesAd
     return { success: false, error: handleFirestoreError(error, "Could not seed sample data.") };
   }
 }
+
+    

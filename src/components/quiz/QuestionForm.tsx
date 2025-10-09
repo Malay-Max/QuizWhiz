@@ -19,6 +19,8 @@ import {
   getFullCategoryPath,
   Category as CategoryType,
   Question as QuestionType,
+  addQuestion,
+  addQuestionsBatch,
   getQuestionsByCategoryIdAndDescendants
 } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +28,8 @@ import { generateDistractorsAction } from '@/app/actions';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
+import type { BatchQuestion } from '@/types';
+
 
 const answerOptionSchema = z.object({
   id: z.string().default(() => crypto.randomUUID()),
@@ -400,18 +404,16 @@ export function QuestionForm() {
             });
         }
     } else {
-        const response = await fetch(`/api/categories/${data.categoryId}/questions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const newQuestionData: Omit<QuestionType, 'id'> = {
             text: data.text,
-            options: data.options.map(o => o.text),
-            correctAnswerText: data.options.find(o => o.id === data.correctAnswerId)?.text,
+            options: data.options.map(o => ({ id: o.id, text: o.text })),
+            correctAnswerId: data.correctAnswerId,
+            categoryId: data.categoryId,
             explanation: data.explanation,
             source: data.source,
-          })
-        });
-        const result = await response.json();
+        };
+
+        const result = await addQuestion(newQuestionData);
 
         if (result.success) {
             toast({
@@ -462,7 +464,7 @@ export function QuestionForm() {
     
     let questionsData;
     try {
-      questionsData = JSON.parse(batchInput);
+      questionsData = JSON.parse(batchInput) as BatchQuestion[];
     } catch (e) {
       toast({
         title: 'Invalid JSON',
@@ -474,23 +476,18 @@ export function QuestionForm() {
 
     setIsProcessingBatch(true);
     
-    const response = await fetch(`/api/categories/${currentCategoryId}/questions/batch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(questionsData),
-    });
-
-    const result = await response.json();
+    const result = await addQuestionsBatch(questionsData, currentCategoryId);
+    
     setIsProcessingBatch(false);
 
-    if (response.ok) {
+    if (result.success) {
         toast({
-            title: result.message || 'Batch Processing Complete',
-            description: `${result.data.added} questions added. ${result.data.failed} failed.`,
-            variant: result.data.failed > 0 ? 'default' : 'default',
-            className: result.data.failed === 0 ? 'bg-accent text-accent-foreground' : ''
+            title: 'Batch Processing Complete',
+            description: `${result.added} questions added. ${result.failed} failed.`,
+            variant: result.failed > 0 ? 'default' : 'default',
+            className: result.failed === 0 ? 'bg-accent text-accent-foreground' : ''
         });
-        if (result.data.added > 0) {
+        if (result.added > 0) {
             setBatchInput('');
         }
     } else {
@@ -510,20 +507,36 @@ export function QuestionForm() {
     setIsExporting(true);
     setExportedQuestionsText(''); 
     try {
-      const response = await fetch(`/api/categories/${categoryForExport.id}/questions/export`);
-      const result = await response.json();
-  
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch questions for export.');
-      }
-      
-      const questionsToExport = result.data;
-      if (!questionsToExport || questionsToExport.length === 0) {
+      const questionsFromDb = await getQuestionsByCategoryIdAndDescendants(categoryForExport.id, allCategories);
+
+      if (!questionsFromDb || questionsFromDb.length === 0) {
         toast({ title: "No Questions", description: `No questions found in category "${categoryForExport.name}" or its sub-categories to display.`, variant: "default" });
         setIsExporting(false);
         return;
       }
       
+      const questionsToExport = questionsFromDb.map(q => {
+          const optionsObject: {[key: string]: string} = {};
+          const correctOption = q.options.find(o => o.id === q.correctAnswerId);
+          let correctKey = '';
+          
+          q.options.forEach((opt, index) => {
+              const key = String.fromCharCode(65 + index); // A, B, C...
+              optionsObject[key] = opt.text;
+              if (opt.id === correctOption?.id) {
+                  correctKey = key;
+              }
+          });
+
+          return {
+              question: q.text,
+              options: optionsObject,
+              correctAnswer: correctKey,
+              explanation: q.explanation,
+              source: q.source
+          };
+      });
+
       const formattedJson = JSON.stringify(questionsToExport, null, 2);
       
       setExportedQuestionsText(formattedJson);
@@ -810,3 +823,5 @@ export function QuestionForm() {
     </Card>
   );
 }
+
+    
