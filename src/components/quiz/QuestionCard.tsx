@@ -42,6 +42,9 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   
   // State for Static Explanation
   const [showStaticExplanation, setShowStaticExplanation] = useState(false);
+  
+  // Track if any explanation is currently being shown (for pausing timer)
+  const isExplanationShown = showStaticExplanation || aiExplanation !== null;
 
 
   const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -208,6 +211,17 @@ const optionMarkdownComponents = {
   const handleExplainAnswer = async () => {
     if (aiExplanation || isExplaining) return;
 
+    // Pause auto-advance when showing AI explanation
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+    if (visualCountdownTimerRef.current) {
+      clearInterval(visualCountdownTimerRef.current);
+      visualCountdownTimerRef.current = null;
+    }
+    setAutoAdvanceMessage(null);
+
     setIsExplaining(true);
     setExplanationError(null);
 
@@ -279,7 +293,7 @@ const optionMarkdownComponents = {
                 duration={QUESTION_DURATION}
                 onTimeout={handleTimerTimeout}
                 onTick={setTimeLeft}
-                isPaused={isAnswered || isQuizPaused}
+                isPaused={isAnswered || isQuizPaused || isExplanationShown}
                 isExternallyAnsweredRef={isAnsweredRef}
               />
             </div>
@@ -389,7 +403,21 @@ const optionMarkdownComponents = {
             )}
              {isAnswered && question.explanation && (
                 <Button
-                    onClick={() => setShowStaticExplanation(!showStaticExplanation)}
+                    onClick={() => {
+                      // Pause auto-advance when toggling explanation
+                      if (!showStaticExplanation) {
+                        if (autoAdvanceTimerRef.current) {
+                          clearTimeout(autoAdvanceTimerRef.current);
+                          autoAdvanceTimerRef.current = null;
+                        }
+                        if (visualCountdownTimerRef.current) {
+                          clearInterval(visualCountdownTimerRef.current);
+                          visualCountdownTimerRef.current = null;
+                        }
+                        setAutoAdvanceMessage(null);
+                      }
+                      setShowStaticExplanation(!showStaticExplanation);
+                    }}
                     variant="secondary"
                     className="w-full sm:w-auto text-xs sm:text-sm"
                 >
