@@ -1,0 +1,135 @@
+'use server';
+
+/**
+ * @fileOverview AI flow to generate postgraduate-level MCQ questions 
+ * for English Literature, Literary Theory, and Cultural History exams
+ * using Gemini 2.5 Pro.
+ */
+
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+import {
+    GenerateQuestionsInputSchema,
+    GenerateQuestionsOutputSchema,
+    type GenerateQuestionsInput,
+    type GenerateQuestionsOutput,
+} from '@/types';
+
+export async function generateQuestions(input: GenerateQuestionsInput): Promise<GenerateQuestionsOutput> {
+    return generateQuestionsFlow(input);
+}
+
+const generateQuestionsPrompt = ai.definePrompt({
+    name: 'generateQuestionsPrompt',
+    model: 'googleai/gemini-2.5-pro',
+    input: { schema: GenerateQuestionsInputSchema },
+    output: { schema: GenerateQuestionsOutputSchema },
+    prompt: `You are an expert MCQ generator for Postgraduate-level exams in English Literature, Literary Theory, or Cultural/Intellectual History (UGC-NET, GATE, SET, etc.). You will be given a main topic and associated subtopics.
+
+Your task: Generate high-quality, postgraduate-level MCQs that are conceptually rigorous and balanced in design.
+
+📌 MCQ Design Rules
+
+✅ Level and Depth
+Questions must test deep understanding — conceptual nuance, textual specificity, and interconnections — not trivial recall.
+
+✅ Option-Length Balance
+Do NOT make the correct option consistently longer or more detailed than the distractors.
+All options must be:
+- Similar in length and grammatical structure.
+- Plausible and academically appropriate.
+- Use precision, not verbosity, to convey correctness.
+
+Example of balanced options:
+Q. Who introduced the concept of "Bricolage" in structural anthropology?
+A. Claude Lévi-Strauss  
+B. Roland Barthes  
+C. Ferdinand de Saussure  
+D. Roman Jakobson  
+Correct Answer: A  
+
+❌ Avoid this:
+A. Claude Lévi-Strauss, in his theory of structural anthropology, using bricolage as a key metaphor  
+B. Roland Barthes  
+C. Ferdinand de Saussure  
+D. Roman Jakobson  
+
+✅ Variation
+- Rotate the position of the correct answer (A, B, C, D).
+- Mix question styles:
+  * Concept identification
+  * Chronology
+  * Text–author matching
+  * Term–definition pairing
+  * Contextual inference
+
+✅ Compulsory Coverage
+If data includes:
+- Titles & Publication Years → Create at least one question per title/year.
+- Key Concepts/Terms → Who coined, where introduced, meaning.
+- Authors/Theorists → Works, affiliations, arguments.
+- Quotes/Openings → Match quote to author/work/context.
+- Themes & Structures → Plot, characters, symbols.
+- Interrelations → Chronology, shared ideas, contrasting positions.
+
+✅ Additional Anti-Bias Instructions
+- Do NOT use phrases like "all of the above" or "none of the above."
+- Avoid options with unequal information density (e.g., one detailed vs. three single-word).
+- When using names or terms, keep option complexity uniform.
+
+Your Goal: Produce a dense, balanced, exam-ready question bank without giving away answers through option length or structure.
+
+SOURCE TEXT TO ANALYZE:
+{{{sourceText}}}
+
+QUESTION GENERATION STRATEGY:
+You must generate a COMPREHENSIVE question bank that covers the material thoroughly:
+- For every author/theorist mentioned → Create questions about their works, contributions, and theories
+- For every title/publication year → Create chronology and attribution questions
+- For every concept/term → Create definition, origin, and application questions
+- For every quote/opening line → Create matching questions
+- For themes, plot points, characters → Create analytical questions
+
+QUANTITY EXPECTATION:
+- Short text (50-200 words) → Aim for 8-15 questions minimum
+- Medium text (200-500 words) → Aim for 15-30 questions minimum  
+- Long text (500+ words) → Aim for 30-60+ questions minimum
+- Dense academic content → Generate 1 question per major concept/name/date/title mentioned
+
+Your goal is COMPREHENSIVE COVERAGE, not minimal coverage. Extract maximum pedagogical value from the source material.
+
+{{#if categoryContext}}SUBJECT/CATEGORY: {{categoryContext}}{{/if}}
+
+TECHNICAL REQUIREMENTS:
+- Generate exactly 4 options per question with IDs: "option-A", "option-B", "option-C", "option-D"
+- Include brief explanation for the correct answer
+- Set source field to: "AI Generated from Text"
+- Ensure output matches the required JSON schema
+
+Generate a comprehensive, exam-ready question bank now - do NOT limit yourself to 10-15 questions if the content warrants more.`,
+});
+
+const generateQuestionsFlow = ai.defineFlow(
+    {
+        name: 'generateQuestionsFlow',
+        inputSchema: GenerateQuestionsInputSchema,
+        outputSchema: GenerateQuestionsOutputSchema,
+    },
+    async (input) => {
+        try {
+            const { output } = await generateQuestionsPrompt(input);
+
+            if (!output || !output.questions || output.questions.length === 0) {
+                console.warn('generateQuestionsFlow: No questions generated by the model.');
+                return {
+                    questions: []
+                };
+            }
+
+            return output;
+        } catch (flowError) {
+            console.error('Error in generateQuestionsFlow:', flowError);
+            throw new Error('Failed to generate questions from text. Please try again.');
+        }
+    }
+);

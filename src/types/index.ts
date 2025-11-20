@@ -1,5 +1,5 @@
 
-import type { Timestamp } from 'firebase/firestore'; 
+import type { Timestamp } from 'firebase/firestore';
 import { z } from 'genkit';
 
 export interface AnswerOption {
@@ -28,11 +28,11 @@ export interface Question {
 }
 
 export interface BatchQuestion {
-    question: string;
-    options: Record<string, string>;
-    correctAnswer: string;
-    explanation?: string;
-    source?: string;
+  question: string;
+  options: Record<string, string>;
+  correctAnswer: string;
+  explanation?: string;
+  source?: string;
 }
 
 
@@ -45,29 +45,29 @@ export interface QuizAnswer {
 }
 
 export interface QuizSession {
-  id:string;
+  id: string;
   categoryId: string;
-  categoryName?: string; 
+  categoryName?: string;
   questions: Question[];
   currentQuestionIndex: number;
   answers: QuizAnswer[];
   startTime: number; // timestamp
   endTime?: number; // timestamp
   status: 'active' | 'completed' | 'paused';
-  userId?: string; 
+  userId?: string;
   pauseTime?: number; // Timestamp when quiz was paused
   totalPausedTime: number; // in milliseconds
 }
 
 export interface StorableQuizSession {
   id: string;
-  categoryId: string; 
-  categoryName?: string; 
+  categoryId: string;
+  categoryName?: string;
   questions: Question[];
   currentQuestionIndex: number;
   answers: QuizAnswer[];
-  startTime: Timestamp; 
-  endTime?: Timestamp; 
+  startTime: Timestamp;
+  endTime?: Timestamp;
   status: 'active' | 'completed' | 'paused';
   userId?: string;
   pauseTime?: Timestamp; // Timestamp when quiz was paused
@@ -120,14 +120,14 @@ export type GenerateDistractorsOutput = z.infer<typeof GenerateDistractorsOutput
 // --- Quiz Session API Schemas ---
 
 export const StartQuizInputSchema = z.object({
-    categoryId: z.string().optional(),
-    random: z.boolean().default(false),
-    questionCount: z.number().int().positive().optional(),
+  categoryId: z.string().optional(),
+  random: z.boolean().default(false),
+  questionCount: z.number().int().positive().optional(),
 });
 
 export const AnswerQuestionInputSchema = z.object({
-    questionId: z.string(),
-    selectedAnswerId: z.string(),
+  questionId: z.string(),
+  selectedAnswerId: z.string(),
 });
 
 
@@ -155,4 +155,37 @@ export const ExplainAnswerOutputSchema = z.object({
 });
 export type ExplainAnswerOutput = z.infer<typeof ExplainAnswerOutputSchema>;
 
-    
+
+// --- Question Generation Flow Schemas ---
+
+// Schema for a single generated question option
+const GeneratedQuestionOptionSchema = z.object({
+  id: z.string().describe('Unique identifier for the option (auto-generated)'),
+  text: z.string().describe('The text of the answer option'),
+});
+
+// Schema for a single generated question
+const GeneratedQuestionSchema = z.object({
+  questionText: z.string().describe('The text of the generated question'),
+  options: z.array(GeneratedQuestionOptionSchema).length(4).describe('Exactly 4 answer options'),
+  correctAnswerId: z.string().describe('The ID of the correct answer option'),
+  explanation: z.string().optional().describe('Optional explanation for the correct answer'),
+  difficulty: z.enum(['easy', 'medium', 'hard']).describe('Difficulty level of the question'),
+  source: z.string().default('AI Generated from Text').describe('Source of the question'),
+});
+
+// Schema for the input to the generateQuestions function/flow
+export const GenerateQuestionsInputSchema = z.object({
+  sourceText: z.string().min(50, 'Source text must be at least 50 characters').describe('The study notes or text to generate questions from'),
+  categoryContext: z.string().optional().describe('Optional category or subject context hint'),
+});
+export type GenerateQuestionsInput = z.infer<typeof GenerateQuestionsInputSchema>;
+
+// Schema for the output from the generateQuestions function/flow
+export const GenerateQuestionsOutputSchema = z.object({
+  questions: z.array(GeneratedQuestionSchema).describe('Array of generated questions'),
+});
+export type GenerateQuestionsOutput = z.infer<typeof GenerateQuestionsOutputSchema>;
+
+// Type for a generated question (for easier use in components)
+export type GeneratedQuestion = z.infer<typeof GeneratedQuestionSchema>;
