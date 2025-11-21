@@ -14,13 +14,14 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
 interface CategorySelectorProps {
-  onCategoryAction: (categoryId: string) => void;
+  onSelectCategory: (categoryId: string) => void;
+  onManageCategory: (categoryId: string) => void;
   onStartRandomQuiz: (count?: number) => void;
 }
 
 export const ALL_QUESTIONS_RANDOM_KEY = "__ALL_QUESTIONS_RANDOM__";
 
-export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: CategorySelectorProps) {
+export function CategorySelector({ onSelectCategory, onManageCategory, onStartRandomQuiz }: CategorySelectorProps) {
   const [categoryTree, setCategoryTree] = useState<CategoryType[]>([]);
   const [allStoredCategories, setAllStoredCategories] = useState<CategoryType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,7 +43,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
     setIsLoading(true);
     try {
       const allCats = await getAllCategories();
-      setAllStoredCategories(allCats); 
+      setAllStoredCategories(allCats);
       const tree = buildCategoryTree(allCats);
       setCategoryTree(tree);
 
@@ -68,17 +69,17 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
   // Effect for parent category search
   useEffect(() => {
     if (parentCategorySearchTerm.trim() !== '') {
-        const lowercasedInput = parentCategorySearchTerm.toLowerCase();
-        const suggestions = categoryOptionsForSelect
-            .filter(catOpt => catOpt.name.toLowerCase().includes(lowercasedInput))
-            .slice(0, 5); // Limit suggestions to 5
-        setFilteredParentSuggestions(suggestions);
+      const lowercasedInput = parentCategorySearchTerm.toLowerCase();
+      const suggestions = categoryOptionsForSelect
+        .filter(catOpt => catOpt.name.toLowerCase().includes(lowercasedInput))
+        .slice(0, 5); // Limit suggestions to 5
+      setFilteredParentSuggestions(suggestions);
     } else {
-        setFilteredParentSuggestions([]);
+      setFilteredParentSuggestions([]);
     }
     // If user clears the input, reset the parentId
     if (parentCategorySearchTerm.trim() === '') {
-        setNewCategoryParentId(null);
+      setNewCategoryParentId(null);
     }
   }, [parentCategorySearchTerm, categoryOptionsForSelect]);
 
@@ -86,7 +87,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
     const count = parseInt(randomQuizCountInput, 10);
     onStartRandomQuiz(isNaN(count) || count <= 0 ? undefined : count);
   };
-  
+
   const handleParentSuggestionClick = (categoryOpt: { id: string, name: string }) => {
     setNewCategoryParentId(categoryOpt.id);
     setParentCategorySearchTerm(categoryOpt.name);
@@ -106,8 +107,8 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
       setNewCategoryName('');
       setNewCategoryParentId(null);
       setParentCategorySearchTerm('');
-      setShowAddCategoryForm(false); 
-      await loadCategoriesData(); 
+      setShowAddCategoryForm(false);
+      await loadCategoriesData();
     } else {
       toast({ title: "Failed to Add Category", description: result.error || "Could not create category.", variant: "destructive" });
     }
@@ -131,7 +132,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
       </Card>
     );
   }
-  
+
   const noCategoriesExist = allStoredCategories.length === 0;
 
   return (
@@ -169,17 +170,18 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
           </div>
         </div>
 
+
         {categoryTree.length === 0 && !showAddCategoryForm && !noCategoriesExist && (
-           <p className="text-center text-muted-foreground py-4">No top-level categories found. Add one below.</p>
+          <p className="text-center text-muted-foreground py-4">No top-level categories found. Add one below.</p>
         )}
-        
+
         {categoryTree.length > 0 && (
           <div className="pt-3 space-y-1">
             {categoryTree.map((node) => (
               <CategoryTreeItem
                 key={node.id}
                 node={node}
-                onSelectNode={onCategoryAction} 
+                onSelectNode={onManageCategory}
                 level={0}
               />
             ))}
@@ -201,37 +203,37 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
             </div>
             <div>
               <Label htmlFor="new-category-parent-inline">Parent Category (Optional)</Label>
-               <Input
-                  id="new-category-parent-inline"
-                  value={parentCategorySearchTerm}
-                  onChange={(e) => setParentCategorySearchTerm(e.target.value)}
-                  placeholder="Search for a parent category..."
-                  className="mt-1 text-sm md:text-base"
-                  autoComplete="off"
-                  disabled={categoryOptionsForSelect.length === 0}
+              <Input
+                id="new-category-parent-inline"
+                value={parentCategorySearchTerm}
+                onChange={(e) => setParentCategorySearchTerm(e.target.value)}
+                placeholder="Search for a parent category..."
+                className="mt-1 text-sm md:text-base"
+                autoComplete="off"
+                disabled={categoryOptionsForSelect.length === 0}
               />
               {filteredParentSuggestions.length > 0 && (
-                  <div className="mt-2 border rounded-md bg-background shadow-md p-2">
-                      <p className="text-xs text-muted-foreground mb-1">Suggestions:</p>
-                      <div className="flex flex-wrap gap-1">
-                          {filteredParentSuggestions.map(catOpt => (
-                              <Button
-                                  key={`parent-sugg-${catOpt.id}`}
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleParentSuggestionClick(catOpt)}
-                                  className="text-xs px-2 py-1 h-auto whitespace-normal"
-                              >
-                                  <Folder className="mr-1.5 h-3 w-3 shrink-0" />
-                                  <span className="min-w-0 break-all">{catOpt.name}</span>
-                              </Button>
-                          ))}
-                      </div>
+                <div className="mt-2 border rounded-md bg-background shadow-md p-2">
+                  <p className="text-xs text-muted-foreground mb-1">Suggestions:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {filteredParentSuggestions.map(catOpt => (
+                      <Button
+                        key={`parent-sugg-${catOpt.id}`}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleParentSuggestionClick(catOpt)}
+                        className="text-xs px-2 py-1 h-auto whitespace-normal"
+                      >
+                        <Folder className="mr-1.5 h-3 w-3 shrink-0" />
+                        <span className="min-w-0 break-all">{catOpt.name}</span>
+                      </Button>
+                    ))}
                   </div>
+                </div>
               )}
               {categoryOptionsForSelect.length === 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">No parent categories available to select.</p>
+                <p className="text-xs text-muted-foreground mt-1">No parent categories available to select.</p>
               )}
             </div>
             <Button onClick={handleAddNewCategoryInternal} disabled={isAddingCategory || !newCategoryName.trim()} className="w-full text-sm sm:text-base">
@@ -242,7 +244,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
         )}
 
         {(noCategoriesExist && !showAddCategoryForm) && (
-           <Card className="w-full max-w-md mx-auto shadow-lg my-6">
+          <Card className="w-full max-w-md mx-auto shadow-lg my-6">
             <CardHeader>
               <CardTitle className="font-headline text-xl sm:text-2xl">No Quizzes Available</CardTitle>
             </CardHeader>
@@ -251,7 +253,7 @@ export function CategorySelector({ onCategoryAction, onStartRandomQuiz }: Catego
                 It looks like there are no questions or categories added yet.
               </p>
             </CardContent>
-           </Card>
+          </Card>
         )}
 
       </CardContent>
