@@ -31,7 +31,7 @@ const AUTO_ADVANCE_DELAY = 5000;
 
 export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNumber, totalQuestions }: QuestionCardProps) {
   const { toast } = useToast();
-  const { currentUser } = useAuth();
+  const { user } = useAuth();
   const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const isAnsweredRef = useRef(false);
@@ -51,8 +51,6 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
   // State for SRS Confidence Tracking
   const [showConfidenceSlider, setShowConfidenceSlider] = useState(false);
   const [pendingAnswer, setPendingAnswer] = useState<{ answerId: string; timeTaken: number; isCorrect: boolean } | null>(null);
-  const [isSubmittingConfidence, setIsSubmittingConfidence] = useState(false);
-  const [isLoadingNext, setIsLoadingNext] = useState(false);
 
   // Track if any explanation is currently being shown (for pausing timer)
   const isExplanationShown = showStaticExplanation || aiExplanation !== null;
@@ -128,7 +126,6 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     // Reset SRS confidence tracking
     setShowConfidenceSlider(false);
     setPendingAnswer(null);
-    setIsLoadingNext(false);
 
     if (autoAdvanceTimerRef.current) {
       clearTimeout(autoAdvanceTimerRef.current);
@@ -169,12 +166,10 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
 
   useEffect(() => {
     if (isAnsweredRef.current) {
+      const wasCorrect = selectedAnswerId === question.correctAnswerId;
       const wasSkippedOrTimedOut = selectedAnswerId === null && isAnsweredRef.current;
 
-      // Only auto-advance for skipped/timed out questions
-      // Correct answers wait for confidence submission
-      // Incorrect answers auto-advance immediately (they get auto-rated as GUESS)
-      if (wasSkippedOrTimedOut) {
+      if (wasCorrect || wasSkippedOrTimedOut) {
         const timeoutId = setTimeout(() => {
           startAutoAdvanceSequence();
         }, 100);
@@ -198,7 +193,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     startAutoAdvanceSequence();
   };
 
-  const handleAnswerClick = async (answerId: string) => {
+  const handleAnswerClick = (answerId: string) => {
     if (isAnsweredRef.current || isQuizPaused) return;
     isAnsweredRef.current = true;
 
@@ -212,34 +207,21 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     // Store pending answer for confidence tracking
     setPendingAnswer({ answerId, timeTaken, isCorrect });
 
-    if (isCorrect) {
-      // Show confidence slider after brief delay for correct answers
-      setTimeout(() => {
-        setShowConfidenceSlider(true);
-      }, 800);
-    } else {
-      // Wrong answers: auto-rate as GUESS and submit immediately
-      setTimeout(async () => {
-        await handleConfidenceSubmit(1); // ConfidenceLevel.GUESS = 1
-        // Start auto-advance after brief delay
-        setTimeout(() => {
-          startAutoAdvanceSequence();
-        }, 100);
-      }, 800);
-    }
+    // Show confidence slider after brief delay (let user see feedback first)
+    setTimeout(() => {
+      setShowConfidenceSlider(true);
+    }, 800);
   };
 
   const handleConfidenceSubmit = async (confidence: ConfidenceLevel) => {
     if (!pendingAnswer) return;
 
-    setIsSubmittingConfidence(true);
-
     // Update SRS performance if user is authenticated
-    if (currentUser && question.categoryId) {
+    if (user && question.categoryId) {
       try {
         const perf = await ensureQuestionPerformance(
           question.id,
-          currentUser.uid,
+          user.uid,
           question.categoryId
         );
         const updated = calculateNextReview(perf, pendingAnswer.isCorrect, confidence);
@@ -254,9 +236,8 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
 
     setShowConfidenceSlider(false);
     setPendingAnswer(null);
-    setIsSubmittingConfidence(false);
 
-    // Start auto-advance after confidence is recorded for correct answers
+    // Start auto-advance after confidence is recorded
     if (pendingAnswer.isCorrect) {
       startAutoAdvanceSequence();
     }
@@ -431,136 +412,319 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
                 The correct answer was:
               </span>
               <div className="prose prose-xs sm:prose-sm dark:prose-invert max-w-none text-inherit">
-                <ReactMarkdown components={optionMarkdownComponents}>
-                  {question.options.find(opt => opt.id === question.correctAnswerId)?.text || ''}
-                </ReactMarkdown>
-              </div>
-            </div>
-          )}
+                if (user && question.categoryId) {
+      try {
+        const perf = await ensureQuestionPerformance(
+                question.id,
+                user.uid,
+                question.categoryId
+                );
+                const updated = calculateNextReview(perf, pendingAnswer.isCorrect, confidence);
+                await updateQuestionPerformance(updated);
+      } catch (error) {
+                  console.error('Error updating SRS performance:', error);
+      }
+    }
 
-          {/* Confidence Slider - only shown for CORRECT answers */}
-          {showConfidenceSlider && pendingAnswer && pendingAnswer.isCorrect && (
-            <div className="w-full mt-4">
-              <ConfidenceSlider
-                isCorrect={pendingAnswer.isCorrect}
-                onSubmit={handleConfidenceSubmit}
-                isSubmitting={isSubmittingConfidence}
-              />
-            </div>
-          )}
+                // Call original onAnswer callback with confidence
+                onAnswer(pendingAnswer.answerId, pendingAnswer.timeTaken, confidence);
 
-          {isAnswered && autoAdvanceMessage && !showConfidenceSlider && (
-            <p className="text-xs sm:text-sm text-muted-foreground">{autoAdvanceMessage}</p>
-          )}
+                setShowConfidenceSlider(false);
+                setPendingAnswer(null);
 
-          <div className="flex flex-col sm:flex-row gap-2 w-full justify-center">
-            {!isAnswered && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsQuizPaused(true)}
-                  className="w-full sm:w-auto text-xs sm:text-sm"
-                  disabled={isAnswered || isQuizPaused}
-                >
-                  <Pause className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Pause
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleSkipButtonClick}
-                  className="w-full sm:w-auto text-xs sm:text-sm"
-                  disabled={isAnswered || isQuizPaused}
-                >
-                  <SkipForwardIcon className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Skip Question
-                </Button>
-              </>
-            )}
-            {isAnswered && question.explanation && !showConfidenceSlider && (
-              <Button
-                onClick={() => {
-                  // Pause auto-advance when toggling explanation
-                  if (!showStaticExplanation) {
-                    if (autoAdvanceTimerRef.current) {
-                      clearTimeout(autoAdvanceTimerRef.current);
-                      autoAdvanceTimerRef.current = null;
-                    }
-                    if (visualCountdownTimerRef.current) {
-                      clearInterval(visualCountdownTimerRef.current);
-                      visualCountdownTimerRef.current = null;
-                    }
-                    setAutoAdvanceMessage(null);
-                  }
-                  setShowStaticExplanation(!showStaticExplanation);
-                }}
-                variant="secondary"
-                className="w-full sm:w-auto text-xs sm:text-sm"
-              >
-                <Info className="mr-2 h-4 w-4" /> {showStaticExplanation ? 'Hide' : 'Show'} Explanation
-              </Button>
-            )}
-            {isAnswered && !showConfidenceSlider && (
-              <Button
-                onClick={handleExplainAnswer}
-                variant="secondary"
-                className="w-full sm:w-auto text-xs sm:text-sm"
-                disabled={isExplaining}
-              >
-                {isExplaining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}
-                {isExplaining ? "Thinking..." : "AI Explain"}
-              </Button>
-            )}
-          </div>
+                // Start auto-advance after confidence is recorded
+                if (pendingAnswer.isCorrect) {
+                  startAutoAdvanceSequence();
+    }
+  };
 
-          {showStaticExplanation && question.explanation && (
-            <div className="w-full p-4 mt-4 border rounded-md bg-secondary/30 prose dark:prose-invert max-w-none prose-sm sm:prose-base">
-              <h3 className="font-headline text-lg font-semibold -mt-1 mb-2">Explanation</h3>
-              <ReactMarkdown components={markdownComponents}>{question.explanation}</ReactMarkdown>
-            </div>
-          )}
+  const handleSkipButtonClick = () => {
+                  triggerSkipOrTimeout(timeLeft);
+  };
 
-          {aiExplanation && (
-            <div className="w-full p-4 mt-4 border rounded-md bg-secondary/30 prose dark:prose-invert max-w-none prose-sm sm:prose-base">
-              <ReactMarkdown components={markdownComponents}>{aiExplanation}</ReactMarkdown>
-            </div>
-          )}
-          {explanationError && (
-            <div className="w-full p-4 mt-4 border rounded-md bg-destructive/10 text-destructive text-center">
-              <p className="font-semibold">Error</p>
-              <p className="text-sm">{explanationError}</p>
-            </div>
-          )}
+  const handleTimerTimeout = () => {
+                  triggerSkipOrTimeout(0);
+  };
 
-          {isAnswered && !showConfidenceSlider && (
-            <Button onClick={() => {
-              setIsLoadingNext(true);
-              if (autoAdvanceTimerRef.current) {
-                clearTimeout(autoAdvanceTimerRef.current);
+  const handleExplainAnswer = async () => {
+    if (aiExplanation || isExplaining) return;
+
+                // Pause auto-advance when showing AI explanation
+                if (autoAdvanceTimerRef.current) {
+                  clearTimeout(autoAdvanceTimerRef.current);
                 autoAdvanceTimerRef.current = null;
-              }
-              if (visualCountdownTimerRef.current) {
-                clearInterval(visualCountdownTimerRef.current);
+    }
+                if (visualCountdownTimerRef.current) {
+                  clearInterval(visualCountdownTimerRef.current);
                 visualCountdownTimerRef.current = null;
-              }
-              setAutoAdvanceMessage(null);
-              onNext();
-            }}
-              size="lg"
-              className="w-full md:w-auto shadow-md transition-transform hover:scale-105 text-sm sm:text-base mt-4"
-              disabled={isLoadingNext}
-            >
-              {isLoadingNext ? (
+    }
+                setAutoAdvanceMessage(null);
+
+                setIsExplaining(true);
+                setExplanationError(null);
+
+                try {
+      const result = await explainAnswerAction({
+                  questionText: question.text,
+                options: question.options,
+                correctAnswerId: question.correctAnswerId,
+                selectedAnswerId: selectedAnswerId,
+      });
+
+                if (result.success && result.data?.explanation) {
+                  setAiExplanation(result.data.explanation);
+      } else {
+        const errorMsg = result.error || "Failed to get an explanation from the AI.";
+                setExplanationError(errorMsg);
+                toast({
+                  title: "Explanation Failed",
+                description: errorMsg,
+                variant: "destructive",
+        });
+      }
+    } catch (e) {
+      const errorMsg = "An unexpected error occurred while fetching the explanation.";
+                setExplanationError(errorMsg);
+                toast({
+                  title: "Error",
+                description: errorMsg,
+                variant: "destructive",
+      });
+    } finally {
+                  setIsExplaining(false);
+    }
+  };
+
+  const getButtonVariant = (optionId: string) => {
+    if (!showFeedback) return 'outline';
+                if (optionId === question.correctAnswerId) return 'default';
+                if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return 'destructive';
+                return 'outline';
+  };
+
+  const getButtonClassNames = (optionId: string) => {
+    if (!showFeedback) return '';
+                if (optionId === question.correctAnswerId) return 'bg-accent hover:bg-accent/90 text-accent-foreground animate-pulse';
+                if (isAnswered && (selectedAnswerId !== question.correctAnswerId || selectedAnswerId === null) && optionId === question.correctAnswerId) {
+      return 'border-2 border-accent ring-2 ring-accent bg-accent/10';
+    }
+                if (optionId === selectedAnswerId && optionId !== question.correctAnswerId) return '';
+                return '';
+  };
+
+                const CorrectIcon = <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />;
+                const IncorrectIcon = <XCircle className="mr-2 h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />;
+                const TimeoutIcon = <AlertTriangle className="mr-2 h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />;
+
+
+                return (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                  Loading...
+                  <Card className="w-full max-w-3xl mx-auto shadow-xl transition-all duration-300 ease-in-out">
+                    <CardHeader className="p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-1">
+                        <CardTitle className="font-headline text-lg sm:text-xl md:text-2xl break-words">
+                          Question {questionNumber}/{totalQuestions}
+                        </CardTitle>
+                        <div className="w-full sm:flex-1">
+                          <Timer
+                            key={`${question.id}-${questionNumber}`}
+                            duration={QUESTION_DURATION}
+                            onTimeout={handleTimerTimeout}
+                            onTick={setTimeLeft}
+                            isPaused={isAnswered || isQuizPaused || isExplanationShown}
+                            isExternallyAnsweredRef={isAnsweredRef}
+                          />
+                        </div>
+                      </div>
+                      {(question.source || question.categoryName) && (
+                        <div className="flex items-center text-xs sm:text-sm text-muted-foreground mt-2">
+                          <BookOpen className="mr-2 h-4 w-4" />
+                          Source: {question.source || question.categoryName}
+                        </div>
+                      )}
+                      <CardDescription asChild className="pt-1 prose prose-base sm:prose-lg dark:prose-invert max-w-none">
+                        <div className={cn("relative", isQuizPaused && "blur-sm pointer-events-none")}>
+                          <ReactMarkdown components={markdownComponents}>
+                            {question.text}
+                          </ReactMarkdown>
+                        </div>
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2 sm:space-y-3 px-4 sm:px-6 relative">
+                      {isQuizPaused && (
+                        <div className="absolute inset-0 bg-background/80 z-10 flex items-center justify-center rounded-lg">
+                          <div className="text-center">
+                            <p className="text-xl font-semibold">Quiz Paused</p>
+                            <Button onClick={() => setIsQuizPaused(false)} className="mt-4">
+                              <Play className="mr-2 h-4 w-4" /> Resume
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      {question.options.map((option) => (
+                        <Button
+                          key={option.id}
+                          variant={getButtonVariant(option.id)}
+                          className={cn(
+                            "w-full justify-start text-left h-auto py-2.5 sm:py-3 px-3 sm:px-4 text-sm sm:text-base whitespace-normal transition-all duration-200 ease-in-out transform hover:scale-[1.01]",
+                            "items-start",
+                            getButtonClassNames(option.id),
+                            selectedAnswerId === option.id && "ring-2 ring-offset-2",
+                            selectedAnswerId === option.id && option.id === question.correctAnswerId && "ring-accent",
+                            selectedAnswerId === option.id && option.id !== question.correctAnswerId && "ring-destructive",
+                            isAnswered && option.id === question.correctAnswerId && "bg-accent hover:bg-accent/90 text-accent-foreground",
+                          )}
+                          onClick={() => handleAnswerClick(option.id)}
+                          disabled={isAnswered || isQuizPaused}
+                          aria-pressed={selectedAnswerId === option.id}
+                        >
+                          {showFeedback && option.id === selectedAnswerId && option.id === question.correctAnswerId && CorrectIcon}
+                          {showFeedback && option.id === selectedAnswerId && option.id !== question.correctAnswerId && IncorrectIcon}
+                          {showFeedback && isAnswered && selectedAnswerId === null && option.id === question.correctAnswerId && TimeoutIcon}
+                          <div className="prose prose-base sm:prose-lg dark:prose-invert max-w-none text-inherit min-w-0">
+                            <ReactMarkdown components={optionMarkdownComponents}>
+                              {option.text}
+                            </ReactMarkdown>
+                          </div>
+                        </Button>
+                      ))}
+                    </CardContent>
+                    <CardFooter className="flex flex-col items-center pt-3 space-y-3 px-4 sm:px-6 pb-4 sm:pb-6">
+                      {showFeedback && selectedAnswerId && selectedAnswerId !== question.correctAnswerId && (
+                        <div className="text-destructive text-center font-medium text-xs sm:text-sm flex items-baseline justify-center gap-1 flex-wrap">
+                          <span>Correct answer:</span>
+                          <div className="prose prose-xs sm:prose-sm dark:prose-invert max-w-none text-inherit">
+                            <ReactMarkdown components={optionMarkdownComponents}>
+                              {question.options.find(opt => opt.id === question.correctAnswerId)?.text || ''}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
+                      )}
+                      {showFeedback && isAnswered && !selectedAnswerId && (
+                        <div className="text-destructive text-center font-medium text-xs sm:text-sm flex items-baseline justify-center gap-1 flex-wrap">
+                          <span>
+                            {timeLeft <= 0 ? "Time's up! " : "Skipped. "}
+                            The correct answer was:
+                          </span>
+                          <div className="prose prose-xs sm:prose-sm dark:prose-invert max-w-none text-inherit">
+                            <ReactMarkdown components={optionMarkdownComponents}>
+                              {question.options.find(opt => opt.id === question.correctAnswerId)?.text || ''}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Confidence Slider - shown after feedback, before explanations */}
+                      {showConfidenceSlider && pendingAnswer && (
+                        <div className="w-full mt-4">
+                          <ConfidenceSlider
+                            isCorrect={pendingAnswer.isCorrect}
+                            onSubmit={handleConfidenceSubmit}
+                          />
+                        </div>
+                      )}
+
+                      {isAnswered && autoAdvanceMessage && !showConfidenceSlider && (
+                        <p className="text-xs sm:text-sm text-muted-foreground">{autoAdvanceMessage}</p>
+                      )}
+
+                      <div className="flex flex-col sm:flex-row gap-2 w-full justify-center">
+                        {!isAnswered && (
+                          <>
+                            <Button
+                              variant="outline"
+                              onClick={() => setIsQuizPaused(true)}
+                              className="w-full sm:w-auto text-xs sm:text-sm"
+                              disabled={isAnswered || isQuizPaused}
+                            >
+                              <Pause className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Pause
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={handleSkipButtonClick}
+                              className="w-full sm:w-auto text-xs sm:text-sm"
+                              disabled={isAnswered || isQuizPaused}
+                            >
+                              <SkipForwardIcon className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Skip Question
+                            </Button>
+                          </>
+                        )}
+                        {isAnswered && question.explanation && !showConfidenceSlider && (
+                          <Button
+                            onClick={() => {
+                              // Pause auto-advance when toggling explanation
+                              if (!showStaticExplanation) {
+                                if (autoAdvanceTimerRef.current) {
+                                  clearTimeout(autoAdvanceTimerRef.current);
+                                  autoAdvanceTimerRef.current = null;
+                                }
+                                if (visualCountdownTimerRef.current) {
+                                  clearInterval(visualCountdownTimerRef.current);
+                                  visualCountdownTimerRef.current = null;
+                                }
+                                setAutoAdvanceMessage(null);
+                              }
+                              setShowStaticExplanation(!showStaticExplanation);
+                            }}
+                            variant="secondary"
+                            className="w-full sm:w-auto text-xs sm:text-sm"
+                          >
+                            <Info className="mr-2 h-4 w-4" /> {showStaticExplanation ? 'Hide' : 'Show'} Explanation
+                          </Button>
+                        )}
+                        {isAnswered && !showConfidenceSlider && (
+                          <Button
+                            onClick={handleExplainAnswer}
+                            variant="secondary"
+                            className="w-full sm:w-auto text-xs sm:text-sm"
+                            disabled={isExplaining}
+                          >
+                            {isExplaining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}
+                            {isExplaining ? "Thinking..." : "AI Explain"}
+                          </Button>
+                        )}
+                      </div>
+
+                      {showStaticExplanation && question.explanation && (
+                        <div className="w-full p-4 mt-4 border rounded-md bg-secondary/30 prose dark:prose-invert max-w-none prose-sm sm:prose-base">
+                          <h3 className="font-headline text-lg font-semibold -mt-1 mb-2">Explanation</h3>
+                          <ReactMarkdown components={markdownComponents}>{question.explanation}</ReactMarkdown>
+                        </div>
+                      )}
+
+                      {aiExplanation && (
+                        <div className="w-full p-4 mt-4 border rounded-md bg-secondary/30 prose dark:prose-invert max-w-none prose-sm sm:prose-base">
+                          <ReactMarkdown components={markdownComponents}>{aiExplanation}</ReactMarkdown>
+                        </div>
+                      )}
+                      {explanationError && (
+                        <div className="w-full p-4 mt-4 border rounded-md bg-destructive/10 text-destructive text-center">
+                          <p className="font-semibold">Error</p>
+                          <p className="text-sm">{explanationError}</p>
+                        </div>
+                      )}
+
+                      {isAnswered && !showConfidenceSlider && (
+                        <Button onClick={() => {
+                          if (autoAdvanceTimerRef.current) {
+                            clearTimeout(autoAdvanceTimerRef.current);
+                            autoAdvanceTimerRef.current = null;
+                          }
+                          if (visualCountdownTimerRef.current) {
+                            clearInterval(visualCountdownTimerRef.current);
+                            visualCountdownTimerRef.current = null;
+                          }
+                          setAutoAdvanceMessage(null);
+                          onNext();
+                        }}
+                          size="lg"
+                          className="w-full md:w-auto shadow-md transition-transform hover:scale-105 text-sm sm:text-base mt-4"
+                        >
+                          {questionNumber === totalQuestions ? 'Finish Quiz' : 'Next Question'} <ArrowRight className="ml-1.5 h-4 w-4 sm:h-5 sm:w-5" />
+                        </Button>
+                      )}
+                    </CardFooter>
+                  </Card>
                 </>
-              ) : (
-                <>
-                  {questionNumber === totalQuestions ? 'Finish Quiz' : 'Next Question'} <ArrowRight className="ml-1.5 h-4 w-4 sm:h-5 sm:w-5" />
-                </>
-              )}
-            </Button>
-          )}
-        </CardFooter>
-      </Card>
-    </>
-  );
+                );
 }

@@ -1,6 +1,7 @@
 
+
 import type { Timestamp } from 'firebase/firestore';
-import { z } from 'genkit';
+import { z } from 'zod'; // Changed from 'genkit' to 'zod' to use standard Zod package
 
 export interface AnswerOption {
   id: string;
@@ -36,12 +37,21 @@ export interface BatchQuestion {
 }
 
 
+// Confidence level after answering a question
+export enum ConfidenceLevel {
+  GUESS = 1,     // "Complete guess"
+  UNSURE = 2,    // "Somewhat unsure"
+  SURE = 3,      // "Pretty sure"
+  KNEW_IT = 4    // "Definitely knew it"
+}
+
 export interface QuizAnswer {
   questionId: string;
   selectedAnswerId?: string;
   isCorrect?: boolean;
   timeTaken: number; // in seconds
   skipped: boolean;
+  confidence?: ConfidenceLevel; // User's confidence in their answer
 }
 
 export interface QuizSession {
@@ -72,6 +82,80 @@ export interface StorableQuizSession {
   userId?: string;
   pauseTime?: Timestamp; // Timestamp when quiz was paused
   totalPausedTime: number; // in milliseconds
+}
+
+// --- SRS (Spaced Repetition System) Types ---
+
+// Question Performance Tracking using SM-2 algorithm
+export interface QuestionPerformance {
+  id: string; // Format: questionId-userId
+  questionId: string;
+  userId: string;
+  easeFactor: number; // SM-2 ease factor (default: 2.5, range: 1.3+)
+  interval: number; // Days until next review
+  repetitions: number; // Number of consecutive correct answers
+  nextReviewDate: Timestamp;
+  lastReviewedAt: Timestamp;
+  totalAttempts: number;
+  correctAttempts: number;
+  incorrectAttempts: number;
+  confidenceHistory: number[]; // Last 5 confidence ratings
+  categoryId: string;
+}
+
+// Storable version with number timestamps for client-side use
+export interface StorableQuestionPerformance extends Omit<QuestionPerformance, 'nextReviewDate' | 'lastReviewedAt'> {
+  nextReviewDate: number; // milliseconds
+  lastReviewedAt: number; // milliseconds
+}
+
+// Review Session (for SRS-based practice)
+export interface ReviewSession {
+  id: string;
+  userId: string;
+  questions: Question[];
+  currentQuestionIndex: number;
+  answers: QuizAnswer[];
+  startTime: number; // timestamp in milliseconds
+  endTime?: number; // timestamp in milliseconds
+  status: 'active' | 'completed';
+}
+
+export interface StorableReviewSession extends Omit<ReviewSession, 'startTime' | 'endTime'> {
+  startTime: Timestamp;
+  endTime?: Timestamp;
+}
+
+// --- Analytics Types ---
+
+// Category-level analytics and mastery tracking
+export interface CategoryAnalytics {
+  id: string; // Format: categoryId-userId
+  categoryId: string;
+  userId: string;
+  totalQuestions: number;
+  masteredQuestions: number; // Questions with 3+ consecutive correct answers
+  strugglingQuestions: number; // Questions with <50% accuracy
+  averageAccuracy: number; // 0-100
+  lastUpdated: Timestamp;
+}
+
+export interface StorableCategoryAnalytics extends Omit<CategoryAnalytics, 'lastUpdated'> {
+  lastUpdated: number; // milliseconds
+}
+
+// Weak spot identification
+export interface WeakSpot {
+  questionId: string;
+  question: Question;
+  accuracy: number; // 0-100
+  attempts: number;
+  lastAttempted: Timestamp;
+  categoryName: string;
+}
+
+export interface StorableWeakSpot extends Omit<WeakSpot, 'lastAttempted'> {
+  lastAttempted: number; // milliseconds
 }
 
 

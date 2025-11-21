@@ -12,11 +12,28 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Allow public read and write access to quiz sessions.
-    // In a production app with user accounts, you would restrict this
-    // to only allow a user to access their own sessions.
+    // Quiz sessions - users can read/write their own quiz sessions
     match /quizSessions/{sessionId} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null &&
+        (resource == null || resource.data.userId == request.auth.uid);
+    }
+
+    // Question Performance - user can only access their own performance data
+    match /questionPerformance/{perfId} {
+      allow read, write: if request.auth != null &&
+        (resource == null || resource.data.userId == request.auth.uid);
+    }
+
+    // Review Sessions - user can only access their own review sessions
+    match /reviewSessions/{sessionId} {
+      allow read, write: if request.auth != null &&
+        (resource == null || resource.data.userId == request.auth.uid);
+    }
+
+    // Category Analytics - user can only access their own analytics
+    match /categoryAnalytics/{analyticsId} {
+      allow read, write: if request.auth != null &&
+        (resource == null || resource.data.userId == request.auth.uid);
     }
   }
 }

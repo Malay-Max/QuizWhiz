@@ -1,7 +1,7 @@
 
 import type { Question, QuizSession, StorableQuizSession, Category, AnswerOption, BatchQuestion } from '@/types';
 import { db, auth } from './firebase';
-import { 
+import {
   collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, writeBatch, Timestamp, orderBy, updateDoc
 } from 'firebase/firestore';
 import { FirebaseError } from 'firebase/app';
@@ -10,7 +10,11 @@ import { sampleData } from './sample-data';
 const QUESTIONS_COLLECTION = 'allQuestions';
 const CATEGORIES_COLLECTION = 'categories';
 const QUIZ_SESSIONS_COLLECTION = 'quizSessions';
+const QUESTION_PERFORMANCE_COLLECTION = 'questionPerformance';
+const REVIEW_SESSIONS_COLLECTION = 'reviewSessions';
+const CATEGORY_ANALYTICS_COLLECTION = 'categoryAnalytics';
 const ACTIVE_QUIZ_SESSION_ID_KEY = 'quizcraft_active_session_id';
+const ACTIVE_REVIEW_SESSION_ID_KEY = 'quizcraft_active_review_session_id';
 
 function handleFirestoreError(error: unknown, defaultMessage: string): string {
   if (error instanceof FirebaseError) {
@@ -21,7 +25,6 @@ function handleFirestoreError(error: unknown, defaultMessage: string): string {
   }
   return defaultMessage;
 }
-
 // --- Category Functions ---
 
 export async function addCategory(name: string, parentId: string | null = null): Promise<{ success: boolean; id?: string; error?: string }> {
@@ -94,12 +97,12 @@ export async function deleteCategory(id: string): Promise<{ success: boolean; er
     const batch = writeBatch(db);
     let operationsCount = 0;
 
-    const CHUNK_SIZE = 30; 
+    const CHUNK_SIZE = 30;
     for (let i = 0; i < allCategoryIdsToDelete.length; i += CHUNK_SIZE) {
       const chunk = allCategoryIdsToDelete.slice(i, i + CHUNK_SIZE);
       const questionsQuery = query(collection(db, QUESTIONS_COLLECTION), where("categoryId", "in", chunk));
       const questionsSnapshot = await getDocs(questionsQuery);
-      
+
       questionsSnapshot.forEach((docSnap) => {
         batch.delete(docSnap.ref);
         operationsCount++;
@@ -113,16 +116,16 @@ export async function deleteCategory(id: string): Promise<{ success: boolean; er
     });
 
     if (operationsCount > 0) {
-        await batch.commit();
+      await batch.commit();
     } else {
-        const categoryRef = doc(db, CATEGORIES_COLLECTION, id);
-        const categoryDoc = await getDoc(categoryRef);
-        if (categoryDoc.exists()) {
-           batch.delete(categoryRef);
-           await batch.commit();
-        }
+      const categoryRef = doc(db, CATEGORIES_COLLECTION, id);
+      const categoryDoc = await getDoc(categoryRef);
+      if (categoryDoc.exists()) {
+        batch.delete(categoryRef);
+        await batch.commit();
+      }
     }
-    
+
     return { success: true };
   } catch (error) {
     console.error("Error deleting category and its sub-content:", error);
@@ -142,7 +145,7 @@ export function getFullCategoryPath(categoryId: string, allCategories: Category[
       currentId = category.parentId;
     } else {
       pathParts.unshift("[Unknown Category]");
-      break; 
+      break;
     }
   }
   return pathParts.join(separator);
@@ -160,18 +163,18 @@ export function getDescendantCategoryIds(categoryId: string, allCategories: Cate
     }
     directChildrenMap.get(cat.parentId)!.push(cat.id);
   });
-  
-  const processedForQueue: string[] = []; 
+
+  const processedForQueue: string[] = [];
 
   while (queue.length > 0) {
     const currentParentId = queue.shift()!;
-    if(processedForQueue.includes(currentParentId) && currentParentId !== categoryId) continue; 
-    if(currentParentId !== categoryId) processedForQueue.push(currentParentId);
+    if (processedForQueue.includes(currentParentId) && currentParentId !== categoryId) continue;
+    if (currentParentId !== categoryId) processedForQueue.push(currentParentId);
 
 
     const children = directChildrenMap.get(currentParentId) || [];
     for (const childId of children) {
-      if (!descendants.includes(childId)) { 
+      if (!descendants.includes(childId)) {
         descendants.push(childId);
         queue.push(childId);
       }
@@ -187,7 +190,7 @@ export function buildCategoryTree(allCategories: Category[]): Category[] {
   allCategories.forEach(cat => {
     categoriesMap.set(cat.id, { ...cat, children: [], fullPath: '' });
   });
-  
+
   categoriesMap.forEach(cat => {
     cat.fullPath = getFullCategoryPath(cat.id, allCategories);
   });
@@ -204,7 +207,7 @@ export function buildCategoryTree(allCategories: Category[]): Category[] {
       rootCategories.push(cat);
     }
   });
-  
+
   const sortChildrenByName = (node: Category) => {
     if (node.children && node.children.length > 0) {
       node.children.sort((a, b) => a.name.localeCompare(b.name));
@@ -212,7 +215,7 @@ export function buildCategoryTree(allCategories: Category[]): Category[] {
     }
   };
   rootCategories.forEach(sortChildrenByName);
-  rootCategories.sort((a,b) => a.name.localeCompare(b.name));
+  rootCategories.sort((a, b) => a.name.localeCompare(b.name));
 
   return rootCategories;
 }
@@ -254,49 +257,49 @@ export async function addQuestion(question: Omit<Question, 'id'> & { id?: string
 }
 
 export async function addQuestionsBatch(questions: BatchQuestion[], categoryId: string): Promise<{ success: boolean; added: number; failed: number, error?: string }> {
-    const batch = writeBatch(db);
-    let added = 0;
-    let failed = 0;
+  const batch = writeBatch(db);
+  let added = 0;
+  let failed = 0;
 
-    for (const q of questions) {
-        try {
-            const options: AnswerOption[] = Object.values(q.options).map(optText => ({ id: crypto.randomUUID(), text: optText }));
-            
-            const correctOptionKey = q.correctAnswer;
-            const correctOptionText = q.options[correctOptionKey];
-            const correctOption = options.find(opt => opt.text === correctOptionText);
-
-            if (!correctOption) {
-                failed++;
-                console.warn(`Could not find correct answer for question: ${q.question}`);
-                continue;
-            }
-
-            const newQuestionRef = doc(collection(db, QUESTIONS_COLLECTION));
-            const newQuestion: Question = {
-                id: newQuestionRef.id,
-                text: q.question,
-                options: options,
-                correctAnswerId: correctOption.id,
-                categoryId: categoryId,
-                ...(q.explanation && { explanation: q.explanation }),
-                ...(q.source && { source: q.source }),
-            };
-            batch.set(newQuestionRef, newQuestion);
-            added++;
-        } catch (e) {
-            failed++;
-            console.error(`Failed to process a question in batch: ${q.question}`, e);
-        }
-    }
-
+  for (const q of questions) {
     try {
-        await batch.commit();
-        return { success: true, added, failed };
-    } catch (error) {
-        console.error("Error committing batch of questions:", error);
-        return { success: false, added: 0, failed: questions.length, error: handleFirestoreError(error, "Failed to save questions.") };
+      const options: AnswerOption[] = Object.values(q.options).map(optText => ({ id: crypto.randomUUID(), text: optText }));
+
+      const correctOptionKey = q.correctAnswer;
+      const correctOptionText = q.options[correctOptionKey];
+      const correctOption = options.find(opt => opt.text === correctOptionText);
+
+      if (!correctOption) {
+        failed++;
+        console.warn(`Could not find correct answer for question: ${q.question}`);
+        continue;
+      }
+
+      const newQuestionRef = doc(collection(db, QUESTIONS_COLLECTION));
+      const newQuestion: Question = {
+        id: newQuestionRef.id,
+        text: q.question,
+        options: options,
+        correctAnswerId: correctOption.id,
+        categoryId: categoryId,
+        ...(q.explanation && { explanation: q.explanation }),
+        ...(q.source && { source: q.source }),
+      };
+      batch.set(newQuestionRef, newQuestion);
+      added++;
+    } catch (e) {
+      failed++;
+      console.error(`Failed to process a question in batch: ${q.question}`, e);
     }
+  }
+
+  try {
+    await batch.commit();
+    return { success: true, added, failed };
+  } catch (error) {
+    console.error("Error committing batch of questions:", error);
+    return { success: false, added: 0, failed: questions.length, error: handleFirestoreError(error, "Failed to save questions.") };
+  }
 }
 
 
@@ -349,31 +352,31 @@ export async function deleteQuestionById(questionId: string): Promise<{ success:
 export async function deleteQuestionsByCategoryId(categoryId: string, allCategories: Category[]): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
     const categoryIdsToDeleteFrom = [categoryId, ...getDescendantCategoryIds(categoryId, allCategories)];
-    
+
     if (categoryIdsToDeleteFrom.length === 0) {
       return { success: true, count: 0 };
     }
-    
+
     const CHUNK_SIZE = 30;
     let deletedCount = 0;
     const batch = writeBatch(db);
     // let currentBatchOperations = 0; // Not strictly needed if we commit once at the end for simplicity
 
     for (let i = 0; i < categoryIdsToDeleteFrom.length; i += CHUNK_SIZE) {
-        const chunk = categoryIdsToDeleteFrom.slice(i, i + CHUNK_SIZE);
-        const q = query(collection(db, QUESTIONS_COLLECTION), where("categoryId", "in", chunk));
-        const querySnapshot = await getDocs(q);
-        
-        querySnapshot.forEach((docSnap) => {
-            batch.delete(docSnap.ref);
-            deletedCount++;
-        });
+      const chunk = categoryIdsToDeleteFrom.slice(i, i + CHUNK_SIZE);
+      const q = query(collection(db, QUESTIONS_COLLECTION), where("categoryId", "in", chunk));
+      const querySnapshot = await getDocs(q);
+
+      querySnapshot.forEach((docSnap) => {
+        batch.delete(docSnap.ref);
+        deletedCount++;
+      });
     }
-    
+
     if (deletedCount > 0) { // Only commit if there were actual deletions
-        await batch.commit();
+      await batch.commit();
     }
-    
+
     return { success: true, count: deletedCount };
   } catch (error) {
     console.error("Error deleting questions by category ID from Firestore:", error);
@@ -389,12 +392,12 @@ export async function getQuestionsByCategoryIdAndDescendants(categoryId: string,
     const questions: Question[] = [];
     const CHUNK_SIZE = 30;
     for (let i = 0; i < relevantCategoryIds.length; i += CHUNK_SIZE) {
-        const chunk = relevantCategoryIds.slice(i, i + CHUNK_SIZE);
-        const q = query(collection(db, QUESTIONS_COLLECTION), where("categoryId", "in", chunk));
-        const querySnapshot = await getDocs(q);
-        querySnapshot.forEach((doc) => {
-            questions.push(doc.data() as Question);
-        });
+      const chunk = relevantCategoryIds.slice(i, i + CHUNK_SIZE);
+      const q = query(collection(db, QUESTIONS_COLLECTION), where("categoryId", "in", chunk));
+      const querySnapshot = await getDocs(q);
+      querySnapshot.forEach((doc) => {
+        questions.push(doc.data() as Question);
+      });
     }
     return questions;
   } catch (error) {
@@ -429,7 +432,7 @@ export async function saveQuizSession(session: QuizSession): Promise<{ success: 
       ...(session.pauseTime && { pauseTime: typeof session.pauseTime === 'number' ? Timestamp.fromMillis(session.pauseTime) : session.pauseTime as Timestamp }),
       totalPausedTime: session.totalPausedTime,
     };
-    
+
     await setDoc(sessionRef, dataToStore);
     localStorage.setItem(ACTIVE_QUIZ_SESSION_ID_KEY, session.id);
     return { success: true };
@@ -440,24 +443,24 @@ export async function saveQuizSession(session: QuizSession): Promise<{ success: 
 }
 
 export async function getQuizSessionById(sessionId: string): Promise<QuizSession | null> {
-    if (!sessionId) return null;
-    try {
-        const docRef = doc(db, QUIZ_SESSIONS_COLLECTION, sessionId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            const data = docSnap.data() as StorableQuizSession;
-            return {
-                ...data,
-                startTime: data.startTime.toMillis(),
-                endTime: data.endTime ? data.endTime.toMillis() : undefined,
-                pauseTime: data.pauseTime ? data.pauseTime.toMillis() : undefined,
-            };
-        }
-        return null;
-    } catch (error) {
-        console.error(`Error fetching quiz session by ID "${sessionId}":`, error);
-        return null;
+  if (!sessionId) return null;
+  try {
+    const docRef = doc(db, QUIZ_SESSIONS_COLLECTION, sessionId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data() as StorableQuizSession;
+      return {
+        ...data,
+        startTime: data.startTime.toMillis(),
+        endTime: data.endTime ? data.endTime.toMillis() : undefined,
+        pauseTime: data.pauseTime ? data.pauseTime.toMillis() : undefined,
+      };
     }
+    return null;
+  } catch (error) {
+    console.error(`Error fetching quiz session by ID "${sessionId}":`, error);
+    return null;
+  }
 }
 
 
@@ -468,7 +471,7 @@ export async function getQuizSession(): Promise<QuizSession | null> {
 
   try {
     const session = await getQuizSessionById(activeSessionId);
-     if (!session) {
+    if (!session) {
       localStorage.removeItem(ACTIVE_QUIZ_SESSION_ID_KEY);
       return null;
     }
@@ -497,13 +500,13 @@ export async function seedSampleData(): Promise<{ success: boolean; categoriesAd
       const categoryRef = doc(db, CATEGORIES_COLLECTION, category.id);
       batch.set(categoryRef, { id: category.id, name: category.name, parentId: parentId });
       categoriesAdded++;
-      
+
       // Add questions for this category
       category.questions.forEach(q => {
         const questionRef = doc(collection(db, QUESTIONS_COLLECTION));
         const answerOptions: AnswerOption[] = q.options.map(optText => ({ id: crypto.randomUUID(), text: optText }));
         const correctOption = answerOptions.find(opt => opt.text === q.correctAnswer);
-        
+
         if (correctOption) {
           const newQuestion: Question = {
             id: questionRef.id,
@@ -518,13 +521,13 @@ export async function seedSampleData(): Promise<{ success: boolean; categoriesAd
           questionsAdded++;
         }
       });
-      
+
       // Process children
       if (category.children) {
         category.children.forEach(child => processCategory(child, category.id));
       }
     };
-    
+
     sampleData.forEach(category => processCategory(category, null));
 
     await batch.commit();
@@ -535,4 +538,3 @@ export async function seedSampleData(): Promise<{ success: boolean; categoriesAd
   }
 }
 
-    
