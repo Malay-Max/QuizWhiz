@@ -377,7 +377,10 @@ function QuizPageContent() {
       setQuizSession(prevSession => {
         if (!prevSession) return prevSession;
         const updatedQuestions = prevSession.questions.filter(q => q.id !== questionToDelete);
-        const updatedAnswers = prevSession.answers.filter(ans => prevSession.questions.find(q => q.id === ans.questionId) && q.id !== questionToDelete);
+        const updatedAnswers = prevSession.answers.filter(ans => {
+          const question = prevSession.questions.find(q => q.id === ans.questionId);
+          return question && question.id !== questionToDelete;
+        });
 
         if (updatedQuestions.length === 0) {
           toast({ title: "Quiz Complete", description: "No more questions available." });
@@ -407,7 +410,7 @@ function QuizPageContent() {
     setShowDeleteCategoryConfirmDialog(false);
 
     toast({ title: "Deleting...", description: `Removing all questions from "${categoryName}".` });
-    const result = await deleteQuestionsByCategoryId(categoryIdToDelete);
+    const result = await deleteQuestionsByCategoryId(categoryIdToDelete, allCategories);
     if (result.success) {
       toast({ title: "Deleted", description: `All questions from "${categoryName}" deleted successfully.` });
       await clearQuizSession();
@@ -432,7 +435,6 @@ function QuizPageContent() {
           </>
         ) : (
           <CategorySelector
-            categories={allCategories}
             onSelectCategory={startQuiz}
             onManageCategory={handleCategoryAction}
             onStartRandomQuiz={handleStartRandomQuiz}

@@ -32,6 +32,10 @@ const AUTO_ADVANCE_DELAY = 5000;
 export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNumber, totalQuestions }: QuestionCardProps) {
   const { toast } = useToast();
   const { currentUser } = useAuth();
+
+  // Store the current question ID to detect changes
+  const currentQuestionIdRef = useRef(question.id);
+
   const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const isAnsweredRef = useRef(false);
@@ -50,12 +54,27 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
 
   // State for SRS Confidence Tracking
   const [showConfidenceSlider, setShowConfidenceSlider] = useState(false);
-  const [pendingAnswer, setPendingAnswer] = useState<{ answerId: string; timeTaken: number; isCorrect: boolean } | null>(null);
+  const pendingAnswerRef = useRef<{ answerId: string; timeTaken: number; isCorrect: boolean } | null>(null);
   const [isSubmittingConfidence, setIsSubmittingConfidence] = useState(false);
   const [isLoadingNext, setIsLoadingNext] = useState(false);
 
   // Track if any explanation is currently being shown (for pausing timer)
   const isExplanationShown = showStaticExplanation || aiExplanation !== null;
+
+  // CRITICAL FIX: Reset visual state IMMEDIATELY when question changes
+  // This prevents the flash of green/red from the previous question
+  if (currentQuestionIdRef.current !== question.id) {
+    currentQuestionIdRef.current = question.id;
+    // Synchronous reset - happens before render
+    if (selectedAnswerId !== null) setSelectedAnswerId(null);
+    if (isAnswered) setIsAnswered(false);
+    if (isAnsweredRef.current) isAnsweredRef.current = false;
+    if (showFeedback) setShowFeedback(false);
+    if (showConfidenceSlider) setShowConfidenceSlider(false);
+    // Keep pendingAnswer until properly cleared by useEffect
+    if (aiExplanation) setAiExplanation(null);
+    if (showStaticExplanation) setShowStaticExplanation(false);
+  }
 
 
   const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -127,7 +146,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
 
     // Reset SRS confidence tracking
     setShowConfidenceSlider(false);
-    setPendingAnswer(null);
+    pendingAnswerRef.current = null;
     setIsLoadingNext(false);
 
     if (autoAdvanceTimerRef.current) {
@@ -210,7 +229,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     setShowFeedback(true);
 
     // Store pending answer for confidence tracking
-    setPendingAnswer({ answerId, timeTaken, isCorrect });
+    pendingAnswerRef.current = { answerId, timeTaken, isCorrect };
 
     if (isCorrect) {
       // Show confidence slider after brief delay for correct answers
@@ -218,21 +237,24 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
         setShowConfidenceSlider(true);
       }, 800);
     } else {
-      // Wrong answers: auto-rate as GUESS and submit immediately
-      setTimeout(async () => {
-        await handleConfidenceSubmit(1); // ConfidenceLevel.GUESS = 1
-        // Start auto-advance after brief delay
-        setTimeout(() => {
-          startAutoAdvanceSequence();
-        }, 100);
+      // Wrong answers: submit IMMEDIATELY to ensure answer is recorded
+      // Even if user clicks Next quickly, the answer won't be lost
+      await handleConfidenceSubmit(1); // ConfidenceLevel.GUESS = 1
+
+      // Start auto-advance after brief delay (for visual feedback only)
+      setTimeout(() => {
+        startAutoAdvanceSequence();
       }, 800);
     }
   };
 
   const handleConfidenceSubmit = async (confidence: ConfidenceLevel) => {
-    if (!pendingAnswer) return;
+    if (!pendingAnswerRef.current) return;
 
     setIsSubmittingConfidence(true);
+
+    // Store reference to avoid accessing .current multiple times
+    const answerData = pendingAnswerRef.current;
 
     // Update SRS performance if user is authenticated
     if (currentUser && question.categoryId) {
@@ -242,7 +264,7 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
           currentUser.uid,
           question.categoryId
         );
-        const updated = calculateNextReview(perf, pendingAnswer.isCorrect, confidence);
+        const updated = calculateNextReview(perf, answerData.isCorrect, confidence);
         await updateQuestionPerformance(updated);
       } catch (error) {
         console.error('Error updating SRS performance:', error);
@@ -250,14 +272,14 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
     }
 
     // Call original onAnswer callback with confidence
-    onAnswer(pendingAnswer.answerId, pendingAnswer.timeTaken, confidence);
+    onAnswer(answerData.answerId, answerData.timeTaken, confidence);
 
     setShowConfidenceSlider(false);
-    setPendingAnswer(null);
+    pendingAnswerRef.current = null;
     setIsSubmittingConfidence(false);
 
     // Start auto-advance after confidence is recorded for correct answers
-    if (pendingAnswer.isCorrect) {
+    if (answerData.isCorrect) {
       startAutoAdvanceSequence();
     }
   };
@@ -439,10 +461,10 @@ export function QuestionCard({ question, onAnswer, onTimeout, onNext, questionNu
           )}
 
           {/* Confidence Slider - only shown for CORRECT answers */}
-          {showConfidenceSlider && pendingAnswer && pendingAnswer.isCorrect && (
+          {showConfidenceSlider && pendingAnswerRef.current && pendingAnswerRef.current.isCorrect && (
             <div className="w-full mt-4">
               <ConfidenceSlider
-                isCorrect={pendingAnswer.isCorrect}
+                isCorrect={pendingAnswerRef.current.isCorrect}
                 onSubmit={handleConfidenceSubmit}
                 isSubmitting={isSubmittingConfidence}
               />

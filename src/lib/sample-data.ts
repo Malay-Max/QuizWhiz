@@ -4,7 +4,8 @@ import type { Category, Question } from '@/types';
 // Omit 'id' and 'children' from sample categories, as they will be generated.
 type SampleCategory = Omit<Category, 'id' | 'children'> & {
   id: string;
-  questions: Omit<Question, 'id' | 'categoryId' | 'options' | 'correctAnswerId'> & {
+  questions: {
+    text: string;
     options: string[];
     correctAnswer: string;
     explanation?: string;
