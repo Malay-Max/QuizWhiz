@@ -103,7 +103,13 @@ Your goal is COMPREHENSIVE COVERAGE, not minimal coverage. Extract maximum pedag
 TECHNICAL REQUIREMENTS:
 - Generate exactly 4 options per question with IDs: "option-A", "option-B", "option-C", "option-D"
 - Include brief explanation for the correct answer
-- Set source field to: "AI Generated from Text"
+- Set source field intelligently based on context:
+  * If the text is primarily about a specific writer/author → use their name (e.g., "T.S. Eliot", "Virginia Woolf")
+  * If the text discusses a specific literary work → use the work's title (e.g., "The Waste Land", "Mrs Dalloway")
+  * If the text is about a theorist/critic → use their name (e.g., "Jacques Derrida", "Judith Butler")
+  * If the text is about a historical event/movement → use the event/movement name (e.g., "Modernism", "Romanticism")
+  * If the text covers multiple topics equally → use the most prominent or recurring figure/concept
+  * Only use "AI Generated from Text" if no specific writer/figure/event can be identified
 - Ensure output matches the required JSON schema
 
 Generate a comprehensive, exam-ready question bank now - do NOT limit yourself to 10-15 questions if the content warrants more.`,
